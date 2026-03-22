@@ -1,0 +1,19 @@
+<main>
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold">Items</h1>
+        <h2 class="text-xl font-semibold">Categories</h2>
+        <nav>
+            <ul>
+                {{#each categories}}
+                    <li><a href="/items/{{this}}">{{this}}</a></li>
+                {{/each}}
+            </ul>
+        </nav>
+        {{!-- item grid --}}
+        <div class="grid grid-cols-4 gap-4">
+            {{#each items}}
+                {{> itemCard}}
+            {{/each}}
+        </div>
+    </div>
+</main>
