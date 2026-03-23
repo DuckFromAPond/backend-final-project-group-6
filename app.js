@@ -24,29 +24,41 @@ app.set('views', __dirname + '/views')
 // middleware
 app.use(express.static(__dirname + '/public'))
 
+const itemData = {
+    categories: [
+        {id: 1, name: 'category1'},
+        {id: 2, name: 'category2'},
+        {id: 3, name: 'category3'}
+    ],
+    items: [
+        {id: 1, name: 'item 1', description: 'item 1 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 1 image'},
+        {id: 2, name: 'item 2', description: 'item 2 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 2 image'},
+        {id: 3, name: 'item 3', description: 'item 3 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 3 image'}
+    ]
+}
+
 // routes
 app.get('/items', (req, res) => {
-    const context = {
-        categories: [
-            {id: 1, name: 'category1'},
-            {id: 2, name: 'category2'},
-            {id: 3, name: 'category3'}
-        ],
-        items: [
-            {id: 1, name: 'item 1', description: 'item 1 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 1 image'},
-            {id: 2, name: 'item 2', description: 'item 2 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 2 image'},
-            {id: 3, name: 'item 3', description: 'item 3 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 3 image'}
-        ]
-    }
+    const context = itemData
+
     res.render('items', context)
 })
 
-app.get('/items/:id', (req, res) => {
-    res.render('itemDetail')
+app.get('/items/:id/history', (req, res) => {
+    res.render('itemHistory')
 })
 
-app.get('/items/history', (req, res) => {
-    res.render('itemHistory')
+app.get('/items/:id', (req, res) => {
+    const {id} = req.params
+
+    const context = itemData.items.find(item => String(item.id) === String(id))
+
+    if(!context) {
+        res.status(404)
+        return res.render('404')
+    }
+
+    res.render('itemDetail', context)
 })
 
 app.use((req, res, next) => {
