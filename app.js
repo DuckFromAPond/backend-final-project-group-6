@@ -24,6 +24,9 @@ app.set('views', __dirname + '/views')
 // middleware
 app.use(express.static(__dirname + '/public'))
 
+
+
+
 // routes
 app.get('/items', (req, res) => {
     const context = {
@@ -49,6 +52,10 @@ app.get('/items/history', (req, res) => {
     res.render('itemHistory')
 })
 
+app.get('/checkin', (req, res) => {
+    res.render('checkin')
+})
+
 app.use((req, res, next) => {
     res.status(404)
     res.render('404')
@@ -59,6 +66,10 @@ app.use((error, req, res, next) => {
     res.render('500')
 })
 
+
+
+
+
 app.listen(PORT, ()=> {
-    console.log('Server started on port 3000')
+    console.log(`Server started on http://localhost:${PORT}/`)
 })
