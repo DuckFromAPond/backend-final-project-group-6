@@ -1,0 +1,30 @@
+<div class="min-h-screen flex flex-col items-center bg-gray-100 p-6">
+  <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-6">
+    
+    <h1 class="text-2xl font-bold mb-6 text-center">Users List</h1>
+
+    <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+      <thead class="bg-blue-500 text-white">
+        <tr>
+          <th class="px-4 py-2 text-left">ID</th>
+          <th class="px-4 py-2 text-left">Name</th>
+          <th class="px-4 py-2 text-left">Email</th>
+          <th class="px-4 py-2 text-left">Role</th>
+          <th class="px-4 py-2 text-left">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each users}}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="px-4 py-2">{{this.id}}</td>
+            <td class="px-4 py-2">{{this.name}}</td>
+            <td class="px-4 py-2">{{this.email}}</td>
+            <td class="px-4 py-2">{{this.role}}</td>
+            <td class="px-4 py-2">{{this.status}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+  </div>
+</div>
