@@ -1,8 +1,9 @@
 {{!-- 
     check-in/check-out form 
+    NOTE: THERE ARE MANY WAYS TO CALL THIS, through another component, the get method call, or maybe as a pop up 
  --}}
 
-<div class="max-w-4xl mx-auto my-30">
+<div id="myForm" class=" transition-opacity duration-300 max-w-4xl mx-auto my-30 bg-white rounded-xl shadow-sm p-6">
     <!-- Header -->
     <div class="text-center mb-12">
         <h1 class="text-4xl text-gray-800 mb-2">
@@ -11,7 +12,7 @@
     </div>
 
     {{!-- Form container for check in --}}
-    <div class="form-container bg-white rounded-xl shadow-sm p-6">
+    {{!-- <div class="bg-white rounded-xl shadow-sm p-6"> --}}
         {{!-- Form set up --}}
         <form action="/api/transactions/checkin" method="POST" enctype="multipart/form-data" class="space-y-4">
             {{!-- Item ID --}}
@@ -56,5 +57,5 @@
                 Submit
             </button>
         </form>
-    </div>
+    {{!-- </div> --}}
 </div>

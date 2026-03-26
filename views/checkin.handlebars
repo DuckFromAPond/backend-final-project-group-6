@@ -2,8 +2,24 @@
     check-in/check-out form 
  --}}
 
+
 <div class="flex">
     {{>navbar}}
+        
+    {{!-- <div id="forBG" class="hidden fixed inset-0 bg-black" onclick="closeForm()"> --}}
+        {{> form title="Check-in"}}        
+    {{!-- </div> --}}
+    {{!-- FOR TESTING ONLY (WILL REMOVE LATER) --}}
+    {{!-- <button class="bg-indigo-600" onclick="openForm()">Open Form</button> --}}
+    <script>
+        function openForm() {
+            document.getElementById("myForm").classList.remove("hidden");
+            document.getElementById("forBG").classList.remove("hidden");
+        }
 
-    {{> form title="Check-in"}}
+        function closeForm() {
+            document.getElementById("myForm").classList.add("hidden");
+            document.getElementById("forBG").classList.add("hidden");
+        }
+    </script>
 </div>
