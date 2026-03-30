@@ -25,7 +25,7 @@ app.engine(
             return options.inverse(this)
         },
         isActive: function (current, value) {
-          return current === value ? 'active' : '';
+          return current === value ? 'bg-gray-200 font-bold' : '';
         }
     }
 }))
@@ -115,7 +115,7 @@ app.get('/items', (req, res) => {
         }
     }
 
-    res.render('items', context)
+    res.render('items', {...context,  activePage: "items"})
 })
 
 app.get('/items/:id/history', (req, res) => {
@@ -143,7 +143,7 @@ app.get('/items/:id', (req, res) => {
 })
 
 app.get('/checkin', (req, res) => {
-    res.render('checkin')
+    res.render('checkin', { activePage: "checkin"})
 })
 
 app.get('/checkout', (req, res) => {
@@ -176,7 +176,7 @@ app.get('/checkout', (req, res) => {
     .filter(item => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
 
   console.log(currentlyOwnedItems)
-  res.render('checkout', { items: currentlyOwnedItems });
+  res.render('checkout', { items: currentlyOwnedItems, activePage: "checkout" });
 })
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
