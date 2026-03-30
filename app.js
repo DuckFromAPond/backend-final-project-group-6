@@ -24,8 +24,6 @@ app.engine(
         }
         return options.inverse(this);
       },
-
-      // DON'T REMOVE ME :)
       isActive: function (page, currentPage, options) {
         return page === currentPage
           ? "text-blue-500 font-semibold"
@@ -41,7 +39,7 @@ app.set("views", __dirname + "/views");
 app.use(express.static(__dirname + "/public"));
 app.use(express.urlencoded({ extended: true })); // for forms (login/register)
 
-const { items, itemHistories } = require("./utils/data.js"); // import
+const { items, itemHistories } = require("./lib/data.js"); // import
 const itemData = {
   categories: [
     { name: "Computers", subCategories: [] },
@@ -94,12 +92,49 @@ app.get("/items/:id", (req, res) => {
   res.render("items/itemDetail", context);
 });
 
-app.get("/items/:id", (req, res) => {
-  res.render("items/itemDetail");
-});
-
 app.get("/items/history", (req, res) => {
   res.render("items/itemHistory");
+});
+
+app.get("/checkin", (req, res) => {
+  res.render("checkin");
+});
+
+app.get("/checkout", (req, res) => {
+  // GONNA START BY ASSUMING YOU ARE ID 1
+  const currentUserId = 1; // replace with actual logged-in user
+
+  const currentlyOwnedItems = itemData.items
+    .map((item) => {
+      const history = itemData.itemHistories.find((h) => h.id === item.id);
+      const lastAssignment =
+        history?.histories[history.histories.length - 1] || null;
+
+      return {
+        id: item.id,
+        name: item.name,
+        // serial: item.serial,
+        // model: item.model,
+        // brand: item.brand,
+        // category: item.category,
+        status: item.status,
+        dateAcquired: item.dateAcquired,
+        // description: item.description,
+        // imagePath: item.imagePath,
+        // imageAlt: item.imageAlt,
+        currentAssignee: lastAssignment?.assignee || null,
+        currentAssigneeID: lastAssignment?.user_id || null,
+        currentDuration: lastAssignment?.duration || null,
+        currentReference: lastAssignment?.referenceLink || null,
+      };
+    })
+    .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
+
+  // console.log(currentlyOwnedItems);
+  res.render("checkout", {
+    items: currentlyOwnedItems,
+    activePage: "checkout",
+  });
 });
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
@@ -123,7 +158,7 @@ app.get("/register", (req, res) => {
   res.render("auth/register", { layout: "no_nav_bar.handlebars" });
 });
 
-app.post("auth/register", (req, res) => {
+app.post("/register", (req, res) => {
   const { name, email, password } = req.body;
   console.log(name, email, password);
 
@@ -137,15 +172,14 @@ app.get("/logout", (req, res) => {
 // ++++++++++ List-user page
 app.get("/users", (req, res) => {
   // MOCK DATA
-  const { users } = require("./utils/data.js");
+  const { users } = require("./lib/data.js");
   res.render("users", { users, activePage: "users" });
 });
 
 // ++++++++++ Home (Dashboard for logged-in users)
 app.get("/home", (req, res) => {
   // Mock data
-  const { dashboardData } = require("./utils/data.js"); // import
-
+  const { dashboardData } = require("./lib/data.js"); // import
   res.render("home", { dashboardData, activePage: "home" });
 });
 
