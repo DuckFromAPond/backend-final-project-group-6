@@ -23,6 +23,9 @@ app.engine(
                 return options.fn(this)
             }
             return options.inverse(this)
+        },
+        isActive: function (current, value) {
+          return current === value ? 'active' : '';
         }
     }
 }))
@@ -39,6 +42,7 @@ const itemData = {
         { name: 'Peripherals', subCategories: []},
     ],
     //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
+    // NOTE: no idea what dateAcquired is supposed to mean here
     items: [
         { id: 1, name: 'item 1', serial: 'serial 1', model: 'model 1', brand: 'brand 1', category: 'Computers', status: 'Available', dateAcquired: '2022-01-01', description: 'item 1 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 1 image' },
         { id: 2, name: 'item 2', serial: 'serial 2', model: 'model 2', brand: 'brand 2', category: 'Computers', status: 'In-Use', dateAcquired: '2022-02-02', description: 'item 2 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 2 image' },
@@ -48,23 +52,55 @@ const itemData = {
         {
             id: 1,
             histories: [
-                { assignee: 'assignee 1', duration: 'duration 1', referenceLink: 'reference link 1' }
+                { assignee: 'Alice', user_id: 1, duration: 'duration 1', dateAcquired: "2022-01-01", referenceLink: 'reference link 1' }
             ]
         },
         {
             id: 2,
             histories: [
-                { assignee: 'assignee 2', duration: 'duration 2', referenceLink: 'reference link 2' }
+                { assignee: 'Bob', user_id: 2, duration: 'duration 2', referenceLink: 'reference link 2' }
             ]
         },
         {
             id: 3,
             histories: [
-                { assignee: 'assignee 3', duration: 'duration 3', referenceLink: 'reference link 3' }
+                { assignee: 'Alice',  user_id: 1, duration: 'duration 3', referenceLink: 'reference link 3' }
             ]
         }
     ]
 }
+
+// MOCK DATA
+const users = [
+  {
+    id: 1,
+    name: "Alice",
+    email: "alice@example.com",
+    role: "Admin",
+    status: "Active",
+  },
+  {
+    id: 2,
+    name: "Bob",
+    email: "bob@example.com",
+    role: "User",
+    status: "Active",
+  },
+  {
+    id: 3,
+    name: "Charlie",
+    email: "charlie@example.com",
+    role: "User",
+    status: "Disabled",
+  },
+  {
+    id: 4,
+    name: "Dave",
+    email: "dave@example.com",
+    role: "Admin",
+    status: "Active",
+  },
+];
 
 // routes
 app.get('/items', (req, res) => {
@@ -106,13 +142,42 @@ app.get('/items/:id', (req, res) => {
     res.render('itemDetail', context)
 })
 
-app.get("/items/:id", (req, res) => {
-  res.render("itemDetail");
-});
+app.get('/checkin', (req, res) => {
+    res.render('checkin')
+})
 
-app.get("/items/history", (req, res) => {
-  res.render("itemHistory");
-});
+app.get('/checkout', (req, res) => {
+  // GONNA START BY ASSUMING YOU ARE ID 1
+  const currentUserId = 1; // replace with actual logged-in user
+
+  const currentlyOwnedItems = itemData.items
+    .map(item => {
+      const history = itemData.itemHistories.find(h => h.id === item.id);
+      const lastAssignment = history?.histories[history.histories.length - 1] || null;
+
+      return {
+        id: item.id,
+        name: item.name,
+        // serial: item.serial,
+        // model: item.model,
+        // brand: item.brand,
+        // category: item.category,
+        status: item.status,
+        dateAcquired: item.dateAcquired,
+        // description: item.description,
+        // imagePath: item.imagePath,
+        // imageAlt: item.imageAlt,
+        currentAssignee: lastAssignment?.assignee || null,
+        currentAssigneeID: lastAssignment?.user_id || null,
+        currentDuration: lastAssignment?.duration || null,
+        currentReference: lastAssignment?.referenceLink || null
+      };
+    })
+    .filter(item => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
+
+  console.log(currentlyOwnedItems)
+  res.render('checkout', { items: currentlyOwnedItems });
+})
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
 app.get("/", (req, res) => {
@@ -148,38 +213,6 @@ app.get("/logout", (req, res) => {
 
 // ++++++++++ List-user page
 app.get("/users", (req, res) => {
-  // MOCK DATA
-  const users = [
-    {
-      id: 1,
-      name: "Alice",
-      email: "alice@example.com",
-      role: "Admin",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Bob",
-      email: "bob@example.com",
-      role: "User",
-      status: "Active",
-    },
-    {
-      id: 3,
-      name: "Charlie",
-      email: "charlie@example.com",
-      role: "User",
-      status: "Disabled",
-    },
-    {
-      id: 4,
-      name: "Dave",
-      email: "dave@example.com",
-      role: "Admin",
-      status: "Active",
-    },
-  ];
-
   res.render("users", { users, activePage: "users" });
 });
 

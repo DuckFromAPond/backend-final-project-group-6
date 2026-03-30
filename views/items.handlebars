@@ -49,4 +49,17 @@
             {{/each}}
         </section>
     </section>
+
+    <script>
+        function openForm(id) {
+            document.getElementById("modal").classList.remove("hidden");
+
+            document.getElementById("file_item").value = id;
+        }
+
+        function closeForm() {
+            document.getElementById("modal").classList.add("hidden");
+        }
+    </script>
 </main>
+
