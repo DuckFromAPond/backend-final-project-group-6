@@ -51,8 +51,10 @@
     </section>
 
     <script>
-        function openForm() {
+        function openForm(id) {
             document.getElementById("modal").classList.remove("hidden");
+
+            document.getElementById("file_item").value = id;
         }
 
         function closeForm() {
