@@ -1,1 +1,28 @@
 {{!--  FINISH LATER  --}}
+
+<div> 
+    {{!--  --}}
+    <div>
+
+    </div>
+
+    {{!-- either a card based design for 2 row/1 cols or maybe 3 row layer on top --}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        {{!-- Inventory Status: Summary of total vs. deployed assets.  --}}
+        <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
+            <h2 class="text-gray-500 font-semibold mb-2">Total Users</h2>
+            <p class="text-2xl font-bold">{{dashboardData.totalUsers}}</p>
+        </div>
+
+        {{!-- Asset Aging: List of items older than 3 years.  --}}
+        <div> 
+            <h2 class="text-gray-500 font-semibold mb-2">Total Users</h2>
+            <p class="text-2xl font-bold">{{dashboardData.totalUsers}}</p>
+        </div>
+    </div>
+
+    {{!-- User Audit: Retrieve al assets currently associated with a specific user profile. --}}
+    <div>
+
+    </div>
+</div>
