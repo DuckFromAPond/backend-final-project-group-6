@@ -1,10 +1,16 @@
 const express = require("express");
 const { engine } = require("express-handlebars");
+const cookieParser = require("cookie-parser");
+const { generateToken } = require("./lib/auth");
+const { protect } = require("./middleware/authMiddleware");
+const { verifyToken } = require("./lib/auth");
+
 require("dotenv").config();
 
 const PORT = process.env.PORT || 3000;
-
 const app = express();
+
+app.use(cookieParser());
 
 // configurations for app
 app.engine(
@@ -50,7 +56,86 @@ const itemData = {
   itemHistories: itemHistories,
 };
 
-// routes
+// routes (no login required)
+app.get("/", (req, res) => {
+  const token = req.cookies.accessToken;
+  const user = verifyToken(token);
+
+  if (user) {
+    return res.redirect("/home"); // if logged in, redirect to home
+  }
+
+  res.render("auth/login", { layout: "no_nav_bar.handlebars" });
+});
+
+app.get("/login", (req, res) => {
+  const token = req.cookies.accessToken;
+  const user = verifyToken(token);
+
+  if (user) {
+    return res.redirect("/home");
+  }
+
+  const errorMsg = req.query.error;
+
+  res.render("auth/login", {
+    layout: "no_nav_bar.handlebars",
+    error: errorMsg,
+  });
+});
+
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  const { users } = require("./lib/data.js");
+
+  // 1. Find user
+  const user = users.find((u) => u.email === email);
+
+  // 2. Validate (In future, use bcrypt to compare hashed password)
+  if (user && password === "12345678") {
+    // Temporary hardcoded check
+    const token = generateToken(user);
+
+    // 3. Set cookie
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 3600, // 1 hour
+    });
+
+    return res.redirect("/home");
+  }
+
+  res.render("auth/login", {
+    layout: "no_nav_bar.handlebars",
+    error: "Invalid email or password",
+  });
+});
+
+app.get("/register", (req, res) => {
+  res.render("auth/register", { layout: "no_nav_bar.handlebars" });
+});
+
+app.post("/register", (req, res) => {
+  const { name, email, password } = req.body;
+  console.log(name, email, password);
+
+  res.redirect("/login");
+});
+
+// middle-ware to render 404 (bad)
+app.use((req, res, next) => {
+  const publicRoutes = ["/", "/login", "/register"];
+  // If it's a known public route, let it pass to the gate or routes
+  if (publicRoutes.includes(req.path)) {
+    return next();
+  }
+  // Otherwise, it's a dead end—render 404 now!
+  res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
+});
+// login-required pages
+app.use(protect);
+
 app.get("/items", (req, res) => {
   const { cat } = req.query;
 
@@ -139,35 +224,9 @@ app.get("/checkout", (req, res) => {
 });
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
-app.get("/", (req, res) => {
-  res.render("auth/login", { layout: "no_nav_bar.handlebars" }); // landing page: login
-});
-
-app.get("/login", (req, res) => {
-  res.render("auth/login", { layout: "no_nav_bar.handlebars" });
-});
-
-app.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  console.log(email, password);
-
-  // TODO: validate user (rn: anything is allowed)
-  res.redirect("/home");
-});
-
-app.get("/register", (req, res) => {
-  res.render("auth/register", { layout: "no_nav_bar.handlebars" });
-});
-
-app.post("/register", (req, res) => {
-  const { name, email, password } = req.body;
-  console.log(name, email, password);
-
-  res.redirect("/login");
-});
-
 app.get("/logout", (req, res) => {
-  res.render("auth/login", { layout: "no_nav_bar.handlebars" });
+  res.clearCookie("accessToken");
+  res.redirect("/");
 });
 
 // ++++++++++ List-user page
@@ -185,11 +244,6 @@ app.get("/home", (req, res) => {
 });
 
 // ++++++++++ Other routes
-app.use((req, res, next) => {
-  res.status(404);
-  res.render("extra_pages/404");
-});
-
 app.use((error, req, res, next) => {
   res.status(500);
   res.render("extra_pages/500");
