@@ -5,7 +5,7 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node app.js",
+    "dev": "nodemon app.js",
     "start": "node app.js"
   },
   "repository": {
@@ -26,6 +26,7 @@
     "express": "^5.2.1",
     "express-handlebars": "^8.0.2",
     "express-rate-limit": "^8.3.2",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "nodemon": "^3.1.14"
   }
 }

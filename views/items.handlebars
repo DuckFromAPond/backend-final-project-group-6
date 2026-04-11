@@ -6,7 +6,7 @@
             <ul class="justify-self-start self-center">
                 {{#each categories}}
                     <li class="p-1">
-                        <a href="/items/?cat={{this.name}}"
+                        <a href="/items?cat={{this.name}}"
                             class="p-1 hover:bg-gray-500 hover:text-white transition-all duration-300 ease-in-out"
                         >
                             {{this.name}}
@@ -16,10 +16,12 @@
             </ul>
         </nav>
 
-        <div class="flex flex-row gap-2 justify-end items-center w-full">
-            <input type="text" class="w-1/2 border-gray-500 border p-2 rounded-lg" placeholder="search...">
+        <form method="GET" action="/items" 
+            class="flex flex-row gap-2 justify-end items-center w-full"
+        >
+            <input type="text" name="q" id="q" class="w-1/2 border-gray-500 border p-2 rounded-lg" placeholder="search...">
             <button class="cursor-pointer bg-green-500 hover:bg-green-700 text-white p-2 rounded-lg transition-all duration-300 ease-in-out">Search</button>
-        </div>
+        </form>
     </section>
 
     <section class="grid grid-cols-[30%_1fr] gap-10 w-full">
@@ -31,10 +33,31 @@
             <input type="text" name="name" id="name" placeholder="Item Name..." required
                 class="w-full border-gray-500 border p-2 rounded-lg"
             >
+
             <label for="description">Item description: </label>
             <input type="text" name="description" id="description" placeholder="Item Description..." required
                 class="w-full border-gray-500 border p-2 rounded-lg"
             >
+
+            <label for="brand">Brand: </label>
+            <input type="text" name="brand" id="brand" placeholder="Item Brand..." required
+                class="w-full border-gray-500 border p-2 rounded-lg"
+            >
+
+            <label for="model">Model: </label>
+            <input type="text" name="model" id="model" placeholder="Item Model..." required
+                class="w-full border-gray-500 border p-2 rounded-lg"
+            >
+
+            <label for="category">Choose a category:</label>
+            <select name="category" id="category"
+                class="w-full border-gray-500 border p-2 rounded-lg"
+            >
+                {{#each categories}}
+                    <option value="{{this.name}}">{{this.name}}</option>
+                {{/each}}
+            </select>
+
             <label for="image">Item image: </label>
             <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg" required
                 class="w-full border-gray-500 border p-2 rounded-lg"

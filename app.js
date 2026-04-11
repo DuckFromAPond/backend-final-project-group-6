@@ -27,7 +27,12 @@ app.engine(
                 return options.fn(this)
             }
             return options.inverse(this)
-        }
+        },
+        isActive: function (page, currentPage, options) {
+          return page === currentPage
+            ? "text-blue-500 font-semibold"
+            : "text-gray-700 hover:text-blue-500";
+        },
     }
 }))
 app.set('view engine', 'handlebars')
@@ -101,15 +106,26 @@ const itemData = {
 
 // routes
 app.get('/items', (req, res) => {
-    const { cat } = req.query
+    const { cat, q } = req.query
 
-    let context = itemData
+    let context = {
+      categories: itemData.categories,
+      items: itemData.items
+    }
 
     if(itemData.categories.find(category => category.name === cat)) {
         context = {
             categories: itemData.categories,
             items: itemData.items.filter(item => item.category === cat)
         }
+    }
+
+    const searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
+    if(searchedItem) {
+      context = {
+          ...context,
+          items: [searchedItem],
+      }
     }
 
     res.render('items', context)
