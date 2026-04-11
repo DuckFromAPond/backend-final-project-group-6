@@ -2,6 +2,10 @@ const express = require('express')
 const { engine } = require('express-handlebars')
 require('dotenv').config()
 
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const cors = require('cors');
+
 const PORT = process.env.PORT || 3000;
 
 const app = express();
@@ -32,6 +36,35 @@ app.set('views', __dirname + '/views')
 // middleware
 app.use(express.static(__dirname + "/public"));
 app.use(express.urlencoded({ extended: true })); // for forms (login/register)
+
+// Rate limiting configuration
+option = {
+    windowMs: 1 * 60 * 1000, // 1 minutes
+    max: 20, // limit each IP to 20 requests
+    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    message: 'Too many requests from this IP, please try again after 1 minutes'
+}
+app.use(rateLimit(option));
+
+// CORS configuration
+const whitelist = [
+    `http://localhost:${PORT}`,
+];
+const corsOptions = {
+    origin: (origin, callback) => {
+        // !origin allows server-to-server or tools like Postman/Curl
+        if (!origin || whitelist.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+};
+app.use(cors(corsOptions));
+
+// Morgan logging
+app.use(morgan('dev'));
 
 const itemData = {
     categories: [
