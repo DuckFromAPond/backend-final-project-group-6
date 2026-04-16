@@ -23,11 +23,15 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.2",
     "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-handlebars": "^8.0.6",
     "jsonwebtoken": "^9.0.3",
+    "express-rate-limit": "^8.3.2",
+    "morgan": "^1.10.1",
+    "multiparty": "^4.2.3",
     "vhost": "^3.0.2"
   },
   "devDependencies": {

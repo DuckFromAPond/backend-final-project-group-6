@@ -1,4 +1,4 @@
-<main class="w-full flex flex-col justify-center items-center gap-y-5">
+<main class="w-full flex flex-col justify-center items-center gap-y-5 p-6">
     <h1 class="text-3xl font-bold justify-self-center self-start">Item Detail</h1>
 
     <div class="grid grid-cols-2 gap-5">
@@ -44,15 +44,45 @@
 
         <div class="w-1/2 flex justify-between gap-x-10">
             <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}?edit=true'"
+                onclick="location.href='/items/{{id}}?edit=true#editForm'"
             >
                 Edit
             </button>
-            <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}?delete=true'"
-            >
-                Delete
-            </button>
+            
+            {{#if isDelete}}
+                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                    id="deleteBtn"
+                >
+                    Confirm Deletion
+                </button>
+            {{else}}
+                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                    onclick="location.href='/items/{{id}}?del=true#deleteBtn'"
+                >
+                    Delete
+                </button>
+            {{/if}}
         </div>
     </section>
+    
+    {{#if isEdit}}
+        <section id="editForm">
+            {{> itemForm}}
+        </section>
+    {{/if}}
 </main>
+
+<script>
+    const deleteBtn = document.querySelector('#deleteBtn');
+    const itemId = "{{id}}";
+    deleteBtn.addEventListener('click', async (event) => {
+        const response = await fetch(`/items/${itemId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            window.location.href = data.redirect;
+        }
+    });
+</script>
