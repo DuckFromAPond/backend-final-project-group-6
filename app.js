@@ -1,6 +1,9 @@
-const express = require('express')
-const { engine } = require('express-handlebars')
-require('dotenv').config()
+const express = require("express");
+const { engine } = require("express-handlebars");
+const cookieParser = require("cookie-parser");
+const { generateToken } = require("./lib/auth");
+const { protect } = require("./middleware/authMiddleware");
+const { verifyToken } = require("./lib/auth");
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
@@ -8,10 +11,12 @@ const fs = require('fs');
 const path = require('path');
 const multiparty = require('multiparty');
 const { randomUUID } = require('crypto');
+require("dotenv").config();
 
 const PORT = process.env.PORT || 3000;
-
 const app = express();
+
+app.use(cookieParser());
 
 // configurations for app
 app.engine(
@@ -32,9 +37,9 @@ app.engine(
                 return options.inverse(this)
             },
             isActive: function (page, currentPage, options) {
-            return page === currentPage
-                ? "text-blue-500 font-semibold"
-                : "text-gray-700 hover:text-blue-500";
+                return page === currentPage
+                    ? "text-blue-500 font-semibold"
+                    : "text-gray-700 hover:text-blue-500";
             },
         }
     })
@@ -82,10 +87,47 @@ if (!fs.existsSync(uploadsDir)) {
     console.log(`✓ Created uploads directory at ${uploadsDir}`);
 }
 
+// Rate limiting configuration
+option = {
+    windowMs: 1 * 60 * 1000, // 1 minutes
+    max: 20, // limit each IP to 20 requests
+    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    message: 'Too many requests from this IP, please try again after 1 minutes'
+}
+app.use(rateLimit(option));
+
+// CORS configuration
+const whitelist = [
+    `http://localhost:${PORT}`,
+];
+const corsOptions = {
+    origin: (origin, callback) => {
+        // !origin allows server-to-server or tools like Postman/Curl
+        if (!origin || whitelist.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+};
+app.use(cors(corsOptions));
+
+// Morgan logging
+app.use(morgan('dev'));
+
+// replace this for db + bucket
+const uploadsDir = path.join(__dirname, 'public', 'images');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`✓ Created uploads directory at ${uploadsDir}`);
+}
+
+const { items, itemHistories } = require("./lib/data.js"); // import
 const itemData = {
     categories: [
-        { name: 'Computers', subCategories: []},
-        { name: 'Peripherals', subCategories: []},
+        { name: 'Computers', subCategories: [] },
+        { name: 'Peripherals', subCategories: [] },
     ],
     statuses: [
         { name: 'Available' },
@@ -93,32 +135,8 @@ const itemData = {
         { name: 'Maintenance' },
         { name: 'Retired' },
     ],
-    //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-    items: [
-        { id: 1, name: 'item 1', serial: 'serial 1', model: 'model 1', brand: 'brand 1', category: 'Computers', status: 'Available', dateAcquired: '2022-01-01', description: 'item 1 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 1 image' },
-        { id: 2, name: 'item 2', serial: 'serial 2', model: 'model 2', brand: 'brand 2', category: 'Computers', status: 'In-Use', dateAcquired: '2022-02-02', description: 'item 2 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 2 image' },
-        { id: 3, name: 'item 3', serial: 'serial 3', model: 'model 3', brand: 'brand 3', category: 'Peripherals', status: 'Maintenance', dateAcquired: '2022-03-03', description: 'item 3 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 3 image' }
-    ],
-    itemHistories: [
-        {
-            id: 1,
-            histories: [
-                { assignee: 'assignee 1', duration: 'duration 1', referenceLink: 'reference link 1' }
-            ]
-        },
-        {
-            id: 2,
-            histories: [
-                { assignee: 'assignee 2', duration: 'duration 2', referenceLink: 'reference link 2' }
-            ]
-        },
-        {
-            id: 3,
-            histories: [
-                { assignee: 'assignee 3', duration: 'duration 3', referenceLink: 'reference link 3' }
-            ]
-        }
-    ]
+    items: items,
+    itemHistories: itemHistories
 }
 
 // routes
@@ -131,7 +149,7 @@ app.get('/items', (req, res) => {
         statuses: itemData.statuses
     }
 
-    if(itemData.categories.find(category => category.name === cat)) {
+    if (itemData.categories.find(category => category.name === cat)) {
         context = {
             ...context,
             categories: itemData.categories,
@@ -140,11 +158,11 @@ app.get('/items', (req, res) => {
     }
 
     let searchedItem;
-    if(q) {
+    if (q) {
         searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
     }
 
-    if(searchedItem) {
+    if (searchedItem) {
         context = {
             ...context,
             items: [searchedItem],
@@ -181,7 +199,7 @@ app.post('/items', (req, res) => {
 
             // extract file
             const uploadedFile = files.image ? files.image : null;
-            
+
             if (!uploadedFile || uploadedFile.length === 0) {
                 console.warn('⚠️  No file was selected for upload');
                 console.debug('📊 Debug - files object:', Object.keys(files));
@@ -199,13 +217,13 @@ app.post('/items', (req, res) => {
             const fileExtension = path.extname(originalFileName).toLowerCase();
 
             if (!allowedExtensions.includes(fileExtension)) {
-            console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-            // Clean up the temporary file
-            fs.unlinkSync(tempFilePath);
-            return res.status(400).json({
-                type: 'error',
-                message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-            });
+                console.warn(`⚠️  Invalid file type: ${fileExtension}`);
+                // Clean up the temporary file
+                fs.unlinkSync(tempFilePath);
+                return res.status(400).json({
+                    type: 'error',
+                    message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
+                });
             }
 
             const timestamp = Date.now();
@@ -257,7 +275,7 @@ app.post('/items', (req, res) => {
             }
         })
     }
-    catch(error) {
+    catch (error) {
         console.error('❌ Error in /items:', error);
         res.status(500).json({
             type: 'error',
@@ -302,7 +320,7 @@ app.get('/items/:id', (req, res) => {
         }
     }
 
-    if(del || del?.length !== 0 && del === 'true') {
+    if (del || del?.length !== 0 && del === 'true') {
         context = {
             ...context,
             isDelete: true
@@ -341,7 +359,7 @@ app.put('/items/:id', (req, res) => {
 
             // extract file
             const uploadedFile = files.image ? files.image : null;
-            
+
             if (!uploadedFile || uploadedFile.length === 0) {
                 console.warn('⚠️  No file was selected for upload');
                 console.debug('📊 Debug - files object:', Object.keys(files));
@@ -385,7 +403,7 @@ app.put('/items/:id', (req, res) => {
                 console.log(`   Original Filename: ${originalFileName}`);
                 console.log(`   Saved As: ${fileName}`);
                 console.log(`   Path: ${finalFilePath}`);
-                
+
                 const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
                 // replace with new item (replace with db)
                 itemData.items[indexOfOld] = {
@@ -420,7 +438,7 @@ app.put('/items/:id', (req, res) => {
             }
         })
     }
-    catch(error) {
+    catch (error) {
         console.error('❌ Error in /items:', error);
         res.status(500).json({
             type: 'error',
@@ -441,126 +459,196 @@ app.delete('/items/:id', (req, res) => {
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
 app.get("/", (req, res) => {
-  res.render("login", { layout: "no_nav_bar.handlebars" }); // landing page: login
+    const token = req.cookies.accessToken;
+    const user = verifyToken(token);
+
+    if (user) {
+        return res.redirect("/home"); // if logged in, redirect to home
+    }
+
+    res.render("auth/login", { layout: "no_nav_bar.handlebars" });
 });
 
 app.get("/login", (req, res) => {
-  res.render("login", { layout: "no_nav_bar.handlebars" });
+    const token = req.cookies.accessToken;
+    const user = verifyToken(token);
+
+    if (user) {
+        return res.redirect("/home");
+    }
+
+    const errorMsg = req.query.error;
+
+    res.render("auth/login", {
+        layout: "no_nav_bar.handlebars",
+        error: errorMsg,
+    });
 });
 
 app.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  console.log(email, password);
+    const { email, password } = req.body;
+    const { users } = require("./lib/data.js");
 
-  // TODO: validate user (rn: anything is allowed)
-  res.redirect("/home");
+    // 1. Find user
+    const user = users.find((u) => u.email === email);
+
+    // 2. Validate (In future, use bcrypt to compare hashed password)
+    if (user && password === "12345678") {
+        // Temporary hardcoded check
+        const token = generateToken(user);
+
+        // 3. Set cookie
+        res.cookie("accessToken", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 1000 * 3600, // 1 hour
+        });
+
+        return res.redirect("/home");
+    }
+
+    res.render("auth/login", {
+        layout: "no_nav_bar.handlebars",
+        error: "Invalid email or password",
+    });
 });
 
 app.get("/register", (req, res) => {
-  res.render("register", { layout: "no_nav_bar.handlebars" });
+    res.render("auth/register", { layout: "no_nav_bar.handlebars" });
 });
 
 app.post("/register", (req, res) => {
-  const { name, email, password } = req.body;
-  console.log(name, email, password);
+    const { name, email, password } = req.body;
+    console.log(name, email, password);
 
-  res.redirect("/login");
+    res.redirect("/login");
 });
 
+// middle-ware to render 404 (bad)
+app.use((req, res, next) => {
+    const publicRoutes = ["/", "/login", "/register"];
+    // If it's a known public route, let it pass to the gate or routes
+    if (publicRoutes.includes(req.path)) {
+        return next();
+    }
+    // Otherwise, it's a dead end—render 404 now!
+    res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
+});
+// login-required pages
+app.use(protect);
+
+app.get("/items", (req, res) => {
+    const { cat } = req.query;
+
+    let context = itemData;
+
+    if (itemData.categories.find((category) => category.name === cat)) {
+        context = {
+            categories: itemData.categories,
+            items: itemData.items.filter((item) => item.category === cat),
+        };
+    }
+
+    res.render("items/items", { ...context, activePage: "items" }); // idk; i think it helps with nav rendering
+});
+
+app.get("/items/:id/history", (req, res) => {
+    const { id } = req.params;
+
+    const context = {
+        item: itemData.items.find((item) => String(item.id) === String(id)),
+        itemHistories: itemData.itemHistories.find(
+            (item) => String(item.id) === String(id),
+        ),
+    };
+
+    res.render("items/itemHistory", context);
+});
+
+app.get("/items/:id", (req, res) => {
+    const { id } = req.params;
+
+    const context = itemData.items.find((item) => String(item.id) === String(id));
+
+    if (!context) {
+        res.status(404);
+        return res.render("404");
+    }
+
+    res.render("items/itemDetail", context);
+});
+
+app.get("/items/history", (req, res) => {
+    res.render("items/itemHistory");
+});
+
+app.get("/checkin", (req, res) => {
+    res.render("checkin");
+});
+
+app.get("/checkout", (req, res) => {
+    // GONNA START BY ASSUMING YOU ARE ID 1
+    const currentUserId = 1; // replace with actual logged-in user
+
+    const currentlyOwnedItems = itemData.items
+        .map((item) => {
+            const history = itemData.itemHistories.find((h) => h.id === item.id);
+            const lastAssignment =
+                history?.histories[history.histories.length - 1] || null;
+
+            return {
+                id: item.id,
+                name: item.name,
+                // serial: item.serial,
+                // model: item.model,
+                // brand: item.brand,
+                // category: item.category,
+                status: item.status,
+                dateAcquired: item.dateAcquired,
+                // description: item.description,
+                // imagePath: item.imagePath,
+                // imageAlt: item.imageAlt,
+                currentAssignee: lastAssignment?.assignee || null,
+                currentAssigneeID: lastAssignment?.user_id || null,
+                currentDuration: lastAssignment?.duration || null,
+                currentReference: lastAssignment?.referenceLink || null,
+            };
+        })
+        .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
+
+    // console.log(currentlyOwnedItems);
+    res.render("checkout", {
+        items: currentlyOwnedItems,
+        activePage: "checkout",
+    });
+});
+
+// ++++++++++ LOGIN, REGISTER & LOGOUT
 app.get("/logout", (req, res) => {
-  res.render("login", { layout: "no_nav_bar.handlebars" });
+    res.clearCookie("accessToken");
+    res.redirect("/");
 });
 
 // ++++++++++ List-user page
 app.get("/users", (req, res) => {
-  // MOCK DATA
-  const users = [
-    {
-      id: 1,
-      name: "Alice",
-      email: "alice@example.com",
-      role: "Admin",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Bob",
-      email: "bob@example.com",
-      role: "User",
-      status: "Active",
-    },
-    {
-      id: 3,
-      name: "Charlie",
-      email: "charlie@example.com",
-      role: "User",
-      status: "Disabled",
-    },
-    {
-      id: 4,
-      name: "Dave",
-      email: "dave@example.com",
-      role: "Admin",
-      status: "Active",
-    },
-  ];
-
-  res.render("users", { users, activePage: "users" });
+    // MOCK DATA
+    const { users } = require("./lib/data.js");
+    res.render("users", { users, activePage: "users" });
 });
 
 // ++++++++++ Home (Dashboard for logged-in users)
 app.get("/home", (req, res) => {
-  // Mock data
-  const dashboardData = {
-    totalUsers: 12,
-    totalItems: 34,
-    pendingCheckouts: 5,
-    recentTransactions: [
-      {
-        id: 1,
-        user: "Alice",
-        item: "Laptop",
-        type: "Checkout",
-        date: "2026-03-22",
-      },
-      {
-        id: 2,
-        user: "Bob",
-        item: "Projector",
-        type: "Checkout",
-        date: "2026-03-21",
-      },
-      {
-        id: 3,
-        user: "Charlie",
-        item: "Camera",
-        type: "Check-in",
-        date: "2026-03-21",
-      },
-      {
-        id: 4,
-        user: "Dave",
-        item: "Tablet",
-        type: "Checkout",
-        date: "2026-03-20",
-      },
-    ],
-  };
-
-  res.render("home", { dashboardData, activePage: "home" });
+    // Mock data
+    const { dashboardData } = require("./lib/data.js"); // import
+    res.render("home", { dashboardData, activePage: "home" });
 });
 
 // ++++++++++ Other routes
-app.use((req, res, next) => {
-  res.status(404);
-  res.render("404");
-});
-
 app.use((error, req, res, next) => {
-  res.status(500);
-  res.render("500");
+    res.status(500);
+    res.render("extra_pages/500");
 });
 
 app.listen(PORT, () => {
-  console.log(`Access via: http://localhost:${PORT}`);
+    console.log(`Access via: http://localhost:${PORT}`);
 });

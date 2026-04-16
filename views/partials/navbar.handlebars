@@ -1,0 +1,21 @@
+{{!-- ADD ACTIVE STYLE LATER BTW!!!! --}}
+
+<nav class="bg-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="flex justify-between h-16 items-center">
+            <div class="flex space-x-4">
+                <a href="/home" class="{{isActive 'home' activePage}} px-3 py-1 hover:bg-gray-100 rounded-lg transition">Home</a>
+                <a href="/items" class="{{isActive 'items' activePage}} p-3 py-1 hover:bg-gray-100 rounded-lg  transition">Items</a>
+                <a href="/checkout" class="{{isActive 'checkout' activePage}} p-3 py-1 hover:bg-gray-100 rounded-lg  transition">Checkout</a>
+                {{!-- ADD IF CONDITION TO CHECK FOR THIS + KEY TO CHECK IF PAGE IS ALLOWED  --}}
+                <a href="/users" class="{{isActive 'users' activePage}} p-3 py-1 hover:bg-gray-100 rounded-lg transition">Users</a>
+            </div>
+            <div>
+                <a href="/logout" 
+                class="px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold hover:bg-red-500 hover:text-white transition">
+                Logout
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
