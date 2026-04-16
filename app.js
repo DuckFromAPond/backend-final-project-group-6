@@ -68,7 +68,7 @@ publicApp.use(cookieParser());
 publicApp.use(express.static(path.join(__dirname, 'public')));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
 // Rate limiting configuration
-option = {
+const option = {
     windowMs: 1 * 60 * 1000, // 1 minutes
     max: 20, // limit each IP to 20 requests
     standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
@@ -78,7 +78,7 @@ option = {
 publicApp.use(rateLimit(option));
 // CORS configuration
 const whitelist = [
-    `http://localhost:${PORT}`,
+    `http://localhost:${config.PORT}`,
 ];
 const corsOptions = {
     origin: (origin, callback) => {

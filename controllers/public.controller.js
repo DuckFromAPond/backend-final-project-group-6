@@ -1,5 +1,8 @@
 'use strict';   // for debugging
 
+const multiparty = require("multiparty");
+const fs = require("fs");
+const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
 const { getDbProvider } = require("../utils/dbProviderShared");
@@ -39,8 +42,8 @@ exports.home = async (req, res) => {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5)
     .map(h => {
-      const user = userMap.find(u => u.id === h.userId);
-      const item = itemMap.find(i => i.id === h.itemId);
+      const user = userMap.get(h.userId);
+      const item = itemMap.get(h.itemId);
 
       return {
         id: h.id,
@@ -63,37 +66,32 @@ exports.home = async (req, res) => {
 
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q } = req.query
+  const { cat, q } = req.query;
 
-  const items = await db.getItems();
+  // get all items from DB
+  let items = await db.getItems();
 
-  // derive categories from items
+  // derive categories dynamically
   const categories = [
     ...new Set(items.map(item => item.category))
   ].map(name => ({ name }));
 
-  let filteredItems = items;
-
+  // filter by category
   if (cat) {
-    filteredItems = items.filter(item => item.category === cat);
+    items = items.filter(item => item.category === cat);
   }
 
+  // search by name (case-insensitive)
   if (q) {
-      searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
+    items = items.filter(item =>
+      item.name?.toLowerCase().includes(q.toLowerCase())
+    );
   }
-
-  if (searchedItem) {
-      context = {
-          ...context,
-          items: [searchedItem],
-      }
-  }
-
-  // console.log("FINAL ITEMS:", filteredItems);
 
   res.render("items/items", {
     categories,
-    items: filteredItems 
+    items,
+    user: req.user || null,
   });
 };
 
@@ -153,7 +151,7 @@ exports.addItem = (req, res) => {
 
             const timestamp = Date.now();
             const fileName = `${timestamp}_${originalFileName}`;
-            const finalFilePath = path.join(uploadsDir, fileName);
+            const uploadsDir = path.join(__dirname, "../public/images");
 
             try {
                 fs.copyFileSync(tempFilePath, finalFilePath);
