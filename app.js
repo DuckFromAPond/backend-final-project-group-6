@@ -279,14 +279,15 @@ app.get('/items/:id/history', (req, res) => {
 
 app.get('/items/:id', (req, res) => {
     const { id } = req.params;
-    const { edit } = req.query;
+    const { edit, del } = req.query;
 
     let context = itemData.items.find(item => String(item.id) === String(id))
     context = {
         ...context,
         categories: itemData.categories,
         statuses: itemData.statuses,
-        isEdit: false
+        isEdit: false,
+        isDelete: false
     }
 
     if (!context) {
@@ -298,6 +299,13 @@ app.get('/items/:id', (req, res) => {
         context = {
             ...context,
             isEdit: true
+        }
+    }
+
+    if(del || del?.length !== 0 && del === 'true') {
+        context = {
+            ...context,
+            isDelete: true
         }
     }
 
@@ -419,6 +427,16 @@ app.put('/items/:id', (req, res) => {
             message: 'An error occurred while processing your file upload.',
         });
     }
+})
+
+app.delete('/items/:id', (req, res) => {
+    const { id } = req.params;
+    const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
+    itemData.items.splice(indexOfOld, 1);
+    return res.json({
+        type: 'success',
+        redirect: '/items'
+    })
 })
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
