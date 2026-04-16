@@ -8,4 +8,9 @@ module.exports = {
   DOMAIN:      process.env.DOMAIN      || 'localhost',
   NODE_ENV:    process.env.NODE_ENV    || 'development',
   ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'secret',
+
+  DB_PROVIDER:  process.env.DB_PROVIDER || 'supabase',
+  SUPABASE_URL:process.env.SUPABASE_URL || 'No DB',
+  SUPABASE_KEY:process.env.SUPABASE_KEY || 'No Key',
+  SESSION_SECRET:process.env.SESSION_SECRET || 'I-dont-have-a-key-:('
 };

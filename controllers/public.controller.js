@@ -1,8 +1,9 @@
 
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
+const { getDbProvider } = require("../utils/dbProviderShared");
 
-// temp temp data 
+// this data might be important 
 const itemData = {
   categories: [
     { name: "Computers", subCategories: [] },
@@ -14,23 +15,75 @@ const itemData = {
 };
 
 
-exports.home = (req, res) => {
-  res.render("home", { dashboardData });
+exports.home = async (req, res) => {
+  const db = getDbProvider();
+
+  // get data at the same time to speed up loading
+  const [users, items, histories] = await Promise.all([
+    db.getAllUsers?.() || [],
+    db.getItems(),
+    db.getItemHistories()
+  ]);
+
+  const totalUsers = users.length;
+  const totalItems = items.length;
+
+  const pendingCheckouts = histories.filter(h => !h.returnedAt).length;
+
+  // lookup maps
+  const userMap = new Map(users.map(u => [u.id, u]));
+  const itemMap = new Map(items.map(i => [i.id, i]));
+
+  const recentTransactions = histories
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5)
+    .map(h => {
+      const user = userMap.find(u => u.id === h.userId);
+      const item = itemMap.find(i => i.id === h.itemId);
+
+      return {
+        id: h.id,
+        user: user?.name || "Unknown",
+        item: item?.name || "Unknown",
+        type: h.returnedAt ? "Check-in" : "Checkout",
+        date: h.createdAt
+      };
+    });
+
+  res.render("home", {
+    dashboardData: {
+      totalUsers,
+      totalItems,
+      pendingCheckouts,
+      recentTransactions
+    }
+  });
 };
 
-exports.showItems = (req, res) => {
+exports.showItems = async (req, res) => {
+  const db = getDbProvider();
+
   const { cat } = req.query;
 
-  let context = itemData;
+  const items = await db.getItems();
 
-  if (itemData.categories.find((category) => category.name === cat)) {
-    context = {
-      categories: itemData.categories,
-      items: itemData.items.filter((item) => item.category === cat),
-    };
+  // derive categories from items
+  const categories = [
+    ...new Set(items.map(item => item.category))
+  ].map(name => ({ name }));
+
+  let filteredItems = items;
+
+  if (cat) {
+    filteredItems = items.filter(item => item.category === cat);
   }
 
-  res.render("items/items", { ...context, activePage: "items" }); // idk; i think it helps with nav rendering
+  // console.log("FINAL ITEMS:", filteredItems);
+
+  res.render("items/items", {
+    categories,
+    items: filteredItems 
+  });
 };
 
 exports.showHistory = (req, res) => {
@@ -107,7 +160,7 @@ exports.checkout = (req, res) => {
     })
     .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
 
-  console.log(currentlyOwnedItems);
+  // console.log(currentlyOwnedItems);
   res.render("checkout", {
     items: currentlyOwnedItems,
   });

@@ -28,6 +28,10 @@ exports.login = (req, res) => {
       maxAge: 1000 * 3600, // 1 hour
     });
 
+    if (user.role === "Admin") {
+      return res.redirect(`http://admin.${process.env.DOMAIN}:${process.env.PORT}/home`);
+    }
+
     return res.redirect("/home");
   }
 

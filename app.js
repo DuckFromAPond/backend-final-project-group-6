@@ -1,3 +1,5 @@
+'use strict';   // for debugging
+
 const express = require("express");
 // const vhost    = require('vhost');
 const { engine } = require("express-handlebars");
@@ -7,9 +9,16 @@ const path = require('path');
 const { items, itemHistories, users, dashboardData } = require("./data/data.js"); // import
 const { protect } = require("./middleware/authMiddleware");
 
+const { setDbProvider } = require("./utils/dbProviderShared");
 const config = require('./config/app.config');
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require('./routes/public.routes');
+
+const createDatabaseProvider = require("./utils/createDBProvider");
+
+
+let dbProvider;
+
 
 // HELPERS ───────────────────────────────────
 const hbsHelpers = {
@@ -72,7 +81,6 @@ publicApp.use((req, res, next) => {
 
 publicApp.use("/", authRoutes);
 publicApp.use('/', publicRoutes);
-publicApp.use(protect);
 
 
 
@@ -89,6 +97,26 @@ publicApp.use((error, req, res, next) => {
   res.render("extra_pages/500");
 });
 
-publicApp.listen(config.PORT, () => {
-  console.log(`Access via: http://localhost:${config.PORT}`);
-});
+
+async function startServer() {
+	try {
+		dbProvider = await createDatabaseProvider();
+    setDbProvider(dbProvider);  
+		console.log(`Connected to ${dbProvider.providerLabel} database provider`);
+
+		publicApp.listen(config.PORT, () => {
+      console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
+      console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
+			console.log(`Database provider: ${dbProvider.providerLabel}`);
+		});
+	} catch (error) {
+		if (error && error.message) {
+			console.error("Failed to initialize database provider:", error.message);
+		} else {
+			console.error("Failed to initialize database provider:", error);
+		}
+		process.exit(1);
+	}
+}
+
+startServer();
