@@ -44,7 +44,7 @@
 
         <div class="w-1/2 flex justify-between gap-x-10">
             <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}?edit=true'"
+                onclick="location.href='/items/{{id}}?edit=true#editForm'"
             >
                 Edit
             </button>
@@ -55,4 +55,10 @@
             </button>
         </div>
     </section>
+    
+    {{#if isEdit}}
+        <section id="editForm">
+            {{> itemForm}}
+        </section>
+    {{/if}}
 </main>

@@ -15,29 +15,30 @@ const app = express();
 
 // configurations for app
 app.engine(
-  "handlebars",
-  engine({
-    defaultLayout: "main",
-    partialsDir: __dirname + "/views/partials",
-    helpers: {
-        section: function (name, options) {
-            if (!this._sections) this._sections = {}
-            this._sections[name] = options.fn(this)
-            return null
-        },
-        ifContains: function (container, stringToFind, options) {
-            if (container && container.includes(stringToFind)) {
-                return options.fn(this)
-            }
-            return options.inverse(this)
-        },
-        isActive: function (page, currentPage, options) {
-          return page === currentPage
-            ? "text-blue-500 font-semibold"
-            : "text-gray-700 hover:text-blue-500";
-        },
-    }
-}))
+    "handlebars",
+    engine({
+        defaultLayout: "main",
+        partialsDir: __dirname + "/views/partials",
+        helpers: {
+            section: function (name, options) {
+                if (!this._sections) this._sections = {}
+                this._sections[name] = options.fn(this)
+                return null
+            },
+            ifContains: function (container, stringToFind, options) {
+                if (container && container.includes(stringToFind)) {
+                    return options.fn(this)
+                }
+                return options.inverse(this)
+            },
+            isActive: function (page, currentPage, options) {
+            return page === currentPage
+                ? "text-blue-500 font-semibold"
+                : "text-gray-700 hover:text-blue-500";
+            },
+        }
+    })
+)
 app.set('view engine', 'handlebars')
 app.set('views', __dirname + '/views')
 
@@ -77,14 +78,20 @@ app.use(morgan('dev'));
 // replace this for db + bucket
 const uploadsDir = path.join(__dirname, 'public', 'images');
 if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log(`✓ Created uploads directory at ${uploadsDir}`);
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`✓ Created uploads directory at ${uploadsDir}`);
 }
 
 const itemData = {
     categories: [
         { name: 'Computers', subCategories: []},
         { name: 'Peripherals', subCategories: []},
+    ],
+    statuses: [
+        { name: 'Available' },
+        { name: 'In-Use' },
+        { name: 'Maintenance' },
+        { name: 'Retired' },
     ],
     //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
     items: [
@@ -119,12 +126,14 @@ app.get('/items', (req, res) => {
     const { cat, q } = req.query
 
     let context = {
-      categories: itemData.categories,
-      items: itemData.items
+        categories: itemData.categories,
+        items: itemData.items,
+        statuses: itemData.statuses
     }
 
     if(itemData.categories.find(category => category.name === cat)) {
         context = {
+            ...context,
             categories: itemData.categories,
             items: itemData.items.filter(item => item.category === cat)
         }
@@ -132,124 +141,129 @@ app.get('/items', (req, res) => {
 
     let searchedItem;
     if(q) {
-      searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
+        searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
     }
 
     if(searchedItem) {
-      context = {
-          ...context,
-          items: [searchedItem],
-      }
+        context = {
+            ...context,
+            items: [searchedItem],
+        }
     }
 
     res.render('items', context)
 })
 
 app.post('/items', (req, res) => {
-  try {
-    const form = new multiparty.Form();
+    try {
+        const form = new multiparty.Form();
 
-    let uploadedFilePath = null;
+        let uploadedFilePath = null;
 
-    form.parse(req, (error, fields, files) => {
-      if (error) {
-        console.error('❌ Form parsing error:', err);
-        return res.status(400).json({
-          type: 'error',
-          message: 'Error parsing the form. Please try again.',
-        });
-      }
+        form.parse(req, (error, fields, files) => {
+            if (error) {
+                console.error('❌ Form parsing error:', err);
+                return res.status(400).json({
+                    type: 'error',
+                    message: 'Error parsing the form. Please try again.',
+                });
+            }
 
-      // extract fields
-      const name = fields.name?.[0] ?? '';
-      const description = fields.description?.[0] ?? '';
-      const brand = fields.brand?.[0] ?? '';
-      const model = fields.model?.[0] ?? '';
-      const category = fields.category?.[0] ?? '';
-      const uploadedFile = files.image ? files.image : null;
-      
-      if (!uploadedFile || uploadedFile.length === 0) {
-        console.warn('⚠️  No file was selected for upload');
-        console.debug('📊 Debug - files object:', Object.keys(files));
-        return res.status(400).json({
-          type: 'error',
-          message: 'No file was selected. Please choose an image file.',
-        });
-      }
+            // extract fields
+            const name = fields.name?.[0] ?? '';
+            const description = fields.description?.[0] ?? '';
+            const brand = fields.brand?.[0] ?? '';
+            const model = fields.model?.[0] ?? '';
+            const category = fields.category?.[0] ?? '';
+            const serial = fields.serial?.[0] ?? '';
+            const status = fields.status?.[0] ?? '';
+            const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
-      const file = uploadedFile[0];
-      const originalFileName = file.originalFilename;
-      const tempFilePath = file.path;
+            // extract file
+            const uploadedFile = files.image ? files.image : null;
+            
+            if (!uploadedFile || uploadedFile.length === 0) {
+                console.warn('⚠️  No file was selected for upload');
+                console.debug('📊 Debug - files object:', Object.keys(files));
+                return res.status(400).json({
+                    type: 'error',
+                    message: 'No file was selected. Please choose an image file.',
+                });
+            }
 
-      const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-      const fileExtension = path.extname(originalFileName).toLowerCase();
+            const file = uploadedFile[0];
+            const originalFileName = file.originalFilename;
+            const tempFilePath = file.path;
 
-      if (!allowedExtensions.includes(fileExtension)) {
-        console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-        // Clean up the temporary file
-        fs.unlinkSync(tempFilePath);
-        return res.status(400).json({
-          type: 'error',
-          message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-        });
-      }
+            const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+            const fileExtension = path.extname(originalFileName).toLowerCase();
 
-      const timestamp = Date.now();
-      const fileName = `${timestamp}_${originalFileName}`;
-      const finalFilePath = path.join(uploadsDir, fileName);
+            if (!allowedExtensions.includes(fileExtension)) {
+            console.warn(`⚠️  Invalid file type: ${fileExtension}`);
+            // Clean up the temporary file
+            fs.unlinkSync(tempFilePath);
+            return res.status(400).json({
+                type: 'error',
+                message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
+            });
+            }
 
-      try {
-        fs.copyFileSync(tempFilePath, finalFilePath);
-        // Delete the temporary file
-        fs.unlinkSync(tempFilePath);
+            const timestamp = Date.now();
+            const fileName = `${timestamp}_${originalFileName}`;
+            const finalFilePath = path.join(uploadsDir, fileName);
 
-        // Store the relative path for the view template
-        // This will be used to display the image in the result page
-        uploadedFilePath = `/images/${fileName}`;
+            try {
+                fs.copyFileSync(tempFilePath, finalFilePath);
+                // Delete the temporary file
+                fs.unlinkSync(tempFilePath);
 
-        console.log('✓ File Upload Successful:');
-        console.log(`   Original Filename: ${originalFileName}`);
-        console.log(`   Saved As: ${fileName}`);
-        console.log(`   Path: ${finalFilePath}`);
+                // Store the relative path for the view template
+                // This will be used to display the image in the result page
+                uploadedFilePath = `/images/${fileName}`;
 
-        // add new item (replace with db)
-        const newItem = {
-          name,
-          description,
-          model,
-          brand,
-          category,
-          imagePath: uploadedFilePath,
-          imageAlt: `image of ${name}`,
-          serial: randomUUID(),
-          status: 'Available',
-          dateAcquired: new Date(),
-        };
+                console.log('✓ File Upload Successful:');
+                console.log(`   Original Filename: ${originalFileName}`);
+                console.log(`   Saved As: ${fileName}`);
+                console.log(`   Path: ${finalFilePath}`);
 
-        itemData.items.push(newItem);
+                // add new item (replace with db)
+                const newItem = {
+                    id: itemData.items.length + 1,
+                    name,
+                    description,
+                    model,
+                    brand,
+                    category,
+                    imagePath: uploadedFilePath,
+                    imageAlt: `image of ${name}`,
+                    serial,
+                    status,
+                    dateAcquired,
+                };
 
-        // Render result page with file information
-        res.redirect('/items');
-      } catch (fsError) {
-        console.error('❌ File system error:', fsError);
-        // Clean up temp file if copy failed
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-        }
+                itemData.items.push(newItem);
+
+                res.redirect('/items');
+            } catch (fsError) {
+                console.error('❌ File system error:', fsError);
+                // Clean up temp file if copy failed
+                if (fs.existsSync(tempFilePath)) {
+                    fs.unlinkSync(tempFilePath);
+                }
+                res.status(500).json({
+                    type: 'error',
+                    message: 'Error saving the file. Please try again.',
+                });
+            }
+        })
+    }
+    catch(error) {
+        console.error('❌ Error in /items:', error);
         res.status(500).json({
-          type: 'error',
-          message: 'Error saving the file. Please try again.',
+            type: 'error',
+            message: 'An error occurred while processing your file upload.',
         });
-      }
-    })
-  }
-  catch(error) {
-    console.error('❌ Error in /items:', error);
-    res.status(500).json({
-      type: 'error',
-      message: 'An error occurred while processing your file upload.',
-    });
-  }
+    }
 })
 
 app.get('/items/:id/history', (req, res) => {
@@ -264,25 +278,148 @@ app.get('/items/:id/history', (req, res) => {
 })
 
 app.get('/items/:id', (req, res) => {
-    const { id } = req.params
+    const { id } = req.params;
+    const { edit } = req.query;
 
-    const context = itemData.items.find(item => String(item.id) === String(id))
+    let context = itemData.items.find(item => String(item.id) === String(id))
+    context = {
+        ...context,
+        categories: itemData.categories,
+        statuses: itemData.statuses,
+        isEdit: false
+    }
 
     if (!context) {
         res.status(404)
         return res.render('404')
     }
 
+    if (edit || edit?.length !== 0 && edit === 'true') {
+        context = {
+            ...context,
+            isEdit: true
+        }
+    }
+
     res.render('itemDetail', context)
 })
 
-app.get("/items/:id", (req, res) => {
-  res.render("itemDetail");
-});
+app.put('/items/:id', (req, res) => {
+    const { id } = req.params;
 
-app.get("/items/history", (req, res) => {
-  res.render("itemHistory");
-});
+    try {
+        const form = new multiparty.Form();
+
+        let uploadedFilePath = null;
+
+        form.parse(req, (error, fields, files) => {
+            if (error) {
+                console.error('❌ Form parsing error:', error);
+                return res.status(400).json({
+                    type: 'error',
+                    message: 'Error parsing the form. Please try again.',
+                });
+            }
+
+            // extract fields
+            const name = fields.name?.[0] ?? '';
+            const description = fields.description?.[0] ?? '';
+            const brand = fields.brand?.[0] ?? '';
+            const model = fields.model?.[0] ?? '';
+            const category = fields.category?.[0] ?? '';
+            const serial = fields.serial?.[0] ?? '';
+            const status = fields.status?.[0] ?? '';
+            const dateAcquired = fields.dateAcquired?.[0] ?? '';
+
+            // extract file
+            const uploadedFile = files.image ? files.image : null;
+            
+            if (!uploadedFile || uploadedFile.length === 0) {
+                console.warn('⚠️  No file was selected for upload');
+                console.debug('📊 Debug - files object:', Object.keys(files));
+                return res.status(400).json({
+                    type: 'error',
+                    message: 'No file was selected. Please choose an image file.',
+                });
+            }
+
+            const file = uploadedFile[0];
+            const originalFileName = file.originalFilename;
+            const tempFilePath = file.path;
+
+            const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+            const fileExtension = path.extname(originalFileName).toLowerCase();
+
+            if (!allowedExtensions.includes(fileExtension)) {
+                console.warn(`⚠️  Invalid file type: ${fileExtension}`);
+                // Clean up the temporary file
+                fs.unlinkSync(tempFilePath);
+                return res.status(400).json({
+                    type: 'error',
+                    message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
+                });
+            }
+
+            const timestamp = Date.now();
+            const fileName = `${timestamp}_${originalFileName}`;
+            const finalFilePath = path.join(uploadsDir, fileName);
+
+            try {
+                fs.copyFileSync(tempFilePath, finalFilePath);
+                // Delete the temporary file
+                fs.unlinkSync(tempFilePath);
+
+                // Store the relative path for the view template
+                // This will be used to display the image in the result page
+                uploadedFilePath = `/images/${fileName}`;
+
+                console.log('✓ File Upload Successful:');
+                console.log(`   Original Filename: ${originalFileName}`);
+                console.log(`   Saved As: ${fileName}`);
+                console.log(`   Path: ${finalFilePath}`);
+                
+                const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
+                // replace with new item (replace with db)
+                itemData.items[indexOfOld] = {
+                    ...itemData.items[indexOfOld],
+                    name,
+                    description,
+                    model,
+                    brand,
+                    category,
+                    imagePath: uploadedFilePath,
+                    imageAlt: `image of ${name}`,
+                    serial,
+                    status,
+                    dateAcquired,
+                };
+
+                // Render result page with file information
+                return res.json({
+                    success: true,
+                    redirect: `/items/${id}`
+                });
+            } catch (fsError) {
+                console.error('❌ File system error:', fsError);
+                // Clean up temp file if copy failed
+                if (fs.existsSync(tempFilePath)) {
+                    fs.unlinkSync(tempFilePath);
+                }
+                res.status(500).json({
+                    type: 'error',
+                    message: 'Error saving the file. Please try again.',
+                });
+            }
+        })
+    }
+    catch(error) {
+        console.error('❌ Error in /items:', error);
+        res.status(500).json({
+            type: 'error',
+            message: 'An error occurred while processing your file upload.',
+        });
+    }
+})
 
 // ++++++++++ LOGIN, REGISTER & LOGOUT
 app.get("/", (req, res) => {
