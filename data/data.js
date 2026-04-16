@@ -48,7 +48,8 @@ const itemHistories = [
     id: 1,
     histories: [
       {
-        assignee: "assignee 1",
+        user_id: 1,
+        // assignee: "assignee 1", <- use id to find name instead 
         duration: "duration 1",
         referenceLink: "reference link 1",
       },
@@ -58,7 +59,8 @@ const itemHistories = [
     id: 2,
     histories: [
       {
-        assignee: "assignee 2",
+        user_id: 2,
+        // assignee: "assignee 2",
         duration: "duration 2",
         referenceLink: "reference link 2",
       },
@@ -68,7 +70,8 @@ const itemHistories = [
     id: 3,
     histories: [
       {
-        assignee: "assignee 3",
+        user_id: 3,
+        // assignee: "assignee 3",
         duration: "duration 3",
         referenceLink: "reference link 3",
       },

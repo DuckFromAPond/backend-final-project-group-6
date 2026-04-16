@@ -1,1 +1,77 @@
-{{!--  FINISH LATER  --}}
+{{!-- REPORT PAGE --}}
+{{!-- might be diff for admin and user but for now this is user focus or just use if to alternate --}}
+<div class="p-6 bg-gray-100 min-h-screen">
+
+    {{!-- Header might not be needed  --}}
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Report page</h1>
+        <p class="text-gray-500">Detailed overview</p>
+    </div>
+
+    {{!-- Summary Cards --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        
+        {{!-- Total users --}}
+        {{!-- <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
+            <h2 class="text-gray-500 font-semibold mb-2">Total Users</h2>
+            <p class="text-2xl font-bold">{{dashboardData.totalUsers}}</p>
+        </div> --}}
+
+        {{!-- Active users --}}
+        {{!-- <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
+            <h2 class="text-gray-500 font-semibold mb-2">Active Users</h2>
+            <p class="text-2xl font-bold">{{dashboardData.activeUsers}}</p>
+        </div> --}}
+
+        {{!-- Total assets --}}
+        <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
+            <h2 class="text-gray-500 font-semibold mb-2">Total Assets</h2>
+            <p class="text-2xl font-bold">{{dashboardData.totalAssets}}</p>
+        </div>
+
+    </div>
+
+    {{!-- Second section --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+        {{!-- Asset age --}}
+        <div class="bg-white p-6 rounded-2xl shadow">
+            <h2 class="text-lg font-semibold mb-4">Asset Aging (3+ Years)</h2>
+            <ul class="text-gray-600 space-y-2">
+                {{#each dashboardData.oldAssets}}
+                    <li class="border-b pb-1">{{this.name}}</li>
+                {{/each}}
+            </ul>
+        </div>
+
+        {{!-- User audit (temp might delete) --}}
+        <div class="bg-white p-6 rounded-2xl shadow">
+            <h2 class="text-lg font-semibold mb-4">User Audit</h2>
+            <form class="mb-4">
+                <input 
+                    type="text" 
+                    placeholder="Enter username..." 
+                    class="w-full border rounded-lg p-2"
+                >
+            </form>
+
+            <ul class="text-gray-600 space-y-2">
+                {{#each dashboardData.userAssets}}
+                    <li class="border-b pb-1">{{this}}</li>
+                {{/each}}
+            </ul>
+        </div>
+
+    </div>
+
+    {{!-- Recent Charts / Logs --}}
+    <div class="bg-white p-6 rounded-2xl shadow">
+        <h2 class="text-lg font-semibold mb-4">Recent Activity</h2>
+        <ul class="text-gray-600 space-y-2">
+            {{#each dashboardData.recentActivity}}
+                <li class="border-b pb-1">{{this}}</li>
+            {{/each}}
+        </ul>
+    </div>
+
+</div>
