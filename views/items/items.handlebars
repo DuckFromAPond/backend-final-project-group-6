@@ -1,4 +1,4 @@
-<main class="flex flex-col justify-center items-center gap-y-5">
+<main class="flex flex-col justify-center items-center gap-y-5 p-6">
     <h1 class="text-3xl font-bold justify-self-center self-start">Items</h1>
     <section class="grid grid-cols-2 w-full">
         <nav class="w-full">
@@ -6,7 +6,7 @@
             <ul class="justify-self-start self-center">
                 {{#each categories}}
                     <li class="p-1">
-                        <a href="/items/?cat={{this.name}}"
+                        <a href="/items?cat={{this.name}}"
                             class="p-1 hover:bg-gray-500 hover:text-white transition-all duration-300 ease-in-out"
                         >
                             {{this.name}}
@@ -16,34 +16,19 @@
             </ul>
         </nav>
 
-        <div class="flex flex-row gap-2 justify-end items-center w-full">
-            <input type="text" class="w-1/2 border-gray-500 border p-2 rounded-lg" placeholder="search...">
+        <form method="GET" action="/items" 
+            class="flex flex-row gap-2 justify-end items-center w-full"
+        >
+            <input type="text" name="q" id="q" class="w-1/2 border-gray-500 border p-2 rounded-lg" placeholder="search...">
             <button class="cursor-pointer bg-green-500 hover:bg-green-700 text-white p-2 rounded-lg transition-all duration-300 ease-in-out">Search</button>
-        </div>
+        </form>
     </section>
 
-    <section class="grid grid-cols-[30%_1fr] gap-10 w-full">
-        <form action="/items" method="POST" enctype="multipart/form-data"
-            class="w-full grid grid-cols-[20%_1fr] gap-2 shadow-lg shadow-gray-500 p-4 rounded-lg"
-        >
-            <h2 class="text-xl text-center font-semibold col-span-2 w-1/2 justify-self-center self-center">Add New Item</h2>
-            <label for="name">Item name: </label>
-            <input type="text" name="name" id="name" placeholder="Item Name..." required
-                class="w-full border-gray-500 border p-2 rounded-lg"
-            >
-            <label for="description">Item description: </label>
-            <input type="text" name="description" id="description" placeholder="Item Description..." required
-                class="w-full border-gray-500 border p-2 rounded-lg"
-            >
-            <label for="image">Item image: </label>
-            <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg" required
-                class="w-full border-gray-500 border p-2 rounded-lg"
-            >
-            <button type="submit" class="justify-self-center self-center col-span-2 w-1/2 text-md bg-green-500 hover:bg-green-700 text-white cursor-pointer p-2 text-center transition-all ease-in-out duration-300">Submit</button>
-        </form>
+    <section class="grid grid-cols-1 lg:grid-cols-[40%_1fr] gap-10 w-full">
+        {{> itemForm}}
         
         {{!-- item grid --}}
-        <section class="grid grid-cols-4 gap-4 w-full">
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
             {{#each items}}
                 {{> itemCard}}
             {{/each}}
