@@ -13,7 +13,6 @@ const itemData = {
   itemHistories: itemHistories,
 };
 
-
 exports.home = (req, res) => {
   res.render("home", { dashboardData });
 };

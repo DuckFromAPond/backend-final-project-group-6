@@ -6,7 +6,6 @@ const publicController = require("../controllers/public.controller");
 
 router.use(protect);  
 
-
 router.get('/', publicController.home);
 router.get("/home", publicController.home);
 router.get("/items", publicController.showItems);
