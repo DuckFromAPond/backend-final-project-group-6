@@ -87,42 +87,6 @@ if (!fs.existsSync(uploadsDir)) {
     console.log(`✓ Created uploads directory at ${uploadsDir}`);
 }
 
-// Rate limiting configuration
-option = {
-    windowMs: 1 * 60 * 1000, // 1 minutes
-    max: 20, // limit each IP to 20 requests
-    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after 1 minutes'
-}
-app.use(rateLimit(option));
-
-// CORS configuration
-const whitelist = [
-    `http://localhost:${PORT}`,
-];
-const corsOptions = {
-    origin: (origin, callback) => {
-        // !origin allows server-to-server or tools like Postman/Curl
-        if (!origin || whitelist.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    }
-};
-app.use(cors(corsOptions));
-
-// Morgan logging
-app.use(morgan('dev'));
-
-// replace this for db + bucket
-const uploadsDir = path.join(__dirname, 'public', 'images');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log(`✓ Created uploads directory at ${uploadsDir}`);
-}
-
 const { items, itemHistories } = require("./lib/data.js"); // import
 const itemData = {
     categories: [
@@ -139,7 +103,76 @@ const itemData = {
     itemHistories: itemHistories
 }
 
-// routes
+// ++++++++++ LOGIN, REGISTER & LOGOUT
+app.get("/", (req, res) => {
+    const token = req.cookies.accessToken;
+    const user = verifyToken(token);
+
+    if (user) {
+        return res.redirect("/home"); // if logged in, redirect to home
+    }
+
+    res.render("auth/login", { layout: "no_nav_bar.handlebars" });
+});
+
+app.get("/login", (req, res) => {
+    const token = req.cookies.accessToken;
+    const user = verifyToken(token);
+
+    if (user) {
+        return res.redirect("/home");
+    }
+
+    const errorMsg = req.query.error;
+
+    res.render("auth/login", {
+        layout: "no_nav_bar.handlebars",
+        error: errorMsg,
+    });
+});
+
+app.post("/login", (req, res) => {
+    const { email, password } = req.body;
+    const { users } = require("./lib/data.js");
+
+    // 1. Find user
+    const user = users.find((u) => u.email === email);
+
+    // 2. Validate (In future, use bcrypt to compare hashed password)
+    if (user && password === "12345678") {
+        // Temporary hardcoded check
+        const token = generateToken(user);
+
+        // 3. Set cookie
+        res.cookie("accessToken", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 1000 * 3600, // 1 hour
+        });
+
+        return res.redirect("/home");
+    }
+
+    res.render("auth/login", {
+        layout: "no_nav_bar.handlebars",
+        error: "Invalid email or password",
+    });
+});
+
+app.get("/register", (req, res) => {
+    res.render("auth/register", { layout: "no_nav_bar.handlebars" });
+});
+
+app.post("/register", (req, res) => {
+    const { name, email, password } = req.body;
+    console.log(name, email, password);
+
+    res.redirect("/login");
+});
+// login-required pages
+app.use(protect);
+
+// items routes
 app.get('/items', (req, res) => {
     const { cat, q } = req.query
 
@@ -169,7 +202,7 @@ app.get('/items', (req, res) => {
         }
     }
 
-    res.render('items', context)
+    res.render('items/items', context)
 })
 
 app.post('/items', (req, res) => {
@@ -292,7 +325,7 @@ app.get('/items/:id/history', (req, res) => {
         itemHistories: itemData.itemHistories.find(item => String(item.id) === String(id))
     }
 
-    res.render('itemHistory', context)
+    res.render('items/itemHistory', context)
 })
 
 app.get('/items/:id', (req, res) => {
@@ -327,7 +360,7 @@ app.get('/items/:id', (req, res) => {
         }
     }
 
-    res.render('itemDetail', context)
+    res.render('items/itemDetail', context)
 })
 
 app.put('/items/:id', (req, res) => {
@@ -456,131 +489,7 @@ app.delete('/items/:id', (req, res) => {
         redirect: '/items'
     })
 })
-
-// ++++++++++ LOGIN, REGISTER & LOGOUT
-app.get("/", (req, res) => {
-    const token = req.cookies.accessToken;
-    const user = verifyToken(token);
-
-    if (user) {
-        return res.redirect("/home"); // if logged in, redirect to home
-    }
-
-    res.render("auth/login", { layout: "no_nav_bar.handlebars" });
-});
-
-app.get("/login", (req, res) => {
-    const token = req.cookies.accessToken;
-    const user = verifyToken(token);
-
-    if (user) {
-        return res.redirect("/home");
-    }
-
-    const errorMsg = req.query.error;
-
-    res.render("auth/login", {
-        layout: "no_nav_bar.handlebars",
-        error: errorMsg,
-    });
-});
-
-app.post("/login", (req, res) => {
-    const { email, password } = req.body;
-    const { users } = require("./lib/data.js");
-
-    // 1. Find user
-    const user = users.find((u) => u.email === email);
-
-    // 2. Validate (In future, use bcrypt to compare hashed password)
-    if (user && password === "12345678") {
-        // Temporary hardcoded check
-        const token = generateToken(user);
-
-        // 3. Set cookie
-        res.cookie("accessToken", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            maxAge: 1000 * 3600, // 1 hour
-        });
-
-        return res.redirect("/home");
-    }
-
-    res.render("auth/login", {
-        layout: "no_nav_bar.handlebars",
-        error: "Invalid email or password",
-    });
-});
-
-app.get("/register", (req, res) => {
-    res.render("auth/register", { layout: "no_nav_bar.handlebars" });
-});
-
-app.post("/register", (req, res) => {
-    const { name, email, password } = req.body;
-    console.log(name, email, password);
-
-    res.redirect("/login");
-});
-
-// middle-ware to render 404 (bad)
-app.use((req, res, next) => {
-    const publicRoutes = ["/", "/login", "/register"];
-    // If it's a known public route, let it pass to the gate or routes
-    if (publicRoutes.includes(req.path)) {
-        return next();
-    }
-    // Otherwise, it's a dead end—render 404 now!
-    res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
-});
-// login-required pages
-app.use(protect);
-
-app.get("/items", (req, res) => {
-    const { cat } = req.query;
-
-    let context = itemData;
-
-    if (itemData.categories.find((category) => category.name === cat)) {
-        context = {
-            categories: itemData.categories,
-            items: itemData.items.filter((item) => item.category === cat),
-        };
-    }
-
-    res.render("items/items", { ...context, activePage: "items" }); // idk; i think it helps with nav rendering
-});
-
-app.get("/items/:id/history", (req, res) => {
-    const { id } = req.params;
-
-    const context = {
-        item: itemData.items.find((item) => String(item.id) === String(id)),
-        itemHistories: itemData.itemHistories.find(
-            (item) => String(item.id) === String(id),
-        ),
-    };
-
-    res.render("items/itemHistory", context);
-});
-
-app.get("/items/:id", (req, res) => {
-    const { id } = req.params;
-
-    const context = itemData.items.find((item) => String(item.id) === String(id));
-
-    if (!context) {
-        res.status(404);
-        return res.render("404");
-    }
-
-    res.render("items/itemDetail", context);
-});
-
-app.get("/items/history", (req, res) => {
-    res.render("items/itemHistory");
-});
+// end of items routes
 
 app.get("/checkin", (req, res) => {
     res.render("checkin");
@@ -641,6 +550,17 @@ app.get("/home", (req, res) => {
     // Mock data
     const { dashboardData } = require("./lib/data.js"); // import
     res.render("home", { dashboardData, activePage: "home" });
+});
+
+// middle-ware to render 404 (bad)
+app.use((req, res, next) => {
+    const publicRoutes = ["/", "/login", "/register"];
+    // If it's a known public route, let it pass to the gate or routes
+    if (publicRoutes.includes(req.path)) {
+        return next();
+    }
+    // Otherwise, it's a dead end—render 404 now!
+    res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
 });
 
 // ++++++++++ Other routes
