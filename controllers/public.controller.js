@@ -60,7 +60,8 @@ exports.home = async (req, res) => {
       totalItems,
       pendingCheckouts,
       recentTransactions
-    }
+    }, 
+    pageTitle: "Home"
   });
 };
 
@@ -92,6 +93,9 @@ exports.showItems = async (req, res) => {
     categories,
     items,
     user: req.user || null,
+    error: req.query.error || null,
+    success: req.query.success || null, 
+    pageTitle: "Items"
   });
 };
 
@@ -396,40 +400,147 @@ exports.showItemHistory = (req, res) => {
   res.render("items/itemHistory", context);
 };
 
-exports.checkout = (req, res) => {
-  // GONNA START BY ASSUMING YOU ARE ID 1
-  const currentUserId = 1; // replace with actual logged-in user
+exports.checkIn = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
+    const form = new multiparty.Form();
 
-  const currentlyOwnedItems = itemData.items
-    .map((item) => {
-      const history = itemData.itemHistories.find((h) => h.id === item.id);
-      const lastAssignment =
-        history?.histories[history.histories.length - 1] || null;
+    const { fields, files } = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err);
+        resolve({ fields, files });
+      });
+    });
 
-      return {
-        id: item.id,
-        name: item.name,
-        // serial: item.serial,
-        // model: item.model,
-        // brand: item.brand,
-        // category: item.category,
-        status: item.status,
-        dateAcquired: item.dateAcquired,
-        // description: item.description,
-        // imagePath: item.imagePath,
-        // imageAlt: item.imageAlt,
-        currentAssignee: lastAssignment?.assignee || null,
-        currentAssigneeID: lastAssignment?.user_id || null,
-        currentDuration: lastAssignment?.duration || null,
-        currentReference: lastAssignment?.referenceLink || null,
-      };
-    })
-    .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
+    const itemId = fields.itemId?.[0];   
+    const userId = req.user.id;
 
-  // console.log(currentlyOwnedItems);
-  res.render("checkout", {
-    items: currentlyOwnedItems,
-  });
+    if (!itemId) {
+      return res.redirect("/items?error=Missing+itemId");
+    }
+
+    const item = await db.getItemById(itemId);
+
+    if (!item) {
+      return res.redirect("/items?error=Item+not+found");
+    }
+
+    if (item.status !== "In-Use") {
+      return res.redirect("/items?error=Item+not+checked+out");
+    }
+
+    // 1. upload file FIRST
+    let filePath = null;
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      const fs = require("fs");
+
+      const fileBuffer = fs.readFileSync(file.path);
+
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+      filePath = `checkin/${fileName}`;
+
+      const { error: uploadError } = await db.supabase.storage
+        .from("docs-bucket")
+        .upload(filePath, fileBuffer);
+
+      if (uploadError) throw uploadError;
+    }
+
+    // 2. update state
+    await db.setItemStatus(itemId, "Available");
+
+    // 3. log history ONCE
+    await db.addItemHistory(itemId, {
+      userId,
+      action: "checkin",
+      referenceLink: filePath
+    });
+
+    return res.redirect("/items?success=Checked+in+successfully");
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.checkOut = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
+
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const userId = req.user.id;
+
+    const item = await db.getItemById(itemId);
+
+    if (!item) {
+      return res.redirect("/items?error=Item+not+found");
+    }
+
+
+    if (item.status !== "Available") {
+      return res.redirect("/items?error=Item+not+available");
+    }
+
+    let filePath = null;
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      const fs = require("fs");
+
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+      filePath = `checkout/${fileName}`;
+
+      const { error } = await db.supabase.storage
+        .from("docs-bucket")
+        .upload(filePath, fileBuffer);
+
+      if (error) {
+        console.error("Upload error:", error);
+        return res.redirect("/items?error=Upload+failed");
+      }
+    }
+
+    await db.setItemStatus(itemId, "In-Use");
+
+    await db.addItemHistory(itemId, {
+      userId,
+      action: "checkout",
+      duration: fields.duration?.[0] ?? null,
+      referenceLink: filePath,
+    });
+
+    return res.redirect("/items?success=CHECKED+OUT+SUCCESSFULLY!");
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.ShowCheckin = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
+    const currentUserId = req.user.id;
+
+    const items = await db.getUserItems(currentUserId);
+
+    res.render("checkout", {
+      items
+    });
+
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.report = (req, res) => {
@@ -446,18 +557,6 @@ exports.users = (req, res) => {
 exports.notFound = (req, res) => {
   res.status(404).render('extra_pages/404', {
     message: 'The page you are looking for does not exist.',
+    pageTitle: "404"
   });
 };
-
-// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT 
-
-// middle-ware to render 404 (bad)
-// app.use((req, res, next) => {
-//   const publicRoutes = ["/", "/login", "/register"];
-//   // If it's a known public route, let it pass to the gate or routes
-//   if (publicRoutes.includes(req.path)) {
-//     return next();
-//   }
-//   // Otherwise, it's a dead end—render 404 now!
-//   // res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
-// });

@@ -41,12 +41,7 @@ const hbsHelpers = {
         }
         return options.inverse(this);
     },
-    // for active nav 
-    isActive: function (page, currentPage, options) {
-        return page === currentPage
-            ? "text-blue-500 font-semibold"
-            : "text-gray-700 hover:text-blue-500";
-    },
+    eq: (a, b) => a === b
 }
 
 // configurations for public app ───────────────────────────────────
@@ -77,19 +72,25 @@ const option = {
 }
 publicApp.use(rateLimit(option));
 // CORS configuration
-const whitelist = [
-    `http://localhost:${config.PORT}`,
-];
+const whitelist = new Set([
+  `http://localhost:${config.PORT}`,
+  "https://websitename.com"                 // <--------------------------- change when host on cloudflare later btw 
+]);
+
 const corsOptions = {
-    origin: (origin, callback) => {
-        // !origin allows server-to-server or tools like Postman/Curl
-        if (!origin || whitelist.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+  origin: (origin, callback) => {
+    // allow Postman / server-to-server
+    if (!origin) return callback(null, true);
+
+    if (whitelist.has(origin)) {
+      return callback(null, true);
     }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
 };
+
 publicApp.use(cors(corsOptions));
 // Morgan logging
 publicApp.use(morgan('dev'));
@@ -109,10 +110,11 @@ publicApp.use((req, res, next) => {
     res.locals.navItems =
         pathName === '/items' ||
         pathName.startsWith('/items/');
-    res.locals.navCheckout = pathName.startsWith('/checkout');
+    res.locals.navCheckin = pathName.startsWith('/checkin');
     res.locals.navReport = pathName.startsWith('/report');
     res.locals.navUsers = pathName.startsWith('/users');     // <---- temp will delete when admin part is implemented
-
+    
+    res.locals.config = config;
     next();
 });
 
@@ -122,12 +124,14 @@ publicApp.use('/', publicRoutes);
 // const app = express();
 // app.use(publicApp);
 
+
 // Other routes
 publicApp.use((error, req, res, next) => {
     console.log(error)
     res.status(500);
     res.render("extra_pages/500");
 });
+
 
 
 async function startServer() {
@@ -137,8 +141,8 @@ async function startServer() {
 		console.log(`Connected to ${dbProvider.providerLabel} database provider`);
 
 		publicApp.listen(config.PORT, () => {
-      console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
-      console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
+            console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
+            console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
 			console.log(`Database provider: ${dbProvider.providerLabel}`);
 		});
 	} catch (error) {

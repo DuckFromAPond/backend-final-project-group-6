@@ -1,5 +1,9 @@
-<main class="flex flex-col justify-center items-center gap-y-5 p-6">
+<div class="flex flex-col justify-center items-center gap-y-5 p-6">
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+        {{> toast}}
+    </div>
     <h1 class="text-3xl font-bold justify-self-center self-start">Items</h1>
+    
     <section class="grid grid-cols-2 w-full">
         <nav class="w-full">
             <h2 class="text-xl font-semibold">Categories</h2>
@@ -47,5 +51,5 @@
             document.getElementById("modal").classList.add("hidden");
         }
     </script>
-</main>
+</div>
 

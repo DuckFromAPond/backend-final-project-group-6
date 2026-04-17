@@ -5,7 +5,7 @@ const { getDbProvider } = require("../utils/dbProviderShared");
 // Generate a token for a user
 function generateToken (user) {
   return jwt.sign({ id: user.id, email: user.email, role: user.role }, secret, {
-    expiresIn: "1h",
+    expiresIn: "24h",
   });
 };
 

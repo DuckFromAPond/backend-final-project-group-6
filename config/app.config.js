@@ -11,6 +11,6 @@ module.exports = {
 
   DB_PROVIDER:  process.env.DB_PROVIDER || 'supabase',
   SUPABASE_URL:process.env.SUPABASE_URL || 'No DB',
-  SUPABASE_KEY:process.env.SUPABASE_KEY || 'No Key',
+  SUPABASE_SERVICE_ROLE_KEY:process.env.SUPABASE_SERVICE_ROLE_KEY || 'No Key',
   SESSION_SECRET:process.env.SESSION_SECRET || 'I-dont-have-a-key-:('
 };

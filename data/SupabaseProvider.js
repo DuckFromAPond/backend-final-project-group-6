@@ -1,6 +1,5 @@
 const bcryptjs = require("bcryptjs");
 const { createClient } = require("@supabase/supabase-js");
-const { hasTimeConflict } = require("../utils/conflictCheck")
 const DatabaseProvider = require("./databaseProvider");
 const {
 	SUPABASE_TABLES,
@@ -72,6 +71,16 @@ class SupabaseProvider extends DatabaseProvider {
 		return data.publicUrl;
 	}
 
+	getReferenceUrl(filePath) {
+		if (!filePath) return null;
+
+		const { data } = this.supabase.storage
+			.from("docs-bucket") 
+			.getPublicUrl(filePath);
+
+		return data.publicUrl;
+	}
+
 	async initializeDatabase() {
 		// USERS
 		const { error: userError } = await this.supabase
@@ -110,36 +119,34 @@ class SupabaseProvider extends DatabaseProvider {
 	async registerUser(email, password) {
 		const normalizedEmail = this.normalizeEmail(email);
 
-		// Check if email already exists
-		const { data: existingUser, error: existingUserError } = await this.supabase
+		const { data: existingUser } = await this.supabase
 			.from(SUPABASE_TABLES.USERS)
 			.select("id")
 			.eq("email", normalizedEmail)
-			.single();
-
-		if (existingUserError && existingUserError.code !== "PGRST116") {
-			throw existingUserError;
-		}
+			.maybeSingle();
 
 		if (existingUser) {
 			throw new Error("Email already exists");
 		}
 
-		// Hash password
 		const salt = await bcryptjs.genSalt(10);
 		const passwordHash = await bcryptjs.hash(password, salt);
 
-		// Insert new user
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.USERS)
-			.insert([{ email: normalizedEmail, password_hash: passwordHash }])
-			.select("id, email, created_at");
+			.insert([{
+			email: normalizedEmail,
+			password_hash: passwordHash,
+			name: email.split("@")[0],
+			role: "User",
+			status: "Active"
+			}])
+			.select("id, email, name, role, status, created_at")
+			.single();
 
-		if (error) {
-			throw error;
-		}
+		if (error) throw error;
 
-		return mapUserRowToModel(data[0]);
+		return mapUserRowToModel(data);
 	}
 
 	async findUserByEmail(email) {
@@ -147,19 +154,17 @@ class SupabaseProvider extends DatabaseProvider {
 
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.USERS)
-			.select("id, email, password_hash")
+			.select("id, email, role, password_hash, name, status, created_at")
 			.eq("email", normalizedEmail)
-			.single();
+			.maybeSingle();
 
-		if (error && error.code === "PGRST116") {
-			return null; // No user found
-		}
+		if (error) throw error;
+		if (!data) return null;
 
-		if (error) {
-			throw error;
-		}
-
-		return mapUserRowToModel(data);
+		return {
+			...mapUserRowToModel(data),
+			passwordHash: data.password_hash
+		};
 	}
 
 	async verifyPassword(password, hash) {
@@ -316,19 +321,40 @@ class SupabaseProvider extends DatabaseProvider {
 		return true;
 	}
 	
+	async setItemStatus(itemId, status) {
+		const normalizedId = this.toSupabaseId(itemId);
+
+		const { data, error } = await this.supabase
+			.from(SUPABASE_TABLES.ITEMS)
+			.update({ status })
+			.eq("id", normalizedId)
+			.select()
+			.single();
+
+		if (error) throw error;
+
+		return mapItemRowToModel(data);
+	}
+
+	async getItemStatus(itemId) {
+		const item = await this.getItemById(itemId);
+		return item?.status;
+	}
 
 
 	// ===== HISTORY =====
 	async getItemHistories() {
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.select("*");
+			.select("*")
+			.order("created_at", { ascending: false });
 
-		if (error) {
-			throw error;
-		}
+		if (error) throw error;
 
-		return data.map(mapItemHistoryRowToModel);
+		return data.map(row => ({
+			...mapItemHistoryRowToModel(row),
+			referenceUrl: this.getReferenceUrl(row.reference_link)
+		}));
 	}
 	
 	async getItemHistoryByItemId(itemId) {
@@ -340,19 +366,20 @@ class SupabaseProvider extends DatabaseProvider {
 			.eq("item_id", normalizedId)
 			.order("created_at", { ascending: false });
 
-		if (error) {
-			throw error;
-		}
+		if (error) throw error;
 
-		return data.map(mapItemHistoryRowToModel);
+		return data.map(row => ({
+			...mapItemHistoryRowToModel(row),
+			referenceUrl: this.getReferenceUrl(row.reference_link)
+		}));
 	}
 
 	async addItemHistory(itemId, data) {
-		const normalizedId = this.toSupabaseId(itemId);
-
 		const payload = {
-			item_id: normalizedId,
-			...data,
+			item_id: this.toSupabaseId(itemId),
+			user_id: this.toSupabaseId(data.userId),
+			action: data.action,
+			reference_link: data.referenceLink ?? null,
 			created_at: new Date()
 		};
 
@@ -362,9 +389,7 @@ class SupabaseProvider extends DatabaseProvider {
 			.select()
 			.single();
 
-		if (error) {
-			throw error;
-		}
+		if (error) throw error;
 
 		return mapItemHistoryRowToModel(inserted);
 	}
@@ -380,36 +405,44 @@ class SupabaseProvider extends DatabaseProvider {
 			id,
 			user_id,
 			item_id,
-			start_time,
 			duration,
-			returned_at,
+			action,
 			created_at,
-			items!inner(id, name, category, status, date_acquired)
+			reference_link,
+			items!inner(id, name, serial, model, brand, category, status, date_acquired, image_name)
 			`)
 			.eq("user_id", normalizedUserId)
-			.is("returned_at", null); // only active items
+			.order("created_at", { ascending: false });
 
-		if (error) {
-			throw error;
+		if (error) throw error;
+
+		// get latest per item
+		const latestMap = new Map();
+
+		for (const row of data) {
+			if (!latestMap.has(row.item_id)) {
+			latestMap.set(row.item_id, row);
+			}
 		}
 
-		return data.map((row) => {
-			return {
-				id: row.id,
-				userId: row.user_id,
-				itemId: row.item_id,
-				startTime: row.start_time,
-				duration: row.duration,
-				returnedAt: row.returned_at,
-				createdAt: row.created_at,
+		// only keep items still checked out
+		const activeItems = [...latestMap.values()].filter(
+			row => row.action === "checkout"
+		);
 
-				// joined item
-				item: {
-					...mapItemRowToModel(row.items),
-					imageUrl: this.getImageUrl(row.items.image_name),
-				}
-			};
-		});
+		return activeItems.map(row => ({
+			id: row.id,
+			userId: row.user_id,
+			itemId: row.item_id,
+			duration: row.duration,
+			createdAt: row.created_at,
+			referenceUrl: this.getReferenceUrl(row.reference_link),
+
+			item: {
+			...mapItemRowToModel(row.items),
+			imageUrl: this.getImageUrl(row.items.image_name),
+			}
+		}));
 	}
 
 	async assignItemToUser(itemId, userId, startTime, duration) {
@@ -449,7 +482,13 @@ class SupabaseProvider extends DatabaseProvider {
 			throw error;
 		}
 
-		return mapItemHistoryRowToModel(data);
+
+		const mapped = mapItemHistoryRowToModel(data); 
+
+		return {
+			...mapped, 
+			FileUrl: this.getReferenceUrl(data.reference_link)
+		};
 	}
 
 	async removeItemFromUser(itemId, userId) {
@@ -547,6 +586,23 @@ class SupabaseProvider extends DatabaseProvider {
 		if (error) throw error;
 
 		return data ? mapApiKeyRowToModel(data) : null;
+	}
+
+
+	// for promoting new admin acc
+	async promoteToAdmin(userId) {
+		const normalizedUserId = this.toSupabaseId(userId);
+
+		const { data, error } = await this.supabase
+			.from(SUPABASE_TABLES.USERS)
+			.update({ role: "Admin" })
+			.eq("id", normalizedUserId)
+			.select("id, email, role")
+			.single();
+
+		if (error) throw error;
+
+		return mapUserRowToModel(data);
 	}
 }
 

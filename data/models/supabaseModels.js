@@ -24,13 +24,14 @@ function toDateOnlyString(value) {
 }
 
 function mapUserRowToModel(row) {
-	return {
-		id: toIdString(row.id),
-		name: row.name,
-		email: row.email,
-		role: row.role,
-		status: row.status,
-		createdAt: row.created_at,
+  return {
+    id: toIdString(row.id),
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    createdAt: row.created_at,
+    passwordHash: row.password_hash,
   };
 }
 
@@ -62,6 +63,7 @@ function mapItemHistoryRowToModel(row) {
 		returnedAt: toDateValue(row.returned_at),
 		referenceLink: row.reference_link,
 		createdAt: row.created_at,
+		action: row.action,
   };
 }
 

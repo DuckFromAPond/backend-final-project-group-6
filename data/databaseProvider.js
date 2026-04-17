@@ -22,6 +22,8 @@ class DatabaseProvider {
 	async createItem(data) {}			// admin
 	async updateItem(id, data) {}		// admin for changing data and user for updating status 
 	async deleteItem(id) {}				// admin
+	async setItemStatus(itemId, status) {}
+	async getItemStatus(itemId) {}
 
 	// ===== HISTORY =====
 	async getItemHistories() {}
