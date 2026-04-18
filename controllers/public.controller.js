@@ -18,7 +18,7 @@ const itemData = {
   itemHistories: itemHistories,
 };
 
-
+// GET: /HOME ----------------
 exports.home = async (req, res) => {
   const db = getDbProvider();
 
@@ -65,6 +65,7 @@ exports.home = async (req, res) => {
   });
 };
 
+// GET: /items ----------------
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
   const { cat, q } = req.query;
@@ -88,16 +89,25 @@ exports.showItems = async (req, res) => {
       item.name?.toLowerCase().includes(q.toLowerCase())
     );
   }
+  
+  const statuses = [
+    { name: "Available" },
+    { name: "In-Use" },
+    { name: "Maintenance" },
+    { name: "Retired" }
+  ];
 
   res.render("items/items", {
     categories,
     items,
+    statuses,
     user: req.user || null,
     error: req.query.error || null,
     success: req.query.success || null, 
     pageTitle: "Items"
   });
 };
+
 
 exports.addItem = (req, res) => {
     try {
@@ -400,6 +410,8 @@ exports.showItemHistory = (req, res) => {
   res.render("items/itemHistory", context);
 };
 
+
+// POST: /CHECKIN 
 exports.checkIn = async (req, res, next) => {
   try {
     const db = getDbProvider();
@@ -429,27 +441,29 @@ exports.checkIn = async (req, res, next) => {
       return res.redirect("/items?error=Item+not+checked+out");
     }
 
-    // 1. upload file FIRST
+    // 1. upload file 
     let filePath = null;
 
     if (files?.document?.length > 0) {
       const file = files.document[0];
-      const fs = require("fs");
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+      if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+5MB)");
+      }
 
       const fileBuffer = fs.readFileSync(file.path);
 
       const fileName = `${Date.now()}_${file.originalFilename}`;
       filePath = `checkin/${fileName}`;
 
-      const { error: uploadError } = await db.supabase.storage
-        .from("docs-bucket")
-        .upload(filePath, fileBuffer);
+      await db.uploadFile(filePath, fileBuffer);
 
       if (uploadError) throw uploadError;
     }
 
     // 2. update state
-    await db.setItemStatus(itemId, "Available");
+    await db.updateItem(itemId, { status: "Available" });
 
     // 3. log history ONCE
     await db.addItemHistory(itemId, {
@@ -495,15 +509,17 @@ exports.checkOut = async (req, res, next) => {
 
     if (files?.document?.length > 0) {
       const file = files.document[0];
-      const fs = require("fs");
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+      if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+5MB)");
+      }
 
       const fileBuffer = fs.readFileSync(file.path);
       const fileName = `${Date.now()}_${file.originalFilename}`;
       filePath = `checkout/${fileName}`;
 
-      const { error } = await db.supabase.storage
-        .from("docs-bucket")
-        .upload(filePath, fileBuffer);
+      await db.uploadFile(filePath, fileBuffer);
 
       if (error) {
         console.error("Upload error:", error);
@@ -511,7 +527,7 @@ exports.checkOut = async (req, res, next) => {
       }
     }
 
-    await db.setItemStatus(itemId, "In-Use");
+    await db.updateItem(itemId, { status: "In-Use" });
 
     await db.addItemHistory(itemId, {
       userId,

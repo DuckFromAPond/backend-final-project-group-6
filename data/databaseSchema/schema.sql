@@ -24,6 +24,8 @@ CREATE TABLE items (
     model TEXT,
     brand TEXT,
     category TEXT NOT NULL,
+    sub_category TEXT NOT NULL;
+
     status TEXT NOT NULL CHECK (
         status IN ('Available', 'In-Use', 'Maintenance', 'Retired')
     ),

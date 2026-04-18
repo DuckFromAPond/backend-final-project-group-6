@@ -6,7 +6,6 @@ const { engine } = require("express-handlebars");
 const cookieParser = require("cookie-parser");
 const path = require('path');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
 const multiparty = require('multiparty');
@@ -62,15 +61,7 @@ publicApp.set("views", path.join(__dirname, 'views'));
 publicApp.use(cookieParser());
 publicApp.use(express.static(path.join(__dirname, 'public')));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
-// Rate limiting configuration
-const option = {
-    windowMs: 1 * 60 * 1000, // 1 minutes
-    max: 20, // limit each IP to 20 requests
-    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after 1 minutes'
-}
-publicApp.use(rateLimit(option));
+
 // CORS configuration
 const whitelist = new Set([
   `http://localhost:${config.PORT}`,
@@ -95,7 +86,7 @@ publicApp.use(cors(corsOptions));
 // Morgan logging
 publicApp.use(morgan('dev'));
 
-// replace this for db + bucket
+// replace this for db + bucket --------------------------------------------- remove later I assume 
 const uploadsDir = path.join(__dirname, 'public', 'images');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });

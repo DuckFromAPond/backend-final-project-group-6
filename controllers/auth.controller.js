@@ -7,6 +7,7 @@ exports.showLogin = (req, res) => {
   res.render("auth/login", {
     layout: "no_nav_bar",
     error: errorMsg,
+    pageTitle: "Login"
   });
 };
 
@@ -23,6 +24,7 @@ exports.login = async (req, res) => {
       return res.render("auth/login", {
         layout: "no_nav_bar",
         error: "Invalid email or password",
+        pageTitle: "Login"
       });
     }
 
@@ -33,6 +35,7 @@ exports.login = async (req, res) => {
       return res.render("auth/login", {
         layout: "no_nav_bar",
         error: "Invalid email or password",
+        pageTitle: "Login"
       });
     }
 
@@ -61,6 +64,7 @@ exports.login = async (req, res) => {
     console.error(err);
     res.status(500).render('extra_pages/500', {
     message: `Error message: ${err}`,
+    pageTitle: "505"
   });
   }
 };
@@ -90,7 +94,8 @@ exports.register = async (req, res) => {
 
     return res.render("auth/register", {
       layout: "no_nav_bar",
-      error: error.message || "Registration failed"
+      error: error.message || "Registration failed",
+      pageTitle: "Register"
     });
   }
 };

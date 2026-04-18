@@ -320,27 +320,6 @@ class SupabaseProvider extends DatabaseProvider {
 
 		return true;
 	}
-	
-	async setItemStatus(itemId, status) {
-		const normalizedId = this.toSupabaseId(itemId);
-
-		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.ITEMS)
-			.update({ status })
-			.eq("id", normalizedId)
-			.select()
-			.single();
-
-		if (error) throw error;
-
-		return mapItemRowToModel(data);
-	}
-
-	async getItemStatus(itemId) {
-		const item = await this.getItemById(itemId);
-		return item?.status;
-	}
-
 
 	// ===== HISTORY =====
 	async getItemHistories() {
@@ -445,31 +424,39 @@ class SupabaseProvider extends DatabaseProvider {
 		}));
 	}
 
-	async assignItemToUser(itemId, userId, startTime, duration) {
+	async UpdateItemHistory(itemId, userId, action, options = {}) {				// admin
 		const normalizedItemId = this.toSupabaseId(itemId);
 		const normalizedUserId = this.toSupabaseId(userId);
 
-		const { data: existing, error: checkError } = await this.supabase
-			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.select("id")
-			.eq("item_id", normalizedItemId)
-			.is("returned_at", null)
-			.maybeSingle();
-
-		if (checkError) {
-			throw checkError;
+		// validate action
+		if (!["checkout", "checkin"].includes(action)) {
+			throw new Error("Invalid action type");
 		}
 
-		if (existing) {
-			throw new Error("Item is already assigned");
+		// enforce rules
+		if (action === "checkout") {
+			const { data: existing, error: checkError } = await this.supabase
+				.from(SUPABASE_TABLES.ITEM_HISTORIES)
+				.select("id")
+				.eq("item_id", normalizedItemId)
+				.is("returned_at", null)
+				.maybeSingle();
+
+			if (checkError) throw checkError;
+
+			if (existing) {
+				throw new Error("Item is already checked out");
+			}
 		}
 
 		const payload = {
 			item_id: normalizedItemId,
 			user_id: normalizedUserId,
-			start_time: startTime,
-			duration: duration,
-			returned_at: null
+			action,
+			duration: options.duration ?? null,
+			reference_link: options.referenceLink ?? null,
+			start_time: options.startTime ?? new Date(),
+			returned_at: action === "checkin" ? new Date() : null,
 		};
 
 		const { data, error } = await this.supabase
@@ -478,40 +465,20 @@ class SupabaseProvider extends DatabaseProvider {
 			.select()
 			.single();
 
-		if (error) {
-			throw error;
+		if (error) throw error;
+
+		// optionally sync item status
+		if (action === "checkout") {
+			await this.setItemStatus(itemId, "In-Use");
+		} else if (action === "checkin") {
+			await this.setItemStatus(itemId, "Available");
 		}
 
-
-		const mapped = mapItemHistoryRowToModel(data); 
-
 		return {
-			...mapped, 
-			FileUrl: this.getReferenceUrl(data.reference_link)
+			...mapItemHistoryRowToModel(data),
+			referenceUrl: this.getReferenceUrl(data.reference_link),
 		};
 	}
-
-	async removeItemFromUser(itemId, userId) {
-		const normalizedItemId = this.toSupabaseId(itemId);
-		const normalizedUserId = this.toSupabaseId(userId);
-
-		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.update({
-			returned_at: new Date()
-			})
-			.eq("item_id", normalizedItemId)
-			.eq("user_id", normalizedUserId)
-			.is("returned_at", null) // only active assignment
-			.select()
-			.maybeSingle();
-
-		if (error) throw error;
-		if (!data) return null;
-
-		return mapItemHistoryRowToModel(data);
-	}
-
 
 
 
@@ -567,7 +534,7 @@ class SupabaseProvider extends DatabaseProvider {
 		return data ? mapApiKeyRowToModel(data) : null;
 	}
 
-	async revokeApiKey(admin_id, id) {
+	async revokeApiKey(adminId, id) {
 		const admin = await this.getUserById(adminId);
 
 		if (!admin || admin.role !== "Admin") {
@@ -588,21 +555,16 @@ class SupabaseProvider extends DatabaseProvider {
 		return data ? mapApiKeyRowToModel(data) : null;
 	}
 
+	async uploadFile(path, buffer) {
+		const { error } = await this.supabase.storage
+			.from("docs-bucket")
+			.upload(path, buffer);
 
-	// for promoting new admin acc
-	async promoteToAdmin(userId) {
-		const normalizedUserId = this.toSupabaseId(userId);
+		if (error) {
+			throw new Error(`Upload failed: ${error.message}`);
+		}
 
-		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.USERS)
-			.update({ role: "Admin" })
-			.eq("id", normalizedUserId)
-			.select("id, email, role")
-			.single();
-
-		if (error) throw error;
-
-		return mapUserRowToModel(data);
+		return path;
 	}
 }
 
