@@ -10,7 +10,6 @@ router.get('/', publicController.home);
 router.get("/home", publicController.home);
 router.get("/items", publicController.showItems);
 router.post("/items", publicController.addItem);
-router.get("/items/history", publicController.showHistory);
 router.get("/items/:id", publicController.showItemDetail);
 router.put("/items/:id", publicController.editItem);
 router.delete("/items/:id", publicController.deleteItem);

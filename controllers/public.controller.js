@@ -1,20 +1,29 @@
 
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
+const path = require('path');
+const fs = require('fs');
 
 // temp temp data 
 const itemData = {
-  categories: [
-    { name: "Computers", subCategories: [] },
-    { name: "Peripherals", subCategories: [] },
-  ],
-  //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-  items: items, // Use the imported items here
-  itemHistories: itemHistories,
+    categories: [
+        { name: "Computers", subCategories: [] },
+        { name: "Peripherals", subCategories: [] },
+    ],
+    //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
+    items: items, // Use the imported items here
+    itemHistories: itemHistories,
 };
 
+// replace this for db + bucket
+const uploadsDir = path.join(__dirname, 'public', 'images');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`✓ Created uploads directory at ${uploadsDir}`);
+}
+
 exports.home = (req, res) => {
-  res.render("home", { dashboardData });
+    res.render("home", { dashboardData });
 };
 
 exports.showItems = (req, res) => {
@@ -324,86 +333,86 @@ exports.deleteItem = (req, res) => {
 }
 
 exports.showItemHistory = (req, res) => {
-  const { id } = req.params;
+    const { id } = req.params;
 
-  const context = {
-    item: itemData.items.find((item) => String(item.id) === String(id)),
-    itemHistories: itemData.itemHistories.find(
-      (item) => String(item.id) === String(id),
-    ),
-  };
+    const context = {
+        item: itemData.items.find((item) => String(item.id) === String(id)),
+        itemHistories: itemData.itemHistories.find(
+            (item) => String(item.id) === String(id),
+        ),
+    };
 
-  const history = context.itemHistories;
+    const history = context.itemHistories;
 
-  if (history) {
-    history.histories = history.histories.map(h => {
-      // find username using id 
-      const user = users.find(u => u.id === h.user_id);
+    if (history) {
+        history.histories = history.histories.map(h => {
+            // find username using id 
+            const user = users.find(u => u.id === h.user_id);
 
-      return {
-        ...h,
-        assignee: user ? user.name : "No name given"
-      };
-    });
-  }
+            return {
+                ...h,
+                assignee: user ? user.name : "No name given"
+            };
+        });
+    }
 
-  res.render("items/itemHistory", context);
+    res.render("items/itemHistory", context);
 };
 
 exports.checkout = (req, res) => {
-  // GONNA START BY ASSUMING YOU ARE ID 1
-  const currentUserId = 1; // replace with actual logged-in user
+    // GONNA START BY ASSUMING YOU ARE ID 1
+    const currentUserId = 1; // replace with actual logged-in user
 
-  const currentlyOwnedItems = itemData.items
-    .map((item) => {
-      const history = itemData.itemHistories.find((h) => h.id === item.id);
-      const lastAssignment =
-        history?.histories[history.histories.length - 1] || null;
+    const currentlyOwnedItems = itemData.items
+        .map((item) => {
+            const history = itemData.itemHistories.find((h) => h.id === item.id);
+            const lastAssignment =
+                history?.histories[history.histories.length - 1] || null;
 
-      return {
-        id: item.id,
-        name: item.name,
-        // serial: item.serial,
-        // model: item.model,
-        // brand: item.brand,
-        // category: item.category,
-        status: item.status,
-        dateAcquired: item.dateAcquired,
-        // description: item.description,
-        // imagePath: item.imagePath,
-        // imageAlt: item.imageAlt,
-        currentAssignee: lastAssignment?.assignee || null,
-        currentAssigneeID: lastAssignment?.user_id || null,
-        currentDuration: lastAssignment?.duration || null,
-        currentReference: lastAssignment?.referenceLink || null,
-      };
-    })
-    .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
+            return {
+                id: item.id,
+                name: item.name,
+                // serial: item.serial,
+                // model: item.model,
+                // brand: item.brand,
+                // category: item.category,
+                status: item.status,
+                dateAcquired: item.dateAcquired,
+                // description: item.description,
+                // imagePath: item.imagePath,
+                // imageAlt: item.imageAlt,
+                currentAssignee: lastAssignment?.assignee || null,
+                currentAssigneeID: lastAssignment?.user_id || null,
+                currentDuration: lastAssignment?.duration || null,
+                currentReference: lastAssignment?.referenceLink || null,
+            };
+        })
+        .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
 
-  console.log(currentlyOwnedItems);
-  res.render("checkout", {
-    items: currentlyOwnedItems,
-  });
+    console.log(currentlyOwnedItems);
+    res.render("checkout", {
+        items: currentlyOwnedItems,
+    });
 };
 
 exports.report = (req, res) => {
-  res.render("report");
+    res.render("report");
 };
 
 // ++++++++++ List-user page
 exports.users = (req, res) => {
-  // MOCK DATA
-  res.render("users", { users });
+    // MOCK DATA
+    res.render("users", { users });
 };
 
 // 404 handler 
 exports.notFound = (req, res) => {
-  res.status(404).render('extra_pages/404', {
-    message: 'The page you are looking for does not exist.',
-  });
+    res.status(404).render('extra_pages/404', {
+        message: 'The page you are looking for does not exist.',
+    });
 };
 
-// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT 
+// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT
 
 // middle-ware to render 404 (bad)
 // app.use((req, res, next) => {

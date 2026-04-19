@@ -10,7 +10,6 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
 const multiparty = require('multiparty');
 const { randomUUID } = require('crypto');
 require("dotenv").config();
@@ -70,7 +69,7 @@ option = {
 publicApp.use(rateLimit(option));
 // CORS configuration
 const whitelist = [
-    `http://localhost:${PORT}`,
+    `http://localhost:3000`,
 ];
 const corsOptions = {
     origin: (origin, callback) => {
@@ -85,13 +84,6 @@ const corsOptions = {
 publicApp.use(cors(corsOptions));
 // Morgan logging
 publicApp.use(morgan('dev'));
-
-// replace this for db + bucket
-const uploadsDir = path.join(__dirname, 'public', 'images');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log(`✓ Created uploads directory at ${uploadsDir}`);
-}
 
 // temp (will change when nav is finalized)
 publicApp.use((req, res, next) => {
