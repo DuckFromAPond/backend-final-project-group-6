@@ -8,42 +8,43 @@ class DatabaseProvider {
 	}
 
 	// ===== USER AUTHENTICATION =====
-	async registerUser(email, password) {}
-	async findUserByEmail(email) {}
-	async verifyPassword(password, hash) {}
-	async getUserById(userId) {}
-	async updateUser(userId, data) {}
+	async registerUser(email, password) {throw new Error("missing implementation");}
+	async findUserByEmail(email) {throw new Error("missing implementation");}
+	async verifyPassword(password, hash) {throw new Error("missing implementation");}
+	async getUserById(userId) {throw new Error("missing implementation");}
+	async updateUser(userId, data) {throw new Error("missing implementation");}			// <--- use this to update user and disbale archive/"delete" user
 	
-	async getAllUsers() {}
-	// async promoteToAdmin(userId) {}		// not needed might remove 
+	async getAllUsers() {throw new Error("missing implementation");}
 
 	// ===== ITEMS =====
-	async getItems() {}
-	async getItemById(id) {}
+	async getItems() {throw new Error("missing implementation");}
+	async getItemById(id) {throw new Error("missing implementation");}
 
-	async createItem(data) {}			// admin
-	async updateItem(id, data) {}		// admin for changing data and user for updating status 
-	async deleteItem(id) {}				// admin
+	async createItem(data) {throw new Error("missing implementation");}			// admin
+	async updateItem(id, data) {throw new Error("missing implementation");}		// admin for changing data and user for updating status 
+
+	// async retireItem(id) {throw new Error("missing implementation");}	<--------- just use update to retire (no hard delete)
 
 	// ===== HISTORY =====
-	async getItemHistories() {}
-	async getItemHistoryByItemId(itemId) {}
-	async addItemHistory(itemId, data) {}
+	async getItemHistories() {throw new Error("missing implementation");}
+	async getItemHistoryByItemId(itemId) {throw new Error("missing implementation");}
+	async addItemHistory(itemId, data) {throw new Error("missing implementation");}
 
 	// ===== FOR USER TO ITEMS RELATIONS : UPDATE HISTORY =====
-	async getUserItems(userId) {}
+	async getUserItems(userId) {throw new Error("missing implementation");}
 
-	async UpdateItemHistory(itemId, userId, action, options = {}) {} 			// for admin 
+	async updateUserItem(itemId, newUserId, adminId, options = {}) {throw new Error("missing implementation");} 			// for admin 
 
 	// ===== API KEYS ===== (need to add to auth middleware/auth controller/admin controller later)
-	async createApiKey(adminId, data) {}        			// for admin 
-	async getApiKeys() {}              						// for admin
-	async getApiKeyByKey(key) {}       						// for middleware
-	async revokeApiKey(adminId, id) {}          			// for admin
+	async createApiKey(adminId, data) {throw new Error("missing implementation");}        			// for admin 
+	async getApiKeys() {throw new Error("missing implementation");}              						// for admin
+	async getApiKeyByKey(key) {throw new Error("missing implementation");}       						// for middleware
+	async revokeApiKey(adminId, id) {throw new Error("missing implementation");}          			// for admin
 
 
 	// add more database manip or func here if want 
-	async uploadFile(path, buffer) {}
+	async uploadFile(path, buffer) {throw new Error("missing implementation");}
+	async uploadItem(path, buffer) {throw new Error("missing implementation");}
 
 	
 	// ===== HELPER goes down here  (moved to conflictCheck)

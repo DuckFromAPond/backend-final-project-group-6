@@ -14,7 +14,7 @@
         </h1>
     </div>
         {{!-- Form set up --}}
-    <form action="/api/transactions/checkout" method="POST" enctype="multipart/form-data" class="space-y-4">
+    <form action="/transactions/checkout" method="POST" enctype="multipart/form-data" class="space-y-4">
         {{!-- Item ID --}}
         <div>
             <label for="file_item" class="block text-sm font-medium text-gray-700 mb-1">
@@ -32,7 +32,7 @@
         </div>
         <div>
             <label for="duration" class="block text-sm font-medium text-gray-700 mb-1">
-                Duration
+                Duration (in hours)
             </label>
             <input
                 type="text"
@@ -43,6 +43,13 @@
             />
         </div>
         <div class="flex gap-2 mt-2">
+            
+            <button type="button"
+                onclick="setDuration(24)"
+                class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded">
+                1 Day
+            </button>
+
             <button type="button"
                 onclick="setDuration(24 * 7)"
                 class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded">
@@ -56,10 +63,11 @@
             </button>
 
             <button type="button"
-                onclick="setDuration(24)"
+                onclick="setDuration(24 * 365)"
                 class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded">
-                1 Day
+                1 Year
             </button>
+    
         </div>
 
         {{!-- File upload --}}
@@ -78,7 +86,7 @@
                 />
             </div>
             <p class="text-xs text-gray-500 mt-1">
-                Allowed: PDF, DOC, DOCX • Max size: 50MB
+                Allowed: PDF, DOC, DOCX {{#if (eq config.DB_PROVIDER "supabase")}}• Max size: 50MB {{/if}}
             </p>
         </div>
 

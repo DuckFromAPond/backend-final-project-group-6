@@ -1,6 +1,8 @@
 const { generateToken } = require("../middleware/authMiddleware");
 const { users } = require('../data/data');
 
+const { getDbProvider } = require("../utils/dbProviderShared");
+
 exports.showLogin = (req, res) => {
   const errorMsg = req.query.error;
 
@@ -28,9 +30,18 @@ exports.login = async (req, res) => {
       });
     }
 
+    if (user.status === "Disabled") {
+      return res.render("auth/login", {
+        layout: "no_nav_bar",
+        error: "Account disabled",
+        pageTitle: "Login"
+      });
+    }
+
     // 2. verify password (bcrypt in provider)
     const isValid = await db.verifyPassword(password, user.passwordHash);
 
+    
     if (!isValid) {
       return res.render("auth/login", {
         layout: "no_nav_bar",
@@ -49,15 +60,6 @@ exports.login = async (req, res) => {
       maxAge: 1000 * 60 * 60, // 1 hour
     });
 
-
-
-    // 5. role-based redirect
-    if (user.role === "Admin") {
-      return res.redirect(
-        `/`
-      );
-    }
-
     return res.redirect("/home");
 
   } catch (err) {
@@ -73,8 +75,6 @@ exports.showRegister = (req, res) => {
   res.render("auth/register", { layout: "no_nav_bar" });
 };
 
-const { getDbProvider } = require("../utils/dbProviderShared");
-
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -83,7 +83,7 @@ exports.register = async (req, res) => {
 
     const user = await db.registerUser(email, password, name);
 
-    // auto-login after register (recommended UX)
+    // auto-login after register
     const token = generateToken(user);
     res.cookie("accessToken", token, { httpOnly: true });
 

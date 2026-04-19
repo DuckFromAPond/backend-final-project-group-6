@@ -22,6 +22,11 @@ const publicRoutes = require('./routes/public.routes');
 const createDatabaseProvider = require("./utils/createDBProvider");
 
 
+// fix for nodeJS v22.22 not being able to connect to mongoDB
+const dns = require("node:dns/promises");   
+dns.setServers(["1.1.1.1", "1.0.0.1"]);   
+
+
 let dbProvider;
 
 
@@ -61,6 +66,7 @@ publicApp.set("views", path.join(__dirname, 'views'));
 publicApp.use(cookieParser());
 publicApp.use(express.static(path.join(__dirname, 'public')));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
+publicApp.use(express.json());
 
 // CORS configuration
 const whitelist = new Set([
@@ -118,9 +124,12 @@ publicApp.use('/', publicRoutes);
 
 // Other routes
 publicApp.use((error, req, res, next) => {
-    console.log(error)
-    res.status(500);
-    res.render("extra_pages/500");
+    console.error(error);
+
+    return res.status(500).render("extra_pages/500", {
+        pageTitle: "500",
+        message: error.message || "Internal Server Error"
+    });
 });
 
 

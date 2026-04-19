@@ -9,9 +9,10 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('Admin', 'User')),
+    role TEXT NOT NULL CHECK (role IN ('Admin', 'Technician')),
     status TEXT NOT NULL CHECK (status IN ('Active', 'Disabled')),
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    disabled_at TIMESTAMP NULL
 );
 
 -- =========================
@@ -24,7 +25,7 @@ CREATE TABLE items (
     model TEXT,
     brand TEXT,
     category TEXT NOT NULL,
-    sub_category TEXT NOT NULL;
+    sub_category TEXT NOT NULL,
 
     status TEXT NOT NULL CHECK (
         status IN ('Available', 'In-Use', 'Maintenance', 'Retired')

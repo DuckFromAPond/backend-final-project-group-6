@@ -449,7 +449,7 @@ exports.checkIn = async (req, res, next) => {
       const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
       if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+5MB)");
+          return res.redirect("/items?error=File+too+large+(max+50MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
@@ -492,6 +492,7 @@ exports.checkOut = async (req, res, next) => {
     });
 
     const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
     const userId = req.user.id;
 
     const item = await db.getItemById(itemId);
@@ -500,31 +501,31 @@ exports.checkOut = async (req, res, next) => {
       return res.redirect("/items?error=Item+not+found");
     }
 
-
-    if (item.status !== "Available") {
+    if (item.status !== "Available" || ["Maintenance", "Retired"].includes(item.status)) {
       return res.redirect("/items?error=Item+not+available");
     }
 
     let filePath = null;
 
-    if (files?.document?.length > 0) {
+    if (files?.document?.length > 0 && db.providerLabel === "Supabase") {
       const file = files.document[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+      const MAX_SIZE = 50 * 1024 * 1024;
 
       if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+5MB)");
+        return res.redirect("/items?error=File+too+large+(max+50MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
       const fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `checkout/${fileName}`;
 
-      await db.uploadFile(filePath, fileBuffer);
+      filePath = await db.uploadFile(fileName, fileBuffer);
+    } else {
+      const file = files.document[0];
 
-      if (error) {
-        console.error("Upload error:", error);
-        return res.redirect("/items?error=Upload+failed");
-      }
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+
+      filePath = await db.uploadFile(fileName, fileBuffer);
     }
 
     await db.updateItem(itemId, { status: "In-Use" });
@@ -532,7 +533,7 @@ exports.checkOut = async (req, res, next) => {
     await db.addItemHistory(itemId, {
       userId,
       action: "checkout",
-      duration: fields.duration?.[0] ?? null,
+      duration: duration ?? null,
       referenceLink: filePath,
     });
 
