@@ -10,7 +10,6 @@ const {
 	mapApiKeyRowToModel,
 } = require("./models/supabaseModels");
 
-console.log("TABLES LOADED:", SUPABASE_TABLES);
 
 class SupabaseProvider extends DatabaseProvider {
 	constructor() {
@@ -80,6 +79,21 @@ class SupabaseProvider extends DatabaseProvider {
 			.getPublicUrl(filePath);
 
 		return data.publicUrl;
+	}
+
+	getLatestCheckoutRows(rows, getItemId) {
+		const latestMap = new Map();
+
+		for (const row of rows) {
+			const itemId = getItemId(row);
+			if (!itemId) continue;
+
+			if (!latestMap.has(itemId)) {
+			latestMap.set(itemId, row);
+			}
+		}
+
+		return [...latestMap.values()].filter(r => r.action === "checkout");
 	}
 
 	async initializeDatabase() {
@@ -375,7 +389,7 @@ class SupabaseProvider extends DatabaseProvider {
 			action,
 			created_at,
 			reference_link,
-			items!inner(id, name, serial, model, brand, category, status, date_acquired, image_name)
+			items!inner(id, name, serial, model, brand, category, sub_category, status, description, date_acquired, image_alt, image_name)
 			`)
 			.eq("user_id", normalizedUserId)
 			.order("created_at", { ascending: false });
@@ -383,31 +397,32 @@ class SupabaseProvider extends DatabaseProvider {
 		if (error) throw error;
 
 		// get latest per item
-		const latestMap = new Map();
+		const latest = this.getLatestCheckoutRows(data, r => r.item_id);
 
-		for (const row of data) {
-			if (!latestMap.has(row.item_id)) {
-			latestMap.set(row.item_id, row);
-			}
-		}
+		return latest.map(r => ({
+			id: r.id,
+			userId: r.user_id,
+			itemId: r.item_id,
+			action: r.action,
+			duration: r.duration,
+			createdAt: r.created_at,
 
-		// only keep items still checked out
-		const activeItems = [...latestMap.values()].filter(
-			row => row.action === "checkout"
-		);
-
-		return activeItems.map(row => ({
-			id: row.id,
-			userId: row.user_id,
-			itemId: row.item_id,
-			duration: row.duration,
-			createdAt: row.created_at,
-			referenceUrl: this.getReferenceUrl(row.reference_link),
+			referenceUrl: this.getReferenceUrl(r.reference_link),
 
 			item: {
-			...mapItemRowToModel(row.items),
-			imageUrl: this.getImageUrl(row.items.image_name),
-			}
+			id: r.items.id,
+			name: r.items.name,
+			serial: r.items.serial,
+			model: r.items.model,
+			brand: r.items.brand,
+			category: r.items.category,
+			sub_category: r.items.sub_category, 
+			status: r.items.status,
+			description: r.items.description, 
+			dateAcquired: r.items.date_acquired,
+			imageAlt: r.items.image_alt,
+			imageUrl: this.getImageUrl(r.items.image_name),
+			},
 		}));
 	}
 

@@ -133,7 +133,20 @@ class MongoProvider extends DatabaseProvider {
     );
   }
 
+  getLatestCheckoutRows(rows, getItemId) {
+    const latestMap = new Map();
 
+    for (const row of rows) {
+      const itemId = getItemId(row);
+      if (!itemId) continue;
+
+      if (!latestMap.has(itemId)) {
+        latestMap.set(itemId, row);
+      }
+    }
+
+    return [...latestMap.values()].filter(r => r.action === "checkout");
+  }
 
 
 
@@ -266,21 +279,36 @@ class MongoProvider extends DatabaseProvider {
       .sort({ createdAt: -1 })
       .lean();
 
-    const latestMap = new Map();
-
-    for (const row of histories) {
-      if (!row.itemId) continue;
-
-      const itemKey = row.itemId._id.toString();
-
-      if (!latestMap.has(itemKey)) {
-        latestMap.set(itemKey, row);
-      }
-    }
-
-    return [...latestMap.values()].filter(row =>
-      ["checkout"].includes(row.action)
+    const latest = this.getLatestCheckoutRows(
+      histories,
+      r => r.itemId?._id?.toString()
     );
+
+    return latest.map(r => ({
+      id: r._id.toString(),
+      userId: r.userId.toString(),
+      itemId: r.itemId._id.toString(),
+      action: r.action,
+      duration: r.duration,
+      createdAt: r.createdAt,
+
+      referenceUrl: r.referenceLink ?? null,
+
+      item: {
+        id: r.itemId._id.toString(),
+        name: r.itemId.name,
+        serial: r.itemId.serial,
+        model: r.itemId.model,
+        brand: r.itemId.brand,
+        category: r.itemId.category,
+        sub_category: r.itemId.sub_category,
+        status: r.itemId.status,
+        description: r.itemId.description,
+        dateAcquired: r.itemId.date_acquired,
+        imageAlt: r.itemId.image_alt,
+        imageUrl: this.getImageUrl(r.itemId.image_name),
+      },
+    }));
   }
 
   async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {

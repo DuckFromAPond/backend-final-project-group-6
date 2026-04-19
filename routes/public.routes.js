@@ -8,10 +8,12 @@ const publicController = require("../controllers/public.controller");
 router.get('/', protect, publicController.home);
 router.get("/home", protect, publicController.home);
 router.get("/items", protect, publicController.showItems);   // setting up apikey early
+
 // router.get("/items/history", authOrApiKey, publicController.showHistory);   <- might show full log on admin side instead
+
 router.get("/items/:id", protect, publicController.showItemDetail);        
 router.get("/items/:id/history", protect, publicController.showItemHistory);
-router.get("/checkin", protect, publicController.ShowCheckin);
+router.get("/owned", protect, publicController.showOwned);
 router.get("/report", protect, publicController.report);
 router.get("/users", protect, publicController.users);
 

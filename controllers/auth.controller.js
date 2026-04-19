@@ -1,5 +1,4 @@
 const { generateToken } = require("../middleware/authMiddleware");
-const { users } = require('../data/data');
 
 const { getDbProvider } = require("../utils/dbProviderShared");
 

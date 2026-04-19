@@ -1,7 +1,7 @@
 'use strict';   // for debugging
 
 const express = require("express");
-// const vhost    = require('vhost');
+const vhost    = require('vhost');
 const { engine } = require("express-handlebars");
 const cookieParser = require("cookie-parser");
 const path = require('path');
@@ -18,6 +18,7 @@ const { setDbProvider } = require("./utils/dbProviderShared");
 const config = require('./config/app.config');
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require('./routes/public.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const createDatabaseProvider = require("./utils/createDBProvider");
 
@@ -107,7 +108,7 @@ publicApp.use((req, res, next) => {
     res.locals.navItems =
         pathName === '/items' ||
         pathName.startsWith('/items/');
-    res.locals.navCheckin = pathName.startsWith('/checkin');
+    res.locals.navCheckin = pathName.startsWith('/owned');
     res.locals.navReport = pathName.startsWith('/report');
     res.locals.navUsers = pathName.startsWith('/users');     // <---- temp will delete when admin part is implemented
     
@@ -118,12 +119,37 @@ publicApp.use((req, res, next) => {
 publicApp.use("/", authRoutes);
 publicApp.use('/', publicRoutes);
 
-// const app = express();
-// app.use(publicApp);
+
+// ------ adminApp ------
+const adminApp = express();
+
+adminApp.engine('handlebars', engine({
+  defaultLayout: 'main',
+  extname:       '.handlebars',
+  layoutsDir:    path.join(__dirname, 'views/layouts'),
+  partialsDir:   path.join(__dirname, 'views/partials'),
+  helpers: hbsHelpers,
+}));
+adminApp.set('view engine', 'handlebars');
+adminApp.set('views', path.join(__dirname, 'views'));
+
+// adminApp middleware
+adminApp.use(express.urlencoded({ extended: false }));
+adminApp.use(express.static(path.join(__dirname, 'public')));
+adminApp.use(cookieParser());
+adminApp.use('/', adminRoutes);
+
+
+// ------ Main app ------
+const app = express();
+
+app.use(vhost('admin.' + config.DOMAIN, adminApp));   // admin subdomain first
+app.use(publicApp);                                   // fallback → public app
+
 
 
 // Other routes
-publicApp.use((error, req, res, next) => {
+app.use((error, req, res, next) => {
     console.error(error);
 
     return res.status(500).render("extra_pages/500", {
