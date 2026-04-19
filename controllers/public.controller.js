@@ -116,7 +116,7 @@ exports.showItems = async (req, res) => {
 };
 
 
-exports.addItem = async (req, res) => {
+exports.addItem = async (req, res, next) => {
     try {
         const db = getDbProvider();
         const form = new multiparty.Form();
@@ -134,6 +134,7 @@ exports.addItem = async (req, res) => {
         const brand = fields.brand?.[0] ?? '';
         const model = fields.model?.[0] ?? '';
         const category = fields.category?.[0] ?? '';
+        const sub_category = fields.subcategory?.[0] ?? '';
         const serial = fields.serial?.[0] ?? '';
         const status = fields.status?.[0] ?? '';
         const date_acquired = fields.dateAcquired?.[0] ?? new Date();
@@ -173,32 +174,28 @@ exports.addItem = async (req, res) => {
             image_name: fileName,
             image_alt: `Image of ${name}`
         };
-        
+
         await db.createItem(newItem);
 
         return res.redirect("/items?success=Checked+in+successfully");
     }
-    catch (error) {
-        console.error('❌ Error in /items:', error);
-        res.status(500).json({
-            type: 'error',
-            message: 'An error occurred while processing your file upload.',
-        });
+    catch (err) {
+      next(err);
     }
 }
 
-exports.showItemDetail = (req, res) => {
+exports.showItemDetail = async (req, res) => {
     const { id } = req.params;
     const { edit, del } = req.query;
+    const db = getDbProvider();
 
-    let context = itemData.items.find(item => String(item.id) === String(id))
-    context = {
-        ...context,
-        categories: itemData.categories,
-        statuses: itemData.statuses,
+    let item = await db.getItemById(id);
+
+    let context = {
+        ...items ? item : null,
         isEdit: false,
-        isDelete: false
-    }
+        isDelete: false,
+    };
 
     if (!context) {
         res.status(404)
@@ -339,14 +336,21 @@ exports.editItem = (req, res) => {
     }
 }
 
-exports.deleteItem = (req, res) => {
+exports.deleteItem = async (req, res, next) => {
     const { id } = req.params;
-    const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
-    itemData.items.splice(indexOfOld, 1);
-    return res.json({
-        type: 'success',
-        redirect: '/items'
-    })
+
+    try {
+      const db = getDbProvider();
+      await db.deleteItem(id);
+      
+      return res.json({
+          type: 'success',
+          redirect: '/items'
+      })
+    }
+    catch(err) {
+      next(err);
+    }
 }
 
 exports.showItemHistory = (req, res) => {

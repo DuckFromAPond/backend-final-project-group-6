@@ -65,6 +65,7 @@ publicApp.use(express.urlencoded({ extended: true })); // for forms (login/regis
 // CORS configuration
 const whitelist = new Set([
   `http://localhost:${config.PORT}`,
+  `http://admin.localhost:${config.PORT}`,
   "https://websitename.com"                 // <--------------------------- change when host on cloudflare later btw 
 ]);
 

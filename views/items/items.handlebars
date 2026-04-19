@@ -44,11 +44,18 @@
         {{> itemForm}}
         
         {{!-- item grid --}}
-        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 w-full">
-        {{#each items}}
-            {{> itemCard}}
-        {{/each}}
-        </section>
+        {{#if items}}
+            <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 w-full">
+                {{#each items}}
+                    {{> itemCard}}
+                {{/each}}
+            </section>
+        {{else}}
+            <section class="w-full flex flex-col justify-center items-center gap-y-5">
+                <h1 class="text-3xl font-bold">No Items Found</h1>
+                <p class="text-gray-500">Try searching for something else or adding a new item.</p>
+            </section>
+        {{/if}}
 
     </section>
 
