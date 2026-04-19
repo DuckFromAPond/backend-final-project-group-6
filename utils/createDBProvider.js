@@ -5,11 +5,11 @@ const SupabaseProvider = require("../data/SupabaseProvider");
 
 async function createDatabaseProvider() {
 	const rawProvider = (process.env.DB_PROVIDER || "supabase").trim().toLowerCase();
-	const providerKey = rawProvider === "mongo" ? "mongodb" : rawProvider;  
+	const providerKey = rawProvider === "mongo" ? "mongodb" : rawProvider;
 
 	let provider;
-   
-    if (providerKey === "supabase" || providerKey === "postgres") {
+
+	if (providerKey === "supabase" || providerKey === "postgres") {
 		provider = new SupabaseProvider();
 	} else {
 		throw new Error(

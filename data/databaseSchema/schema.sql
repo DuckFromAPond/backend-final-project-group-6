@@ -29,6 +29,7 @@ CREATE TABLE items (
     status TEXT NOT NULL CHECK (
         status IN ('Available', 'In-Use', 'Maintenance', 'Retired')
     ),
+    
     date_acquired DATE,
     description TEXT,
     image_name TEXT,

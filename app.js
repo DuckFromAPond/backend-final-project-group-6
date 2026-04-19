@@ -128,7 +128,7 @@ publicApp.use((error, req, res, next) => {
 async function startServer() {
 	try {
 		dbProvider = await createDatabaseProvider();
-    setDbProvider(dbProvider);  
+        setDbProvider(dbProvider);  
 		console.log(`Connected to ${dbProvider.providerLabel} database provider`);
 
 		publicApp.listen(config.PORT, () => {

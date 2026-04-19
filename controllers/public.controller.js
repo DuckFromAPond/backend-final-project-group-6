@@ -75,7 +75,7 @@ exports.home = async (req, res) => {
 // GET: /items ----------------
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q } = req.query;
+  const { cat, q, error } = req.query;
 
   // get all items from DB
   let items = await db.getItems();
@@ -116,108 +116,67 @@ exports.showItems = async (req, res) => {
 };
 
 
-exports.addItem = (req, res) => {
+exports.addItem = async (req, res) => {
     try {
+        const db = getDbProvider();
         const form = new multiparty.Form();
 
-        let uploadedFilePath = null;
+        const { fields, files } = await new Promise((resolve, reject) => {
+          form.parse(req, (err, fields, files) => {
+            if (err) return reject(err);
+            resolve({ fields, files });
+          });
+        });
 
-        form.parse(req, (error, fields, files) => {
-            if (error) {
-                console.error('❌ Form parsing error:', err);
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'Error parsing the form. Please try again.',
-                });
-            }
+        // extract fields
+        const name = fields.name?.[0] ?? '';
+        const description = fields.description?.[0] ?? '';
+        const brand = fields.brand?.[0] ?? '';
+        const model = fields.model?.[0] ?? '';
+        const category = fields.category?.[0] ?? '';
+        const serial = fields.serial?.[0] ?? '';
+        const status = fields.status?.[0] ?? '';
+        const date_acquired = fields.dateAcquired?.[0] ?? new Date();
 
-            // extract fields
-            const name = fields.name?.[0] ?? '';
-            const description = fields.description?.[0] ?? '';
-            const brand = fields.brand?.[0] ?? '';
-            const model = fields.model?.[0] ?? '';
-            const category = fields.category?.[0] ?? '';
-            const serial = fields.serial?.[0] ?? '';
-            const status = fields.status?.[0] ?? '';
-            const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
+        // upload file 
+        let filePath = null;
+        let fileName = null;
 
-            // extract file
-            const uploadedFile = files.image ? files.image : null;
+        console.log(files)
 
-            if (!uploadedFile || uploadedFile.length === 0) {
-                console.warn('⚠️  No file was selected for upload');
-                console.debug('📊 Debug - files object:', Object.keys(files));
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'No file was selected. Please choose an image file.',
-                });
-            }
+        if (files?.image?.length > 0) {
+          const file = files.image[0];
+          const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
-            const file = uploadedFile[0];
-            const originalFileName = file.originalFilename;
-            const tempFilePath = file.path;
+          if (file.size > MAX_SIZE) {
+              return res.redirect("/items?error=File+too+large+(max+50MB)");
+          }
 
-            const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-            const fileExtension = path.extname(originalFileName).toLowerCase();
+          const fileBuffer = fs.readFileSync(file.path);
 
-            if (!allowedExtensions.includes(fileExtension)) {
-                console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-                // Clean up the temporary file
-                fs.unlinkSync(tempFilePath);
-                return res.status(400).json({
-                    type: 'error',
-                    message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-                });
-            }
+          fileName = `${Date.now()}_${file.originalFilename}`;
+          filePath = `${fileName}`;
 
-            const timestamp = Date.now();
-            const fileName = `${timestamp}_${originalFileName}`;
-            const uploadsDir = path.join(__dirname, "../public/images");
+          await db.uploadFile(filePath, fileBuffer, true);
+        }
 
-            try {
-                fs.copyFileSync(tempFilePath, finalFilePath);
-                // Delete the temporary file
-                fs.unlinkSync(tempFilePath);
+        const newItem = {
+            name,
+            description,
+            brand,
+            model,
+            category,
+            sub_category: '',
+            serial,
+            status,
+            date_acquired,
+            image_name: fileName,
+            image_alt: `Image of ${name}`
+        };
+        
+        await db.createItem(newItem);
 
-                // Store the relative path for the view template
-                // This will be used to display the image in the result page
-                uploadedFilePath = `/images/${fileName}`;
-
-                console.log('✓ File Upload Successful:');
-                console.log(`   Original Filename: ${originalFileName}`);
-                console.log(`   Saved As: ${fileName}`);
-                console.log(`   Path: ${finalFilePath}`);
-
-                // add new item (replace with db)
-                const newItem = {
-                    id: itemData.items.length + 1,
-                    name,
-                    description,
-                    model,
-                    brand,
-                    category,
-                    imagePath: uploadedFilePath,
-                    imageAlt: `image of ${name}`,
-                    serial,
-                    status,
-                    dateAcquired,
-                };
-
-                itemData.items.push(newItem);
-
-                res.redirect('/items');
-            } catch (fsError) {
-                console.error('❌ File system error:', fsError);
-                // Clean up temp file if copy failed
-                if (fs.existsSync(tempFilePath)) {
-                    fs.unlinkSync(tempFilePath);
-                }
-                res.status(500).json({
-                    type: 'error',
-                    message: 'Error saving the file. Please try again.',
-                });
-            }
-        })
+        return res.redirect("/items?success=Checked+in+successfully");
     }
     catch (error) {
         console.error('❌ Error in /items:', error);
@@ -464,7 +423,7 @@ exports.checkIn = async (req, res, next) => {
       const fileName = `${Date.now()}_${file.originalFilename}`;
       filePath = `checkin/${fileName}`;
 
-      await db.uploadFile(filePath, fileBuffer);
+      await db.uploadFile(filePath, fileBuffer, false);
 
       if (uploadError) throw uploadError;
     }
@@ -526,7 +485,7 @@ exports.checkOut = async (req, res, next) => {
       const fileName = `${Date.now()}_${file.originalFilename}`;
       filePath = `checkout/${fileName}`;
 
-      await db.uploadFile(filePath, fileBuffer);
+      await db.uploadFile(filePath, fileBuffer, false);
 
       if (error) {
         console.error("Upload error:", error);

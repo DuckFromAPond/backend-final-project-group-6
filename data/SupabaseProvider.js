@@ -138,7 +138,7 @@ class SupabaseProvider extends DatabaseProvider {
 			email: normalizedEmail,
 			password_hash: passwordHash,
 			name: email.split("@")[0],
-			role: "User",
+			role: "Admin",
 			status: "Active"
 			}])
 			.select("id, email, name, role, status, created_at")
@@ -555,9 +555,22 @@ class SupabaseProvider extends DatabaseProvider {
 		return data ? mapApiKeyRowToModel(data) : null;
 	}
 
-	async uploadFile(path, buffer) {
+	// async uploadFile(path, buffer) {
+	// 	const { error } = await this.supabase.storage
+	// 		.from("docs-bucket")
+	// 		.upload(path, buffer);
+
+	// 	if (error) {
+	// 		throw new Error(`Upload failed: ${error.message}`);
+	// 	}
+
+	// 	return path;
+	// }
+
+	// a revised version of the uploadFile method (Should keep only 1)
+	async uploadFile(path, buffer, isItem) {
 		const { error } = await this.supabase.storage
-			.from("docs-bucket")
+			.from(isItem ? "items-bucket" : "docs-bucket")
 			.upload(path, buffer);
 
 		if (error) {

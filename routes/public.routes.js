@@ -28,5 +28,4 @@ router.post("/api/transactions/checkout", protect, publicController.checkOut);
 // error 404
 router.use(publicController.notFound);
 
-
 module.exports = router;

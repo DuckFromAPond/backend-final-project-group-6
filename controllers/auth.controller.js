@@ -1,5 +1,6 @@
 const { generateToken } = require("../middleware/authMiddleware");
 const { users } = require('../data/data');
+const { getDbProvider } = require("../utils/dbProviderShared");
 
 exports.showLogin = (req, res) => {
   const errorMsg = req.query.error;
@@ -19,6 +20,7 @@ exports.login = async (req, res) => {
 
     // 1. find user in DB
     const user = await db.findUserByEmail(email);
+
 
     if (!user) {
       return res.render("auth/login", {
@@ -49,8 +51,6 @@ exports.login = async (req, res) => {
       maxAge: 1000 * 60 * 60, // 1 hour
     });
 
-
-
     // 5. role-based redirect
     if (user.role === "Admin") {
       return res.redirect(
@@ -72,8 +72,6 @@ exports.login = async (req, res) => {
 exports.showRegister = (req, res) => {
   res.render("auth/register", { layout: "no_nav_bar" });
 };
-
-const { getDbProvider } = require("../utils/dbProviderShared");
 
 exports.register = async (req, res) => {
   try {
