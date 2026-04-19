@@ -20,6 +20,9 @@
   },
   "homepage": "https://github.com/TANGHuyming/backend-final-project-group-6#readme",
   "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.103.2",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",

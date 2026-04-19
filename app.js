@@ -1,21 +1,29 @@
+'use strict';   // for debugging
+
 const express = require("express");
 // const vhost    = require('vhost');
 const { engine } = require("express-handlebars");
 const cookieParser = require("cookie-parser");
 const path = require('path');
-const { items, itemHistories, users, dashboardData } = require("./data/data.js"); // import
-const { protect } = require("./middleware/authMiddleware");
-const { verifyToken } = require("./lib/auth");
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const fs = require('fs');
 const multiparty = require('multiparty');
 const { randomUUID } = require('crypto');
-require("dotenv").config();
+
+const { protect } = require("./middleware/authMiddleware");
+
+const { setDbProvider } = require("./utils/dbProviderShared");
+
 const config = require('./config/app.config');
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require('./routes/public.routes');
+
+const createDatabaseProvider = require("./utils/createDBProvider");
+
+
+let dbProvider;
+
 
 // HELPERS ───────────────────────────────────
 const hbsHelpers = {
@@ -32,12 +40,7 @@ const hbsHelpers = {
         }
         return options.inverse(this);
     },
-    // for active nav 
-    isActive: function (page, currentPage, options) {
-        return page === currentPage
-            ? "text-blue-500 font-semibold"
-            : "text-gray-700 hover:text-blue-500";
-    },
+    eq: (a, b) => a === b
 }
 
 // configurations for public app ───────────────────────────────────
@@ -58,32 +61,37 @@ publicApp.set("views", path.join(__dirname, 'views'));
 publicApp.use(cookieParser());
 publicApp.use(express.static(path.join(__dirname, 'public')));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
-// Rate limiting configuration
-option = {
-    windowMs: 1 * 60 * 1000, // 1 minutes
-    max: 20, // limit each IP to 20 requests
-    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after 1 minutes'
-}
-publicApp.use(rateLimit(option));
+
 // CORS configuration
-const whitelist = [
-    `http://localhost:3000`,
-];
+const whitelist = new Set([
+  `http://localhost:${config.PORT}`,
+  "https://websitename.com"                 // <--------------------------- change when host on cloudflare later btw 
+]);
+
 const corsOptions = {
-    origin: (origin, callback) => {
-        // !origin allows server-to-server or tools like Postman/Curl
-        if (!origin || whitelist.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+  origin: (origin, callback) => {
+    // allow Postman / server-to-server
+    if (!origin) return callback(null, true);
+
+    if (whitelist.has(origin)) {
+      return callback(null, true);
     }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
 };
+
 publicApp.use(cors(corsOptions));
 // Morgan logging
 publicApp.use(morgan('dev'));
+
+// replace this for db + bucket --------------------------------------------- remove later I assume 
+const uploadsDir = path.join(__dirname, 'public', 'images');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`✓ Created uploads directory at ${uploadsDir}`);
+}
 
 // temp (will change when nav is finalized)
 publicApp.use((req, res, next) => {
@@ -93,19 +101,20 @@ publicApp.use((req, res, next) => {
     res.locals.navItems =
         pathName === '/items' ||
         pathName.startsWith('/items/');
-    res.locals.navCheckout = pathName.startsWith('/checkout');
+    res.locals.navCheckin = pathName.startsWith('/checkin');
     res.locals.navReport = pathName.startsWith('/report');
     res.locals.navUsers = pathName.startsWith('/users');     // <---- temp will delete when admin part is implemented
-
+    
+    res.locals.config = config;
     next();
 });
 
 publicApp.use("/", authRoutes);
 publicApp.use('/', publicRoutes);
-publicApp.use(protect);
 
 // const app = express();
 // app.use(publicApp);
+
 
 // Other routes
 publicApp.use((error, req, res, next) => {
@@ -114,6 +123,27 @@ publicApp.use((error, req, res, next) => {
     res.render("extra_pages/500");
 });
 
-publicApp.listen(config.PORT, () => {
-    console.log(`Access via: http://localhost:${config.PORT}`);
-});
+
+
+async function startServer() {
+	try {
+		dbProvider = await createDatabaseProvider();
+    setDbProvider(dbProvider);  
+		console.log(`Connected to ${dbProvider.providerLabel} database provider`);
+
+		publicApp.listen(config.PORT, () => {
+            console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
+            console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
+			console.log(`Database provider: ${dbProvider.providerLabel}`);
+		});
+	} catch (error) {
+		if (error && error.message) {
+			console.error("Failed to initialize database provider:", error.message);
+		} else {
+			console.error("Failed to initialize database provider:", error);
+		}
+		process.exit(1);
+	}
+}
+
+startServer();

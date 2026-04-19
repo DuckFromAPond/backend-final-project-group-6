@@ -1,3 +1,4 @@
+{{#if (eq user.role "Admin")}}
 {{#unless isEdit}}
     {{!-- add form --}}
     <form action="/items" method="POST" enctype="multipart/form-data"
@@ -35,14 +36,21 @@
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
-        <label for="category">Choose a category:</label>
-        <select name="category" id="category"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-        >
-            {{#each categories}}
-                <option value="{{this.name}}">{{this.name}}</option>
-            {{/each}}
-        </select>
+        <label for="category">Category:</label>
+        <input
+        name="category"
+        id="category"
+        list="categoryList"
+        placeholder="Type or select category..."
+        class="w-full border-gray-500 border p-2 rounded-lg"
+        required
+        />
+
+        <datalist id="categoryList">
+        {{#each categories}}
+            <option value="{{this.name}}">
+        {{/each}}
+        </datalist>
 
         <label for="status">Change status:</label>
         <select name="status" id="status"
@@ -99,14 +107,21 @@
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
-        <label for="category">Choose a category:</label>
-        <select name="category" id="category"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-        >
-            {{#each categories}}
-                <option value="{{this.name}}">{{this.name}}</option>
-            {{/each}}
-        </select>
+        <label for="category">Category:</label>
+        <input
+        name="category"
+        id="category"
+        list="categoryList"
+        placeholder="Type or select category..."
+        class="w-full border-gray-500 border p-2 rounded-lg"
+        required
+        />
+
+        <datalist id="categoryList">
+        {{#each categories}}
+            <option value="{{this.name}}">
+        {{/each}}
+        </datalist>
 
         <label for="status">Change status:</label>
         <select name="status" id="status"
@@ -124,24 +139,28 @@
         <button type="submit" class="justify-self-center self-center col-span-2 w-1/2 text-md bg-green-500 hover:bg-green-700 text-white cursor-pointer p-2 text-center transition-all ease-in-out duration-300">Submit</button>
     </form>
 {{/if}}
+{{/if}}
 
 <script>
     const form = document.querySelector('#updateForm');
-    const itemId = "{{id}}";
 
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
+    if (form) {
+        const itemId = "{{id}}";
 
-        const formData = new FormData(form);
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
 
-        const response = await fetch(`/items/${itemId}`, {
-            method: 'PUT',
-            body: formData
+            const formData = new FormData(form);
+
+            const response = await fetch(`/items/${itemId}`, {
+                method: 'PUT',
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                window.location.href = data.redirect;
+            }
         });
-
-        if (response.ok) {
-            const data = await response.json();
-            window.location.href = data.redirect;
-        }
-    });
+    }
 </script>

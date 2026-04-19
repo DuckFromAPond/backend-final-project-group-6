@@ -1,5 +1,4 @@
 // ============= ITEM ===========
-
 //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
 const items = [
   {
@@ -50,7 +49,8 @@ const itemHistories = [
       {
         user_id: 1,
         // assignee: "assignee 1", <- use id to find name instead 
-        duration: "duration 1",
+        duration: 60,         // STORE DURATION AS SECONDS and CONVERT ON extract 
+        createdAt: '2026-03-01T08:30:00.000Z',
         referenceLink: "reference link 1",
       },
     ],
@@ -61,7 +61,8 @@ const itemHistories = [
       {
         user_id: 2,
         // assignee: "assignee 2",
-        duration: "duration 2",
+        duration: 60,
+        createdAt: '2026-03-01T08:30:00.000Z',
         referenceLink: "reference link 2",
       },
     ],
@@ -72,7 +73,8 @@ const itemHistories = [
       {
         user_id: 3,
         // assignee: "assignee 3",
-        duration: "duration 3",
+        duration: 60,
+        createdAt: '2026-03-01T08:30:00.000Z',
         referenceLink: "reference link 3",
       },
     ],

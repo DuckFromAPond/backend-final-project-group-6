@@ -1,10 +1,13 @@
+'use strict';   // for debugging
 
+const multiparty = require("multiparty");
+const fs = require("fs");
+const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
-const path = require('path');
-const fs = require('fs');
+const { getDbProvider } = require("../utils/dbProviderShared");
 
-// temp temp data 
+// this data might be important 
 const itemData = {
     categories: [
         { name: "Computers", subCategories: [] },
@@ -22,41 +25,96 @@ if (!fs.existsSync(uploadsDir)) {
     console.log(`✓ Created uploads directory at ${uploadsDir}`);
 }
 
-exports.home = (req, res) => {
-    res.render("home", { dashboardData });
+// GET: /HOME ----------------
+exports.home = async (req, res) => {
+  const db = getDbProvider();
+
+  // get data at the same time to speed up loading
+  const [users, items, histories] = await Promise.all([
+    db.getAllUsers?.() || [],
+    db.getItems(),
+    db.getItemHistories()
+  ]);
+
+  const totalUsers = users.length;
+  const totalItems = items.length;
+
+  const pendingCheckouts = histories.filter(h => !h.returnedAt).length;
+
+  // lookup maps
+  const userMap = new Map(users.map(u => [u.id, u]));
+  const itemMap = new Map(items.map(i => [i.id, i]));
+
+  const recentTransactions = histories
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5)
+    .map(h => {
+      const user = userMap.get(h.userId);
+      const item = itemMap.get(h.itemId);
+
+      return {
+        id: h.id,
+        user: user?.name || "Unknown",
+        item: item?.name || "Unknown",
+        type: h.returnedAt ? "Check-in" : "Checkout",
+        date: h.createdAt
+      };
+    });
+
+  res.render("home", {
+    dashboardData: {
+      totalUsers,
+      totalItems,
+      pendingCheckouts,
+      recentTransactions
+    }, 
+    pageTitle: "Home"
+  });
 };
 
-exports.showItems = (req, res) => {
-    const { cat, q } = req.query
+// GET: /items ----------------
+exports.showItems = async (req, res) => {
+  const db = getDbProvider();
+  const { cat, q } = req.query;
 
-    let context = {
-        categories: itemData.categories,
-        items: itemData.items,
-        statuses: itemData.statuses
-    }
+  // get all items from DB
+  let items = await db.getItems();
 
-    if (itemData.categories.find(category => category.name === cat)) {
-        context = {
-            ...context,
-            categories: itemData.categories,
-            items: itemData.items.filter(item => item.category === cat)
-        }
-    }
+  // derive categories dynamically
+  const categories = [
+    ...new Set(items.map(item => item.category))
+  ].map(name => ({ name }));
 
-    let searchedItem;
-    if (q) {
-        searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
-    }
+  // filter by category
+  if (cat) {
+    items = items.filter(item => item.category === cat);
+  }
 
-    if (searchedItem) {
-        context = {
-            ...context,
-            items: [searchedItem],
-        }
-    }
+  // search by name (case-insensitive)
+  if (q) {
+    items = items.filter(item =>
+      item.name?.toLowerCase().includes(q.toLowerCase())
+    );
+  }
+  
+  const statuses = [
+    { name: "Available" },
+    { name: "In-Use" },
+    { name: "Maintenance" },
+    { name: "Retired" }
+  ];
 
-    res.render('items/items', { ...context, activePage: "items" })
-}
+  res.render("items/items", {
+    categories,
+    items,
+    statuses,
+    user: req.user || null,
+    error: req.query.error || null,
+    success: req.query.success || null, 
+    pageTitle: "Items"
+  });
+};
+
 
 exports.addItem = (req, res) => {
     try {
@@ -114,7 +172,7 @@ exports.addItem = (req, res) => {
 
             const timestamp = Date.now();
             const fileName = `${timestamp}_${originalFileName}`;
-            const finalFilePath = path.join(uploadsDir, fileName);
+            const uploadsDir = path.join(__dirname, "../public/images");
 
             try {
                 fs.copyFileSync(tempFilePath, finalFilePath);
@@ -359,40 +417,153 @@ exports.showItemHistory = (req, res) => {
     res.render("items/itemHistory", context);
 };
 
-exports.checkout = (req, res) => {
-    // GONNA START BY ASSUMING YOU ARE ID 1
-    const currentUserId = 1; // replace with actual logged-in user
 
-    const currentlyOwnedItems = itemData.items
-        .map((item) => {
-            const history = itemData.itemHistories.find((h) => h.id === item.id);
-            const lastAssignment =
-                history?.histories[history.histories.length - 1] || null;
+// POST: /CHECKIN 
+exports.checkIn = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
+    const form = new multiparty.Form();
 
-            return {
-                id: item.id,
-                name: item.name,
-                // serial: item.serial,
-                // model: item.model,
-                // brand: item.brand,
-                // category: item.category,
-                status: item.status,
-                dateAcquired: item.dateAcquired,
-                // description: item.description,
-                // imagePath: item.imagePath,
-                // imageAlt: item.imageAlt,
-                currentAssignee: lastAssignment?.assignee || null,
-                currentAssigneeID: lastAssignment?.user_id || null,
-                currentDuration: lastAssignment?.duration || null,
-                currentReference: lastAssignment?.referenceLink || null,
-            };
-        })
-        .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
-
-    console.log(currentlyOwnedItems);
-    res.render("checkout", {
-        items: currentlyOwnedItems,
+    const { fields, files } = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err);
+        resolve({ fields, files });
+      });
     });
+
+    const itemId = fields.itemId?.[0];   
+    const userId = req.user.id;
+
+    if (!itemId) {
+      return res.redirect("/items?error=Missing+itemId");
+    }
+
+    const item = await db.getItemById(itemId);
+
+    if (!item) {
+      return res.redirect("/items?error=Item+not+found");
+    }
+
+    if (item.status !== "In-Use") {
+      return res.redirect("/items?error=Item+not+checked+out");
+    }
+
+    // 1. upload file 
+    let filePath = null;
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+      if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+5MB)");
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+      filePath = `checkin/${fileName}`;
+
+      await db.uploadFile(filePath, fileBuffer);
+
+      if (uploadError) throw uploadError;
+    }
+
+    // 2. update state
+    await db.updateItem(itemId, { status: "Available" });
+
+    // 3. log history ONCE
+    await db.addItemHistory(itemId, {
+      userId,
+      action: "checkin",
+      referenceLink: filePath
+    });
+
+    return res.redirect("/items?success=Checked+in+successfully");
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.checkOut = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
+
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const userId = req.user.id;
+
+    const item = await db.getItemById(itemId);
+
+    if (!item) {
+      return res.redirect("/items?error=Item+not+found");
+    }
+
+
+    if (item.status !== "Available") {
+      return res.redirect("/items?error=Item+not+available");
+    }
+
+    let filePath = null;
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+      if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+5MB)");
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+      filePath = `checkout/${fileName}`;
+
+      await db.uploadFile(filePath, fileBuffer);
+
+      if (error) {
+        console.error("Upload error:", error);
+        return res.redirect("/items?error=Upload+failed");
+      }
+    }
+
+    await db.updateItem(itemId, { status: "In-Use" });
+
+    await db.addItemHistory(itemId, {
+      userId,
+      action: "checkout",
+      duration: fields.duration?.[0] ?? null,
+      referenceLink: filePath,
+    });
+
+    return res.redirect("/items?success=CHECKED+OUT+SUCCESSFULLY!");
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.ShowCheckin = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
+    const currentUserId = req.user.id;
+
+    const items = await db.getUserItems(currentUserId);
+
+    res.render("checkout", {
+      items
+    });
+
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.report = (req, res) => {
@@ -407,12 +578,13 @@ exports.users = (req, res) => {
 
 // 404 handler 
 exports.notFound = (req, res) => {
-    res.status(404).render('extra_pages/404', {
-        message: 'The page you are looking for does not exist.',
-    });
+  res.status(404).render('extra_pages/404', {
+    message: 'The page you are looking for does not exist.',
+    pageTitle: "404"
+  });
 };
 
-// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT
+// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT 
 
 // middle-ware to render 404 (bad)
 // app.use((req, res, next) => {
