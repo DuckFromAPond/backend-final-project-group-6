@@ -1,4 +1,4 @@
-{{#if (eq user.role "Admin")}}
+{{!-- {{#if (eq user.role "Admin")}} --}}
 {{#unless isEdit}}
     {{!-- add form --}}
     <form action="/items" method="POST" enctype="multipart/form-data"
@@ -110,7 +110,7 @@
         >
 
         <label for="dateAcquired">Date of Acquisition: </label>
-        <input type="date" name="dateAcquired" id="dateAcquired" value="{{dateAcquired}}"
+        <input type="date" name="dateAcquired" id="dateAcquired" value="{{formatDate this.dateAcquired}}"
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
@@ -121,32 +121,41 @@
         list="categoryList"
         placeholder="Type or select category..."
         class="w-full border-gray-500 border p-2 rounded-lg"
+        value="{{this.category}}"
         required
         />
 
         <datalist id="categoryList">
-        {{#each categories}}
-            <option value="{{this.name}}">
-        {{/each}}
+            {{#each categories}}
+                <option value="{{this.name}}">
+            {{/each}}
         </datalist>
 
         <label for="status">Change status:</label>
-        <select name="status" id="status"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-        >
+        <input
+        name="status"
+        id="status"
+        list="statusList"
+        placeholder="Type or select status..."
+        class="w-full border-gray-500 border p-2 rounded-lg"
+        value="{{this.status}}"
+        required
+        />
+
+        <datalist id="statusList">
             {{#each statuses}}
                 <option value="{{this.name}}">{{this.name}}</option>
             {{/each}}
-        </select>
+        </datalist>
 
         <label for="image">Item image: </label>
-        <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"
+        <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg, "
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
         <button type="submit" class="justify-self-center self-center col-span-2 w-1/2 text-md bg-green-500 hover:bg-green-700 text-white cursor-pointer p-2 text-center transition-all ease-in-out duration-300">Submit</button>
     </form>
 {{/if}}
-{{/if}}
+{{!-- {{/if}} --}}
 
 <script>
     const form = document.querySelector('#updateForm');

@@ -40,7 +40,8 @@ const hbsHelpers = {
         }
         return options.inverse(this);
     },
-    eq: (a, b) => a === b
+    eq: (a, b) => a === b,
+    formatDate: (date) => new Date(date).toISOString().split('T')[0], // return YYYY-MM-DD
 }
 
 // configurations for public app ───────────────────────────────────
