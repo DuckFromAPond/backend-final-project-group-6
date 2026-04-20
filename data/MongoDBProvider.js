@@ -152,7 +152,10 @@ class MongoProvider extends DatabaseProvider {
 
 
 	// ===== USER AUTHENTICATION =====
-  async registerUser(email, password) {
+  async registerUser(email, password, name) {
+    const existingAdmin =  await User.findOne({ role: "Admin", status: "Active" });
+    let roleToAssign = existingAdmin ? "Technician" : "Admin";
+
     const normalizedEmail = this.normalizeEmail(email);
 
     const existing = await User.findOne({ email: normalizedEmail });
@@ -163,8 +166,8 @@ class MongoProvider extends DatabaseProvider {
     const user = await User.create({
       email: normalizedEmail,
       passwordHash: hash,
-      name: email.split("@")[0],
-      role: "Technician",
+      name: name,
+      role: roleToAssign,
       status: "Active"
     });
 

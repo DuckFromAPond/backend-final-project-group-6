@@ -70,8 +70,16 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.showRegister = (req, res) => {
-  res.render("auth/register", { layout: "no_nav_bar" });
+exports.showRegister = async (req, res) => {
+  const db = getDbProvider(); 
+  const users = await db.getAllUsers();
+
+  const hasActiveAdmin = users.some(
+    u => u.role === "Admin" && u.status === "Active"
+  );
+
+  const noActiveAdmin = !hasActiveAdmin;
+  res.render("auth/register", { layout: "no_nav_bar", pageTitle: "Register", warning: "No active admin found. The newest registered account will be admin"});
 };
 
 exports.register = async (req, res) => {
@@ -80,7 +88,7 @@ exports.register = async (req, res) => {
 
     const db = getDbProvider();
 
-    const user = await db.registerUser(email, password, name);
+    const {user, hasAdmin} = await db.registerUser(email, password, name);
 
     // auto-login after register
     const token = generateToken(user);
