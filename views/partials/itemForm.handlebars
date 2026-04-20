@@ -53,13 +53,20 @@
         </datalist>
 
         <label for="status">Change status:</label>
-        <select name="status" id="status"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-        >
-            {{#each statuses}}
-                <option value="{{this.name}}">{{this.name}}</option>
-            {{/each}}
-        </select>
+        <input
+        name="status"
+        id="status"
+        list="statusList"
+        placeholder="Type or select status..."
+        class="w-full border-gray-500 border p-2 rounded-lg"
+        required
+        />
+
+        <datalist id="statusList">
+        {{#each statuses}}
+            <option value="{{this.name}}">{{this.name}}</option>
+        {{/each}}
+        </datalist>
 
         <label for="image">Item image: </label>
         <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"

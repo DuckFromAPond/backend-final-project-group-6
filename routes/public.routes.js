@@ -37,5 +37,4 @@ router.get("/users", protect, publicController.users);                          
 // error 404
 router.use(publicController.notFound);
 
-
 module.exports = router;

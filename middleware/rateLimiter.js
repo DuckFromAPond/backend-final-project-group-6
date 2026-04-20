@@ -11,7 +11,6 @@ const option = {
     message: 'Too many requests from this IP, please try again after 1 minutes'
 }
 
-
 const loginLimiter = rateLimit(option);
 
 module.exports = {

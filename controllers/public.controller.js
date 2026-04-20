@@ -7,16 +7,23 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
 const { getDbProvider } = require("../utils/dbProviderShared");
 
-// this data might be important 
+// this data might be important (remove later) 
 const itemData = {
-  categories: [
-    { name: "Computers", subCategories: [] },
-    { name: "Peripherals", subCategories: [] },
-  ],
-  //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-  items: items, // Use the imported items here
-  itemHistories: itemHistories,
+    categories: [
+        { name: "Computers", subCategories: [] },
+        { name: "Peripherals", subCategories: [] },
+    ],
+    //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
+    items: items, // Use the imported items here
+    itemHistories: itemHistories,
 };
+
+// replace this for db + bucket
+// const uploadsDir = path.join(__dirname, 'public', 'images');
+// if (!fs.existsSync(uploadsDir)) {
+//     fs.mkdirSync(uploadsDir, { recursive: true });
+//     console.log(`✓ Created uploads directory at ${uploadsDir}`);
+// }
 
 // GET: /HOME ----------------
 exports.home = async (req, res, next) => {
@@ -84,7 +91,7 @@ exports.home = async (req, res, next) => {
 // GET: /items ----------------
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q } = req.query;
+  const { cat, q, error } = req.query;
 
   // get all items from DB
   let items = await db.getItems();
@@ -127,130 +134,86 @@ exports.showItems = async (req, res) => {
 };
 
 
-exports.addItem = (req, res) => {
+exports.addItem = async (req, res, next) => {
     try {
+        const db = getDbProvider();
         const form = new multiparty.Form();
 
-        let uploadedFilePath = null;
-
-        form.parse(req, (error, fields, files) => {
-            if (error) {
-                console.error('❌ Form parsing error:', err);
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'Error parsing the form. Please try again.',
-                });
-            }
-
-            // extract fields
-            const name = fields.name?.[0] ?? '';
-            const description = fields.description?.[0] ?? '';
-            const brand = fields.brand?.[0] ?? '';
-            const model = fields.model?.[0] ?? '';
-            const category = fields.category?.[0] ?? '';
-            const serial = fields.serial?.[0] ?? '';
-            const status = fields.status?.[0] ?? '';
-            const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
-
-            // extract file
-            const uploadedFile = files.image ? files.image : null;
-
-            if (!uploadedFile || uploadedFile.length === 0) {
-                console.warn('⚠️  No file was selected for upload');
-                console.debug('📊 Debug - files object:', Object.keys(files));
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'No file was selected. Please choose an image file.',
-                });
-            }
-
-            const file = uploadedFile[0];
-            const originalFileName = file.originalFilename;
-            const tempFilePath = file.path;
-
-            const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-            const fileExtension = path.extname(originalFileName).toLowerCase();
-
-            if (!allowedExtensions.includes(fileExtension)) {
-                console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-                // Clean up the temporary file
-                fs.unlinkSync(tempFilePath);
-                return res.status(400).json({
-                    type: 'error',
-                    message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-                });
-            }
-
-            const timestamp = Date.now();
-            const fileName = `${timestamp}_${originalFileName}`;
-            const uploadsDir = path.join(__dirname, "../public/images");
-
-            try {
-                fs.copyFileSync(tempFilePath, finalFilePath);
-                // Delete the temporary file
-                fs.unlinkSync(tempFilePath);
-
-                // Store the relative path for the view template
-                // This will be used to display the image in the result page
-                uploadedFilePath = `/images/${fileName}`;
-
-                console.log('✓ File Upload Successful:');
-                console.log(`   Original Filename: ${originalFileName}`);
-                console.log(`   Saved As: ${fileName}`);
-                console.log(`   Path: ${finalFilePath}`);
-
-                // add new item (replace with db)
-                const newItem = {
-                    id: itemData.items.length + 1,
-                    name,
-                    description,
-                    model,
-                    brand,
-                    category,
-                    imagePath: uploadedFilePath,
-                    imageAlt: `image of ${name}`,
-                    serial,
-                    status,
-                    dateAcquired,
-                };
-
-                itemData.items.push(newItem);
-
-                res.redirect('/items');
-            } catch (fsError) {
-                console.error('❌ File system error:', fsError);
-                // Clean up temp file if copy failed
-                if (fs.existsSync(tempFilePath)) {
-                    fs.unlinkSync(tempFilePath);
-                }
-                res.status(500).json({
-                    type: 'error',
-                    message: 'Error saving the file. Please try again.',
-                });
-            }
-        })
-    }
-    catch (error) {
-        console.error('❌ Error in /items:', error);
-        res.status(500).json({
-            type: 'error',
-            message: 'An error occurred while processing your file upload.',
+        const { fields, files } = await new Promise((resolve, reject) => {
+          form.parse(req, (err, fields, files) => {
+            if (err) return reject(err);
+            resolve({ fields, files });
+          });
         });
+
+        // extract fields
+        const name = fields.name?.[0] ?? '';
+        const description = fields.description?.[0] ?? '';
+        const brand = fields.brand?.[0] ?? '';
+        const model = fields.model?.[0] ?? '';
+        const category = fields.category?.[0] ?? '';
+        const sub_category = fields.subcategory?.[0] ?? '';
+        const serial = fields.serial?.[0] ?? '';
+        const status = fields.status?.[0] ?? '';
+        const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+
+        // upload file 
+        let filePath = null;
+        let fileName = null;
+
+        console.log(files)
+
+        if (files?.image?.length > 0) {
+          const file = files.image[0];
+          const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+          if (file.size > MAX_SIZE) {
+              return res.redirect("/items?error=File+too+large+(max+50MB)");
+          }
+
+          const fileBuffer = fs.readFileSync(file.path);
+
+          fileName = `${Date.now()}_${file.originalFilename}`;
+          filePath = `${fileName}`;
+
+          await db.uploadFile(filePath, fileBuffer, true);
+        }
+
+        const newItem = {
+            name,
+            description,
+            brand,
+            model,
+            category,
+            sub_category,
+            serial,
+            status,
+            date_acquired,
+            image_name: fileName,
+            image_alt: image_alt || `Image of ${name}`,
+        };
+
+        await db.createItem(newItem);
+
+        return res.redirect("/items?success=Checked+in+successfully");
+    }
+    catch (err) {
+      next(err);
     }
 }
 
-exports.showItemDetail = (req, res) => {
+exports.showItemDetail = async (req, res) => {
     const { id } = req.params;
     const { edit, del } = req.query;
+    const db = getDbProvider();
 
-    let context = itemData.items.find(item => String(item.id) === String(id))
-    context = {
-        ...context,
-        categories: itemData.categories,
-        statuses: itemData.statuses,
+    let item = await db.getItemById(id);
+
+    let context = {
+        ...items ? item : null,
         isEdit: false,
-        isDelete: false
-    }
+        isDelete: false,
+    };
 
     if (!context) {
         res.status(404)
@@ -391,41 +354,48 @@ exports.editItem = (req, res) => {
     }
 }
 
-exports.deleteItem = (req, res) => {
+exports.deleteItem = async (req, res, next) => {
     const { id } = req.params;
-    const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
-    itemData.items.splice(indexOfOld, 1);
-    return res.json({
-        type: 'success',
-        redirect: '/items'
-    })
+
+    try {
+      const db = getDbProvider();
+      await db.deleteItem(id);
+      
+      return res.json({
+          type: 'success',
+          redirect: '/items'
+      })
+    }
+    catch(err) {
+      next(err);
+    }
 }
 
 exports.showItemHistory = (req, res) => {
-  const { id } = req.params;
+    const { id } = req.params;
 
-  const context = {
-    item: itemData.items.find((item) => String(item.id) === String(id)),
-    itemHistories: itemData.itemHistories.find(
-      (item) => String(item.id) === String(id),
-    ),
-  };
+    const context = {
+        item: itemData.items.find((item) => String(item.id) === String(id)),
+        itemHistories: itemData.itemHistories.find(
+            (item) => String(item.id) === String(id),
+        ),
+    };
 
-  const history = context.itemHistories;
+    const history = context.itemHistories;
 
-  if (history) {
-    history.histories = history.histories.map(h => {
-      // find username using id 
-      const user = users.find(u => u.id === h.user_id);
+    if (history) {
+        history.histories = history.histories.map(h => {
+            // find username using id 
+            const user = users.find(u => u.id === h.user_id);
 
-      return {
-        ...h,
-        assignee: user ? user.name : "No name given"
-      };
-    });
-  }
+            return {
+                ...h,
+                assignee: user ? user.name : "No name given"
+            };
+        });
+    }
 
-  res.render("items/itemHistory", context);
+    res.render("items/itemHistory", context);
 };
 
 
@@ -613,7 +583,7 @@ exports.showOwned = async (req, res, next) => {
 
 
 exports.report = (req, res) => {
-  res.render("report");
+    res.render("report");
 };
 
 
@@ -624,8 +594,8 @@ exports.report = (req, res) => {
 
 // ++++++++++ List-user page
 exports.users = (req, res) => {
-  // MOCK DATA
-  res.render("users", { users });
+    // MOCK DATA
+    res.render("users", { users });
 };
 
 // 404 handler 
@@ -635,3 +605,16 @@ exports.notFound = (req, res) => {
     pageTitle: "404"
   });
 };
+
+// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT 
+
+// middle-ware to render 404 (bad)
+// app.use((req, res, next) => {
+//   const publicRoutes = ["/", "/login", "/register"];
+//   // If it's a known public route, let it pass to the gate or routes
+//   if (publicRoutes.includes(req.path)) {
+//     return next();
+//   }
+//   // Otherwise, it's a dead end—render 404 now!
+//   // res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
+// });

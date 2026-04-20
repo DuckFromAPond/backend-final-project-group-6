@@ -1,5 +1,4 @@
 const { generateToken } = require("../middleware/authMiddleware");
-
 const { getDbProvider } = require("../utils/dbProviderShared");
 
 exports.showLogin = (req, res) => {
@@ -20,6 +19,7 @@ exports.login = async (req, res) => {
 
     // 1. find user in DB
     const user = await db.findUserByEmail(email);
+
 
     if (!user) {
       return res.render("auth/login", {

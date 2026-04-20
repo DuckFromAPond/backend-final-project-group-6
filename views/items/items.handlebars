@@ -40,15 +40,22 @@
         </form>
     </section>
 
-    <section class="grid grid-cols-1 md:grid-cols-[35%_1fr] gap-8 w-full">
+    <section class="grid grid-cols-1 md:grid-cols-[45%_1fr] lg:grid-cols-[30%_1fr] gap-8 w-full">
         {{> itemForm}}
         
         {{!-- item grid --}}
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full items-start min-w-0">
-        {{#each items}}
-            {{> itemCard}}
-        {{/each}}
-        </section>
+        {{#if items}}
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full items-start min-w-0">
+                {{#each items}}
+                    {{> itemCard}}
+                {{/each}}
+            </section>
+        {{else}}
+            <section class="w-full flex flex-col justify-center items-center gap-y-5">
+                <h1 class="text-3xl font-bold">No Items Found</h1>
+                <p class="text-gray-500">Try searching for something else or adding a new item.</p>
+            </section>
+        {{/if}}
 
     </section>
 

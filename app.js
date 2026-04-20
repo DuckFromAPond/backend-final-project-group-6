@@ -97,7 +97,6 @@ publicApp.use(express.static(path.join(__dirname, 'public')));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
 publicApp.use(express.json());
 
-// publicApp.use(cors(corsOptions));
 // Morgan logging
 // publicApp.use(morgan('dev'));
 
@@ -214,7 +213,7 @@ app.use((error, req, res, next) => {
 async function startServer() {
 	try {
 		dbProvider = await createDatabaseProvider();
-    setDbProvider(dbProvider);  
+        setDbProvider(dbProvider);  
 		console.log(`Connected to ${dbProvider.providerLabel} database provider`);
 
 		app.listen(config.PORT, () => {

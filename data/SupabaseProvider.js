@@ -131,7 +131,18 @@ class SupabaseProvider extends DatabaseProvider {
 	}
 
 	// ===== USER AUTHENTICATION =====
-	async registerUser(email, password) {
+	async registerUser(email, password, name) {
+		const { data: existingAdmin } = await this.supabase
+			.from(SUPABASE_TABLES.USERS)
+			.select("id")
+			.eq("role", "Admin")
+			.eq("status", "Active")
+			.limit(1)
+			.maybeSingle();
+
+
+		let roleToAssign = existingAdmin ? "Technician" : "Admin";
+
 		const normalizedEmail = this.normalizeEmail(email);
 
 		const { data: existingUser } = await this.supabase
@@ -152,8 +163,8 @@ class SupabaseProvider extends DatabaseProvider {
 			.insert([{
 			email: normalizedEmail,
 			password_hash: passwordHash,
-			name: email.split("@")[0],
-			role: "Technician",
+			name: name,
+			role: roleToAssign ,
 			status: "Active"
 			}])
 			.select("id, email, name, role, status, created_at")
@@ -565,9 +576,22 @@ class SupabaseProvider extends DatabaseProvider {
 		return data.map(mapApiKeyRowToModel);
 	}
 
-	async uploadFile(path, buffer) {
+	// async uploadFile(path, buffer) {
+	// 	const { error } = await this.supabase.storage
+	// 		.from("docs-bucket")
+	// 		.upload(path, buffer);
+
+	// 	if (error) {
+	// 		throw new Error(`Upload failed: ${error.message}`);
+	// 	}
+
+	// 	return path;
+	// }
+
+	// a revised version of the uploadFile method (Should keep only 1)
+	async uploadFile(path, buffer, isItem) {
 		const { error } = await this.supabase.storage
-			.from("docs-bucket")
+			.from(isItem ? "items-bucket" : "docs-bucket")
 			.upload(path, buffer);
 
 		if (error) {
