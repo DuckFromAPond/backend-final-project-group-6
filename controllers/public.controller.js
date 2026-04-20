@@ -89,6 +89,8 @@ exports.showItems = async (req, res) => {
   // get all items from DB
   let items = await db.getItems();
 
+  items = items.filter(item => item.status !== "Retired");
+  
   // derive categories dynamically
   const categories = [
     ...new Set(items.map(item => item.category))
