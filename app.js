@@ -1,7 +1,7 @@
 'use strict';   // for debugging
 
 const express = require("express");
-// const vhost    = require('vhost');
+const vhost    = require('vhost');
 const { engine } = require("express-handlebars");
 const cookieParser = require("cookie-parser");
 const path = require('path');
@@ -18,8 +18,15 @@ const { setDbProvider } = require("./utils/dbProviderShared");
 const config = require('./config/app.config');
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require('./routes/public.routes');
+const adminRoutes = require('./routes/admin.routes');
+const apiRoutes = require('./routes/api.routes');
 
 const createDatabaseProvider = require("./utils/createDBProvider");
+
+
+// fix for nodeJS v22.22 not being able to connect to mongoDB
+const dns = require("node:dns/promises");   
+dns.setServers(["1.1.1.1", "1.0.0.1"]);   
 
 
 let dbProvider;
@@ -44,6 +51,32 @@ const hbsHelpers = {
     formatDate: (date) => new Date(date).toISOString().split('T')[0], // return YYYY-MM-DD
 }
 
+
+// CORS configuration
+const whitelist = new Set([
+  `http://localhost:${config.PORT}`,
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "https://websitename.com"                 // <--------------------------- change when host on cloudflare later btw 
+]);
+
+const corsOptions = {
+    origin: (origin, callback) => {
+    // allow Postman / server-to-server
+    if (!origin) return callback(null, true);
+
+    if (whitelist.has(origin)) {
+        return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+
 // configurations for public app ───────────────────────────────────
 const publicApp = express();
 publicApp.engine(
@@ -59,41 +92,21 @@ publicApp.set("view engine", "handlebars");
 publicApp.set("views", path.join(__dirname, 'views'));
 
 // middleware ───────────────────────────────────
+publicApp.use(cors(corsOptions));
 publicApp.use(cookieParser());
 publicApp.use(express.static(path.join(__dirname, 'public')));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
+publicApp.use(express.json());
 
-// CORS configuration
-const whitelist = new Set([
-  `http://localhost:${config.PORT}`,
-  `http://admin.localhost:${config.PORT}`,
-  "https://websitename.com"                 // <--------------------------- change when host on cloudflare later btw 
-]);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // allow Postman / server-to-server
-    if (!origin) return callback(null, true);
-
-    if (whitelist.has(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true
-};
-
-publicApp.use(cors(corsOptions));
 // Morgan logging
-publicApp.use(morgan('dev'));
+// publicApp.use(morgan('dev'));
 
 // replace this for db + bucket --------------------------------------------- remove later I assume 
-const uploadsDir = path.join(__dirname, 'public', 'images');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log(`✓ Created uploads directory at ${uploadsDir}`);
-}
+// const uploadsDir = path.join(__dirname, 'public', 'images');
+// if (!fs.existsSync(uploadsDir)) {
+//     fs.mkdirSync(uploadsDir, { recursive: true });
+//     console.log(`✓ Created uploads directory at ${uploadsDir}`);
+// }
 
 // temp (will change when nav is finalized)
 publicApp.use((req, res, next) => {
@@ -103,7 +116,7 @@ publicApp.use((req, res, next) => {
     res.locals.navItems =
         pathName === '/items' ||
         pathName.startsWith('/items/');
-    res.locals.navCheckin = pathName.startsWith('/checkin');
+    res.locals.navCheckin = pathName.startsWith('/owned');
     res.locals.navReport = pathName.startsWith('/report');
     res.locals.navUsers = pathName.startsWith('/users');     // <---- temp will delete when admin part is implemented
     
@@ -112,17 +125,98 @@ publicApp.use((req, res, next) => {
 });
 
 publicApp.use("/", authRoutes);
+publicApp.use('/', apiRoutes);
 publicApp.use('/', publicRoutes);
 
-// const app = express();
-// app.use(publicApp);
+
+// ------ adminApp ------
+const adminApp = express();
+
+adminApp.engine('handlebars', engine({
+  defaultLayout: 'main',
+  extname:       '.handlebars',
+  layoutsDir:    path.join(__dirname, 'views/layouts'),
+  partialsDir:   path.join(__dirname, 'views/partials'),
+  helpers: hbsHelpers,
+}));
+
+adminApp.set('view engine', 'handlebars');
+adminApp.set('views', path.join(__dirname, 'views'));
+
+// adminApp middleware
+adminApp.use(cors(corsOptions));
+adminApp.use(express.urlencoded({ extended: false }));
+adminApp.use(express.static(path.join(__dirname, 'public')));
+adminApp.use(cookieParser());
+
+// temp (will change when nav is finalized)
+adminApp.use((req, res, next) => {
+    const pathName = req.path;
+
+    res.locals.navHome = pathName === '/' || pathName.startsWith('/home');
+    res.locals.navItems =
+        pathName === '/items' ||
+        pathName.startsWith('/items/');
+    res.locals.navCheckin = pathName.startsWith('/owned');
+    res.locals.navReport = pathName.startsWith('/report');
+    res.locals.navUsers = pathName.startsWith('/users');     // <---- temp will delete when admin part is implemented
+    
+    res.locals.config = config;
+    next();
+});
+
+
+adminApp.use("/", authRoutes);
+adminApp.use('/', adminRoutes);
+
+
+
+// ---------- API -----------------
+const apiApp = express();
+apiApp.use(cors(corsOptions));
+apiApp.use(express.json());
+apiApp.use(express.urlencoded({ extended: false }));
+apiApp.use(cookieParser())
+apiApp.use(apiRoutes)
+
+
+
+// ------ Main app ------
+const app = express();
+app.engine('handlebars', engine({
+  defaultLayout: 'no_nav_bar',
+  extname: '.handlebars',
+  layoutsDir: path.join(__dirname, 'views/layouts'),
+  partialsDir: path.join(__dirname, 'views/partials'),
+  helpers: hbsHelpers,
+}));
+
+app.set('view engine', 'handlebars');
+app.set('views', path.join(__dirname, 'views'));
+// safety 
+app.disable('x-powered-by');
+
+// Morgan logging
+if (config.NODE_ENV === 'production') {
+    app.use(morgan('combined'));
+} else {
+    app.use(morgan('dev'));
+}
+
+
+app.use(vhost('admin.' + config.DOMAIN, adminApp));   // admin subdomain first
+app.use('/api', apiApp);
+app.use(publicApp);                                   // fallback → public app
 
 
 // Other routes
-publicApp.use((error, req, res, next) => {
-    console.log(error)
-    res.status(500);
-    res.render("extra_pages/500");
+app.use((error, req, res, next) => {
+    console.error(error);
+
+    return res.status(500).render("extra_pages/500", {
+        pageTitle: "500",
+        message: error.message || "Internal Server Error"
+    });
 });
 
 
@@ -133,7 +227,8 @@ async function startServer() {
         setDbProvider(dbProvider);  
 		console.log(`Connected to ${dbProvider.providerLabel} database provider`);
 
-		publicApp.listen(config.PORT, () => {
+		app.listen(config.PORT, () => {
+            console.log(`Using ${config.NODE_ENV} environment`);
             console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
             console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
 			console.log(`Database provider: ${dbProvider.providerLabel}`);

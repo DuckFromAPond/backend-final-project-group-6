@@ -32,6 +32,7 @@ function mapUserRowToModel(row) {
     status: row.status,
     createdAt: row.created_at,
     passwordHash: row.password_hash,
+	disabledAt: row.disabled_at,
   };
 }
 

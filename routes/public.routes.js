@@ -1,27 +1,36 @@
 
 const express = require("express");
 const router = express.Router();
-const { protect, authOrApiKey } = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 
 const publicController = require("../controllers/public.controller");
 
+// Home (need design with frontend)
 router.get('/', protect, publicController.home);
 router.get("/home", protect, publicController.home);
-router.get("/items", authOrApiKey, publicController.showItems);   // setting up apikey early
-// router.get("/items/history", authOrApiKey, publicController.showHistory);   
-router.get("/items/:id", authOrApiKey, publicController.showItemDetail);        
-router.get("/items/:id/history", authOrApiKey, publicController.showItemHistory);
-router.get("/checkin", protect, publicController.ShowCheckin);
+
+// CRUD (missing integration)
+router.get("/items", protect, publicController.showItems);   // setting up apikey early
+router.get("/items/:id", protect, publicController.showItemDetail);        
+router.get("/items/:id/history", protect, publicController.showItemHistory);
+
+router.post("/items", protect, publicController.addItem);
+router.put("/items/:id", protect, publicController.editItem);
+router.delete("/items/:id", protect, publicController.deleteItem);
+
+// Owned (should done but a little empty)  
+router.get("/owned", protect, publicController.showOwned);
+
+// Report (missing implementation with frontend)    ------------------------- finish later
 router.get("/report", protect, publicController.report);
-router.get("/users", protect, publicController.users);
 
-// move these routes later 
-router.post("/items", authOrApiKey, publicController.addItem);
-router.put("/items/:id", authOrApiKey, publicController.editItem);
-router.delete("/items/:id", authOrApiKey, publicController.deleteItem);
+// Check in/out (shoud be working) 
+router.post("/transactions/checkin", protect, publicController.checkIn);
+router.post("/transactions/checkout", protect, publicController.checkOut);
 
-router.post("/api/transactions/checkin", protect, publicController.checkIn);
-router.post("/api/transactions/checkout", protect, publicController.checkOut);
+// router.get('/hisory', protect, requireRole("Admin"), adminController.createItem); 
+
+router.get("/users", protect, publicController.users);                          // <------------ move to admin later
 
 // autorender can go down here if want to add later 
 

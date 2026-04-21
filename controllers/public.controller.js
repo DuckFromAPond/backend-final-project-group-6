@@ -7,7 +7,7 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
 const { getDbProvider } = require("../utils/dbProviderShared");
 
-// this data might be important 
+// this data might be important (remove later) 
 const itemData = {
     categories: [
         { name: "Computers", subCategories: [] },
@@ -19,57 +19,73 @@ const itemData = {
 };
 
 // replace this for db + bucket
-const uploadsDir = path.join(__dirname, 'public', 'images');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log(`✓ Created uploads directory at ${uploadsDir}`);
-}
+// const uploadsDir = path.join(__dirname, 'public', 'images');
+// if (!fs.existsSync(uploadsDir)) {
+//     fs.mkdirSync(uploadsDir, { recursive: true });
+//     console.log(`✓ Created uploads directory at ${uploadsDir}`);
+// }
 
 // GET: /HOME ----------------
-exports.home = async (req, res) => {
-  const db = getDbProvider();
+exports.home = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
 
-  // get data at the same time to speed up loading
-  const [users, items, histories] = await Promise.all([
-    db.getAllUsers?.() || [],
-    db.getItems(),
-    db.getItemHistories()
-  ]);
+    const [users, items, histories] = await Promise.all([
+      db.getAllUsers ? db.getAllUsers() : Promise.resolve([]),
+      db.getItems(),
+      db.getItemHistories()
+    ]);
 
-  const totalUsers = users.length;
-  const totalItems = items.length;
+    const totalUsers = users.length;
+    const totalItems = items.length;
 
-  const pendingCheckouts = histories.filter(h => !h.returnedAt).length;
+    // latest per item
+    const latestMap = new Map();
+    const sortedHistories = [...histories].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
 
-  // lookup maps
-  const userMap = new Map(users.map(u => [u.id, u]));
-  const itemMap = new Map(items.map(i => [i.id, i]));
+    for (const h of sortedHistories) {
+      if (!latestMap.has(h.itemId)) {
+        latestMap.set(h.itemId, h);
+      }
+    }
 
-  const recentTransactions = histories
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5)
-    .map(h => {
-      const user = userMap.get(h.userId);
-      const item = itemMap.get(h.itemId);
+    const pendingCheckouts = [...latestMap.values()]
+      .filter(h => h.action === "checkout").length;
 
-      return {
-        id: h.id,
-        user: user?.name || "Unknown",
-        item: item?.name || "Unknown",
-        type: h.returnedAt ? "Check-in" : "Checkout",
-        date: h.createdAt
-      };
+    // lookup maps
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const itemMap = new Map(items.map(i => [i.id, i]));
+
+    const recentTransactions = sortedHistories
+      .slice(0, 5)
+      .map(h => {
+        const user = userMap.get(h.userId);
+        const item = itemMap.get(h.itemId);
+
+        return {
+          id: h.id,
+          user: user?.name || "Unknown",
+          item: item?.name || "Unknown",
+          type: h.action === "checkout" ? "Checkout" : "Checkin",
+          date: new Date(h.createdAt).toLocaleString()
+        };
+      });
+
+    res.render("home", {
+      dashboardData: {
+        totalUsers,
+        totalItems,
+        pendingCheckouts,
+        recentTransactions
+      },
+      pageTitle: "Home"
     });
 
-  res.render("home", {
-    dashboardData: {
-      totalUsers,
-      totalItems,
-      pendingCheckouts,
-      recentTransactions
-    }, 
-    pageTitle: "Home"
-  });
+  } catch (err) {
+    next(err);
+  }
 };
 
 // GET: /items ----------------
@@ -80,6 +96,8 @@ exports.showItems = async (req, res) => {
   // get all items from DB
   let items = await db.getItems();
 
+  items = items.filter(item => item.status !== "Retired");
+  
   // derive categories dynamically
   const categories = [
     ...new Set(items.map(item => item.category))
@@ -169,12 +187,12 @@ exports.addItem = async (req, res, next) => {
             brand,
             model,
             category,
-            sub_category: '',
+            sub_category,
             serial,
             status,
             date_acquired,
             image_name: fileName,
-            image_alt: `Image of ${name}`
+            image_alt: image_alt || `Image of ${name}`,
         };
 
         await db.createItem(newItem);
@@ -379,23 +397,25 @@ exports.showItemHistory = (req, res) => {
 exports.checkIn = async (req, res, next) => {
   try {
     const db = getDbProvider();
-    const form = new multiparty.Form();
 
     const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) return reject(err);
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
         resolve({ fields, files });
       });
     });
 
     const itemId = fields.itemId?.[0];   
+    const duration = fields.duration?.[0];
     const userId = req.user.id;
+
+    const item = await db.getItemById(itemId);
 
     if (!itemId) {
       return res.redirect("/items?error=Missing+itemId");
     }
-
-    const item = await db.getItemById(itemId);
 
     if (!item) {
       return res.redirect("/items?error=Item+not+found");
@@ -408,22 +428,25 @@ exports.checkIn = async (req, res, next) => {
     // 1. upload file 
     let filePath = null;
 
-    if (files?.document?.length > 0) {
+    if (files?.document?.length > 0 && db.providerLabel === "Supabase") {
       const file = files.document[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+      const MAX_SIZE = 50 * 1024 * 1024;
 
       if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+5MB)");
+        return res.redirect("/items?error=File+too+large+(max+50MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
-
       const fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `checkin/${fileName}`;
 
-      await db.uploadFile(filePath, fileBuffer, false);
+      filePath = await db.uploadFile(fileName, fileBuffer);
+    } else {
+      const file = files.document[0];
 
-      if (uploadError) throw uploadError;
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+
+      filePath = await db.uploadFile(fileName, fileBuffer);
     }
 
     // 2. update state
@@ -436,7 +459,7 @@ exports.checkIn = async (req, res, next) => {
       referenceLink: filePath
     });
 
-    return res.redirect("/items?success=Checked+in+successfully");
+    return res.redirect("/items?success=Checked+in+successfully!");
   } catch (err) {
     next(err);
   }
@@ -456,6 +479,7 @@ exports.checkOut = async (req, res, next) => {
     });
 
     const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
     const userId = req.user.id;
 
     const item = await db.getItemById(itemId);
@@ -464,31 +488,31 @@ exports.checkOut = async (req, res, next) => {
       return res.redirect("/items?error=Item+not+found");
     }
 
-
-    if (item.status !== "Available") {
+    if (item.status !== "Available" || ["Maintenance", "Retired"].includes(item.status)) {
       return res.redirect("/items?error=Item+not+available");
     }
 
     let filePath = null;
 
-    if (files?.document?.length > 0) {
+    if (files?.document?.length > 0 && db.providerLabel === "Supabase") {
       const file = files.document[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+      const MAX_SIZE = 50 * 1024 * 1024;
 
       if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+5MB)");
+        return res.redirect("/items?error=File+too+large+(max+50MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
       const fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `checkout/${fileName}`;
 
-      await db.uploadFile(filePath, fileBuffer, false);
+      filePath = await db.uploadFile(fileName, fileBuffer);
+    } else {
+      const file = files.document[0];
 
-      if (error) {
-        console.error("Upload error:", error);
-        return res.redirect("/items?error=Upload+failed");
-      }
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+
+      filePath = await db.uploadFile(fileName, fileBuffer);
     }
 
     await db.updateItem(itemId, { status: "In-Use" });
@@ -496,26 +520,54 @@ exports.checkOut = async (req, res, next) => {
     await db.addItemHistory(itemId, {
       userId,
       action: "checkout",
-      duration: fields.duration?.[0] ?? null,
+      duration: duration ?? null,
       referenceLink: filePath,
     });
 
-    return res.redirect("/items?success=CHECKED+OUT+SUCCESSFULLY!");
+    return res.redirect("/owned");
 
   } catch (err) {
     next(err);
   }
 };
 
-exports.ShowCheckin = async (req, res, next) => {
+exports.showOwned = async (req, res, next) => {
   try {
     const db = getDbProvider();
     const currentUserId = req.user.id;
 
     const items = await db.getUserItems(currentUserId);
 
-    res.render("checkout", {
-      items
+    const allOwned = items.map(row => {
+      let status = "unknown";
+      let dueDate = null;
+
+      if (row.createdAt && row.duration) {
+        const created = new Date(row.createdAt);
+
+        dueDate = new Date(created);
+        dueDate.setHours(dueDate.getHours() + row.duration);
+
+        const now = new Date();
+
+        status = now > dueDate ? "overdue" : "active";
+
+      }
+
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+
+      return {
+        id: row.itemId, 
+        name: row.item.name,
+        createdAt: created.toISOString().split("T")[0],
+        dueDate: dueDate ? dueDate.toISOString().split("T")[0] : null,
+        status: status
+      }
+    });
+
+    res.render("owned", {
+      items: allOwned,
+      pageTitle: "Owned"
     });
 
   } catch (err) {
@@ -523,9 +575,16 @@ exports.ShowCheckin = async (req, res, next) => {
   }
 };
 
+
 exports.report = (req, res) => {
     res.render("report");
 };
+
+
+
+
+
+
 
 // ++++++++++ List-user page
 exports.users = (req, res) => {

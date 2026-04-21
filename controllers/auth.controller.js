@@ -1,6 +1,7 @@
 const { generateToken } = require("../middleware/authMiddleware");
-const { users } = require('../data/data');
 const { getDbProvider } = require("../utils/dbProviderShared");
+
+const config = require('../config/app.config');
 
 exports.showLogin = (req, res) => {
   const errorMsg = req.query.error;
@@ -30,9 +31,18 @@ exports.login = async (req, res) => {
       });
     }
 
+    if (user.status === "Disabled") {
+      return res.render("auth/login", {
+        layout: "no_nav_bar",
+        error: "Account disabled",
+        pageTitle: "Login"
+      });
+    }
+
     // 2. verify password (bcrypt in provider)
     const isValid = await db.verifyPassword(password, user.passwordHash);
 
+    
     if (!isValid) {
       return res.render("auth/login", {
         layout: "no_nav_bar",
@@ -47,16 +57,9 @@ exports.login = async (req, res) => {
     // 4. set cookie
     res.cookie("accessToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: config.NODE_ENV === "production",
       maxAge: 1000 * 60 * 60, // 1 hour
     });
-
-    // 5. role-based redirect
-    if (user.role === "Admin") {
-      return res.redirect(
-        `/`
-      );
-    }
 
     return res.redirect("/home");
 
@@ -69,8 +72,20 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.showRegister = (req, res) => {
-  res.render("auth/register", { layout: "no_nav_bar" });
+exports.showRegister = async (req, res) => {
+  const db = getDbProvider(); 
+  const users = await db.getAllUsers();
+
+  const hasActiveAdmin = users.some(
+    u => u.role === "Admin" && u.status === "Active"
+  );
+
+  const warningmsg = !hasActiveAdmin
+    ? "No active admin found. The newest registered account will be admin"
+    : null;
+
+  // const noActiveAdmin = !hasActiveAdmin;
+  res.render("auth/register", { layout: "no_nav_bar", pageTitle: "Register", warning: warningmsg});
 };
 
 exports.register = async (req, res) => {
@@ -81,7 +96,7 @@ exports.register = async (req, res) => {
 
     const user = await db.registerUser(email, password, name);
 
-    // auto-login after register (recommended UX)
+    // auto-login after register
     const token = generateToken(user);
     res.cookie("accessToken", token, { httpOnly: true });
 

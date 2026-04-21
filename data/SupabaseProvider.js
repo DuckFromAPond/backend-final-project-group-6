@@ -1,4 +1,5 @@
 const bcryptjs = require("bcryptjs");
+const crypto = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 const DatabaseProvider = require("./databaseProvider");
 const {
@@ -9,7 +10,6 @@ const {
 	mapApiKeyRowToModel,
 } = require("./models/supabaseModels");
 
-console.log("TABLES LOADED:", SUPABASE_TABLES);
 
 class SupabaseProvider extends DatabaseProvider {
 	constructor() {
@@ -81,6 +81,21 @@ class SupabaseProvider extends DatabaseProvider {
 		return data.publicUrl;
 	}
 
+	getLatestCheckoutRows(rows, getItemId) {
+		const latestMap = new Map();
+
+		for (const row of rows) {
+			const itemId = getItemId(row);
+			if (!itemId) continue;
+
+			if (!latestMap.has(itemId)) {
+			latestMap.set(itemId, row);
+			}
+		}
+
+		return [...latestMap.values()].filter(r => r.action === "checkout");
+	}
+
 	async initializeDatabase() {
 		// USERS
 		const { error: userError } = await this.supabase
@@ -116,7 +131,18 @@ class SupabaseProvider extends DatabaseProvider {
 	}
 
 	// ===== USER AUTHENTICATION =====
-	async registerUser(email, password) {
+	async registerUser(email, password, name) {
+		const { data: existingAdmin } = await this.supabase
+			.from(SUPABASE_TABLES.USERS)
+			.select("id")
+			.eq("role", "Admin")
+			.eq("status", "Active")
+			.limit(1)
+			.maybeSingle();
+
+
+		let roleToAssign = existingAdmin ? "Technician" : "Admin";
+
 		const normalizedEmail = this.normalizeEmail(email);
 
 		const { data: existingUser } = await this.supabase
@@ -137,11 +163,12 @@ class SupabaseProvider extends DatabaseProvider {
 			.insert([{
 			email: normalizedEmail,
 			password_hash: passwordHash,
-			name: email.split("@")[0],
-			role: "Admin",
-			status: "Active"
+			name: name,
+			role: roleToAssign ,
+			status: "Active", 
+			disabled_at: null,
 			}])
-			.select("id, email, name, role, status, created_at")
+			.select("id, email, name, role, status, created_at, disabled_at")
 			.single();
 
 		if (error) throw error;
@@ -154,7 +181,7 @@ class SupabaseProvider extends DatabaseProvider {
 
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.USERS)
-			.select("id, email, role, password_hash, name, status, created_at")
+			.select("id, email, role, password_hash, name, status, created_at, disabled_at")
 			.eq("email", normalizedEmail)
 			.maybeSingle();
 
@@ -198,11 +225,19 @@ class SupabaseProvider extends DatabaseProvider {
 			.from(SUPABASE_TABLES.USERS)
 			.update(updates)
 			.eq("id", normalizedUserId)
-			.select("id, email")
+			.select("id, email, role, status, disabled_at")
 			.single();
 
 		if (error) {
 			throw error;
+		}
+
+		// business rule: if user is disabled then revoke keys
+		if (updates.status === "Disabled") {
+			await this.supabase
+			.from(SUPABASE_TABLES.API_KEYS)
+			.update({ revoked: true })
+			.eq("admin_id", normalizedUserId);
 		}
 
 		return mapUserRowToModel(data);
@@ -282,44 +317,21 @@ class SupabaseProvider extends DatabaseProvider {
 		};
 	}
 
-	async updateItem(id, data) {
+	async updateItem(id, updates) {
 		const normalizedId = this.toSupabaseId(id);
 
-		const { data: updated, error } = await this.supabase
+		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.ITEMS)
-			.update(data)
+			.update(updates)
 			.eq("id", normalizedId)
 			.select()
 			.single();
 
-		if (error && error.code === "PGRST116") {
-			return null;
-		}
+		if (error) throw error;
 
-		if (error) {
-			throw error;
-		}
-
-		return {
-			...mapItemRowToModel(updated),
-			imageUrl: this.getImageUrl(updated.image_name),
-		};
+		return mapItemRowToModel(data);
 	}
 
-	async deleteItem(id) {
-		const normalizedId = this.toSupabaseId(id);
-
-		const { error } = await this.supabase
-			.from(SUPABASE_TABLES.ITEMS)
-			.delete()
-			.eq("id", normalizedId);
-
-		if (error) {
-			throw error;
-		}
-
-		return true;
-	}
 
 	// ===== HISTORY =====
 	async getItemHistories() {
@@ -358,6 +370,7 @@ class SupabaseProvider extends DatabaseProvider {
 			item_id: this.toSupabaseId(itemId),
 			user_id: this.toSupabaseId(data.userId),
 			action: data.action,
+			duration: data.duration,
 			reference_link: data.referenceLink ?? null,
 			created_at: new Date()
 		};
@@ -388,7 +401,7 @@ class SupabaseProvider extends DatabaseProvider {
 			action,
 			created_at,
 			reference_link,
-			items!inner(id, name, serial, model, brand, category, status, date_acquired, image_name)
+			items!inner(id, name, serial, model, brand, category, sub_category, status, description, date_acquired, image_alt, image_name)
 			`)
 			.eq("user_id", normalizedUserId)
 			.order("created_at", { ascending: false });
@@ -396,112 +409,123 @@ class SupabaseProvider extends DatabaseProvider {
 		if (error) throw error;
 
 		// get latest per item
-		const latestMap = new Map();
+		const latest = this.getLatestCheckoutRows(data, r => r.item_id);
 
-		for (const row of data) {
-			if (!latestMap.has(row.item_id)) {
-			latestMap.set(row.item_id, row);
-			}
-		}
+		return latest.map(r => ({
+			id: r.id,
+			userId: r.user_id,
+			itemId: r.item_id,
+			action: r.action,
+			duration: r.duration,
+			createdAt: r.created_at,
 
-		// only keep items still checked out
-		const activeItems = [...latestMap.values()].filter(
-			row => row.action === "checkout"
-		);
-
-		return activeItems.map(row => ({
-			id: row.id,
-			userId: row.user_id,
-			itemId: row.item_id,
-			duration: row.duration,
-			createdAt: row.created_at,
-			referenceUrl: this.getReferenceUrl(row.reference_link),
+			referenceUrl: this.getReferenceUrl(r.reference_link),
 
 			item: {
-			...mapItemRowToModel(row.items),
-			imageUrl: this.getImageUrl(row.items.image_name),
-			}
+			id: r.items.id,
+			name: r.items.name,
+			serial: r.items.serial,
+			model: r.items.model,
+			brand: r.items.brand,
+			category: r.items.category,
+			sub_category: r.items.sub_category, 
+			status: r.items.status,
+			description: r.items.description, 
+			dateAcquired: r.items.date_acquired,
+			imageAlt: r.items.image_alt,
+			imageUrl: this.getImageUrl(r.items.image_name),
+			},
 		}));
 	}
 
-	async UpdateItemHistory(itemId, userId, action, options = {}) {				// admin
+	async updateUserItem(itemId, newUserId, adminId, options = {}) {
 		const normalizedItemId = this.toSupabaseId(itemId);
-		const normalizedUserId = this.toSupabaseId(userId);
+		const normalizedNewUserId = this.toSupabaseId(newUserId);
+		const normalizedAdminId = this.toSupabaseId(adminId);
 
-		// validate action
-		if (!["checkout", "checkin"].includes(action)) {
-			throw new Error("Invalid action type");
+		// 1. check admin
+		const admin = await this.getUserById(normalizedAdminId);
+
+		if (!admin || admin.role !== "Admin") {
+			throw new Error("Unauthorized");
 		}
 
-		// enforce rules
-		if (action === "checkout") {
-			const { data: existing, error: checkError } = await this.supabase
-				.from(SUPABASE_TABLES.ITEM_HISTORIES)
-				.select("id")
-				.eq("item_id", normalizedItemId)
-				.is("returned_at", null)
-				.maybeSingle();
+		// 2. check item exists
+		const item = await this.getItemById(normalizedItemId);
 
-			if (checkError) throw checkError;
-
-			if (existing) {
-				throw new Error("Item is already checked out");
-			}
+		if (!item) {
+			throw new Error("Item not found");
 		}
 
-		const payload = {
-			item_id: normalizedItemId,
-			user_id: normalizedUserId,
-			action,
-			duration: options.duration ?? null,
-			reference_link: options.referenceLink ?? null,
-			start_time: options.startTime ?? new Date(),
-			returned_at: action === "checkin" ? new Date() : null,
-		};
+		// 3. get current owner (latest active checkout)
+		const { data: existing, error: fetchError } = await this.supabase
+			.from(SUPABASE_TABLES.ITEM_HISTORIES)
+			.select("*")
+			.eq("item_id", normalizedItemId)
+			.is("returned_at", null)
+			.maybeSingle();
 
+		if (fetchError) throw fetchError;
+
+		// 4. RULE: already owned by same user
+		if (
+			existing &&
+			existing.user_id === normalizedNewUserId &&
+			existing.action === "checkout"
+		) {
+			throw new Error("User already owns this item");
+		}
+
+		// 5. RULE: prevent double ownership
+		if (existing && existing.user_id !== normalizedNewUserId) {
+			throw new Error("Item is already owned by another user");
+		}
+
+		// 6. optional: close previous ownership (if you want forced transfer)
+		if (existing) {
+			await this.supabase
+			.from(SUPABASE_TABLES.ITEM_HISTORIES)
+			.update({
+				returned_at: new Date(),
+			})
+			.eq("id", existing.id);
+		}
+
+		// 7. create new ownership record
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.insert([payload])
+			.insert([
+			{
+				item_id: normalizedItemId,
+				user_id: normalizedNewUserId,
+				action: "checkout",
+				reference_link: options.referenceLink ?? null,
+				created_at: new Date(),
+			},
+			])
 			.select()
 			.single();
 
 		if (error) throw error;
 
-		// optionally sync item status
-		if (action === "checkout") {
-			await this.setItemStatus(itemId, "In-Use");
-		} else if (action === "checkin") {
-			await this.setItemStatus(itemId, "Available");
-		}
-
-		return {
-			...mapItemHistoryRowToModel(data),
-			referenceUrl: this.getReferenceUrl(data.reference_link),
-		};
+		return this.mapItemHistoryRowToModel(data);
 	}
 
 
 
+	// ===== APIKEYS =====
 	async createApiKey(adminId, data) {
-		const crypto = require("crypto");
 		const keyValue = crypto.randomBytes(32).toString("hex");
 
-		const admin = await this.getUserById(adminId);
-
-		if (!admin || admin.role !== "Admin") {
-			throw new Error("Only admins can create API keys");
-		}
-
-		const payload = {
+		const { data: inserted, error } = await this.supabase
+			.from("api_keys")
+			.insert([{
 			key: keyValue,
-			name: data?.name || null,
+			name: data?.name ?? null,
 			admin_id: adminId,
 			revoked: false,
-		};
-
-		const { data: inserted, error } = await this.supabase
-			.from(SUPABASE_TABLES.API_KEYS)
-			.insert([payload])
+			created_at: new Date(),
+			}])
 			.select()
 			.single();
 
@@ -512,7 +536,7 @@ class SupabaseProvider extends DatabaseProvider {
 
 	async getApiKeys() {
 		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.API_KEYS)
+			.from("api_keys")
 			.select("*")
 			.order("created_at", { ascending: false });
 
@@ -541,23 +565,34 @@ class SupabaseProvider extends DatabaseProvider {
 			throw new Error("Only admins can revoke keys");
 		}
 
-		const normalizedId = this.toSupabaseId(id);
-
 		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.API_KEYS)
+			.from("api_keys")
 			.update({ revoked: true })
-			.eq("id", normalizedId)
+			.eq("id", id)
 			.select()
-			.maybeSingle();
+			.single();
 
 		if (error) throw error;
 
-		return data ? mapApiKeyRowToModel(data) : null;
+		return data.map(mapApiKeyRowToModel);
 	}
 
-	// async uploadFile(path, buffer) {
+	async uploadFile(path, buffer) {
+		const { error } = await this.supabase.storage
+			.from("docs-bucket")
+			.upload(path, buffer);
+
+		if (error) {
+			throw new Error(`Upload failed: ${error.message}`);
+		}
+
+		return path;
+	}
+
+	// a revised version of the uploadFile method (Should keep only 1)
+	// async uploadFile(path, buffer, isItem) {
 	// 	const { error } = await this.supabase.storage
-	// 		.from("docs-bucket")
+	// 		.from(isItem ? "items-bucket" : "docs-bucket")
 	// 		.upload(path, buffer);
 
 	// 	if (error) {
@@ -567,14 +602,13 @@ class SupabaseProvider extends DatabaseProvider {
 	// 	return path;
 	// }
 
-	// a revised version of the uploadFile method (Should keep only 1)
-	async uploadFile(path, buffer, isItem) {
+	async uploadItem(path, buffer) {
 		const { error } = await this.supabase.storage
-			.from(isItem ? "items-bucket" : "docs-bucket")
+			.from("items-bucket")
 			.upload(path, buffer);
 
 		if (error) {
-			throw new Error(`Upload failed: ${error.message}`);
+			throw new Error(`Image upload failed: ${error.message}`);
 		}
 
 		return path;
