@@ -1,4 +1,9 @@
 <main class="w-full flex flex-col justify-center items-center gap-y-5 p-6">
+    {{!-- TOAST BANNER --}}
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+        {{> toast}}
+    </div>
+
     <h1 class="text-3xl font-bold justify-self-center self-start">Item Detail</h1>
 
     <div class="grid grid-cols-2 gap-5">
@@ -43,23 +48,31 @@
         </div>
 
         <div class="w-1/2 flex justify-between gap-x-10">
-            <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
+            {{#if isEdit}}
+                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
+                onclick="location.href='/items/{{id}}#editForm'"
+                >
+                    Hide Edit
+                </button>
+            {{else}}
+                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
                 onclick="location.href='/items/{{id}}?edit=true#editForm'"
-            >
-                Edit
-            </button>
+                >
+                    Show Edit
+                </button>
+            {{/if}}
             
             {{#if isDelete}}
                 <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
                     id="deleteBtn"
                 >
-                    Confirm Deletion
+                    Confirm Retirement
                 </button>
             {{else}}
                 <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
                     onclick="location.href='/items/{{id}}?del=true#deleteBtn'"
                 >
-                    Delete
+                    Retire
                 </button>
             {{/if}}
         </div>

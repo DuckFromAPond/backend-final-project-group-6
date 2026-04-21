@@ -75,7 +75,7 @@ exports.home = async (req, res) => {
 // GET: /items ----------------
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q, error } = req.query;
+  const { cat, q, isRetired, error } = req.query;
 
   // get all items from DB
   let items = await db.getItems();
@@ -96,12 +96,15 @@ exports.showItems = async (req, res) => {
       item.name?.toLowerCase().includes(q.toLowerCase())
     );
   }
+
+  if (isRetired) {
+    items = items.filter(item => item.status === "Retired");
+  }
   
   const statuses = [
     { name: "Available" },
     { name: "In-Use" },
     { name: "Maintenance" },
-    { name: "Retired" }
   ];
 
   res.render("items/items", {
@@ -114,7 +117,6 @@ exports.showItems = async (req, res) => {
     pageTitle: "Items"
   });
 };
-
 
 exports.addItem = async (req, res, next) => {
     try {
@@ -186,7 +188,7 @@ exports.addItem = async (req, res, next) => {
 
 exports.showItemDetail = async (req, res) => {
     const { id } = req.params;
-    const { edit, del } = req.query;
+    const { edit, del, error, success } = req.query;
     const db = getDbProvider();
 
     let item = await db.getItemById(id);
@@ -224,7 +226,19 @@ exports.showItemDetail = async (req, res) => {
         }
     }
 
-    console.log(context)
+    if(error) {
+        context = {
+            ...context,
+            error
+        }
+    }
+
+    if(success) {
+      context = {
+          ...context,
+          success
+      }
+    }
 
     res.render('items/itemDetail', context)
 };
@@ -243,6 +257,13 @@ exports.editItem = async (req, res, next) => {
             resolve({ fields, files });
           });
         });
+
+        if(item.status === "In-Use") {
+          return res.json({
+            type: 'error',
+            redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`
+          });
+        }
 
         // extract fields
         const name = fields.name?.[0] ?? '';
@@ -266,7 +287,7 @@ exports.editItem = async (req, res, next) => {
           const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
           if (file.size > MAX_SIZE) {
-              return res.redirect("/items?error=File+too+large+(max+50MB)");
+            return res.redirect("/items?error=File+too+large+(max+50MB)");
           }
 
           const fileBuffer = fs.readFileSync(file.path);
@@ -303,16 +324,22 @@ exports.editItem = async (req, res, next) => {
     }
 }
 
+// soft deletes only
 exports.deleteItem = async (req, res, next) => {
     const { id } = req.params;
 
     try {
       const db = getDbProvider();
-      await db.deleteItem(id);
+      const newItem = await db.getItemById(id);
+      newItem.status = "Retired";
+      await db.updateItem(id, newItem);
+      
+      // uncomment this for hard delete
+      // await db.deleteItem(id);
       
       return res.json({
           type: 'success',
-          redirect: '/items'
+          redirect: '/items?success=Item+retired+successfully'
       })
     }
     catch(err) {

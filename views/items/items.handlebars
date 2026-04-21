@@ -9,17 +9,27 @@
     
     <section class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-10 w-full">
         <nav class="bg-white p-4 rounded-lg shadow-sm">
-            <h2 class="text-lg font-semibold mb-2">Categories</h2>
+            <a class="text-lg font-semibold mb-2"
+                href="/items"
+            >Categories</a>
 
             <ul class="space-y-1">
                 {{#each categories}}
                 <li>
                     <a href="/items?cat={{this.name}}"
-                    class="block px-2 py-1 rounded hover:bg-gray-100 transition">
+                    class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition">
                     {{this.name}}
                     </a>
                 </li>
                 {{/each}}
+
+                <li>
+                    <a href="/items?isRetired=true"
+                    class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                    >
+                    Show retired
+                    </a>
+                </li>
             </ul>
         </nav>
 
