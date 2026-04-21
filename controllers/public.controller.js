@@ -91,8 +91,8 @@ exports.home = async (req, res, next) => {
 // GET: /items ----------------
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q, isRetired, error } = req.query;
-  const page = parseInt(req.query.page) || 1;
+  const { cat, q, isRetired, error, success } = req.query;
+  let page = req.query.page;
   const pageSize = 10; // items to show per page
 
   // append query parameters to URL
@@ -100,8 +100,6 @@ exports.showItems = async (req, res) => {
 
   // get all items from DB
   let items = await db.getItems();
-
-  items = items.filter(item => item.status !== "Retired");
   
   // derive categories dynamically
   const categories = [
@@ -124,14 +122,28 @@ exports.showItems = async (req, res) => {
 
   if (isRetired) {
     url += `isRetired=${isRetired}&`;
-    items = items.filter(item => item.status === "Retired");
+    items = items.filter(item => 
+      item.status === "Retired");
+  }
+  else {
+    items = items.filter(item => item.status !== "Retired");
+  }
+
+  if(error) {
+    url += `error=${error}&`;
+  }
+
+  if(success) {
+    url += `success=${success}&`;
   }
 
   // append page number to URL
   if (!page) {
-    url += `page=${page}`
+    url += `page=1`;
     return res.redirect(url);
   };
+
+  page = parseInt(page);
 
   // calculate total pages
   const total = items.length;
@@ -163,8 +175,8 @@ exports.showItems = async (req, res) => {
     nextPage,
     totalPages: pagesToRender,
     user: req.user || null,
-    error: req.query.error || null,
-    success: req.query.success || null, 
+    error: error || null,
+    success: success || null, 
     pageTitle: "Items"
   });
 };
@@ -256,6 +268,7 @@ exports.showItemDetail = async (req, res) => {
         statuses,
         isEdit: false,
         isDelete: false,
+        isRetired: item.status === "Retired",
     };
 
     if (!context) {
@@ -381,8 +394,21 @@ exports.deleteItem = async (req, res, next) => {
 
     try {
       const db = getDbProvider();
-      const newItem = await db.getItemById(id);
-      newItem.status = "Retired";
+      const item = await db.getItemById(id);
+      item['date_acquired'] = item['dateAcquired'];
+      item['image_alt'] = item['imageAlt'];
+      item['image_name'] = item['imageName'];
+      delete item['dateAcquired'];
+      delete item['imageAlt'];
+      delete item['imageName'];
+      delete item['imageUrl'];
+      const newItem = {
+        ...item,
+        status: "Retired"
+      };
+
+      // console.log(newItem);
+
       await db.updateItem(id, newItem);
       
       // uncomment this for hard delete

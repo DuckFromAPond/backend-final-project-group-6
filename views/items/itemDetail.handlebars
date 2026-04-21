@@ -62,19 +62,21 @@
                 </button>
             {{/if}}
             
-            {{#if isDelete}}
-                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                    id="deleteBtn"
-                >
-                    Confirm Retirement
-                </button>
-            {{else}}
-                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                    onclick="location.href='/items/{{id}}?del=true#deleteBtn'"
-                >
-                    Retire
-                </button>
-            {{/if}}
+            {{#unless isRetired}}
+                {{#if isDelete}}
+                    <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                        id="deleteBtn"
+                    >
+                        Confirm Retirement
+                    </button>
+                {{else}}
+                    <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                        onclick="location.href='/items/{{id}}?del=true#deleteBtn'"
+                    >
+                        Retire
+                    </button>
+                {{/if}}
+            {{/unless}}
         </div>
     </section>
     
@@ -88,6 +90,7 @@
 <script>
     const deleteBtn = document.querySelector('#deleteBtn');
     const itemId = "{{id}}";
+
     deleteBtn.addEventListener('click', async (event) => {
         const response = await fetch(`/items/${itemId}`, {
             method: 'DELETE'
