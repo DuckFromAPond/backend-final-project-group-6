@@ -573,22 +573,9 @@ class SupabaseProvider extends DatabaseProvider {
     return data.map(mapApiKeyRowToModel);
   }
 
-	// async uploadFile(path, buffer) {
-	// 	const { error } = await this.supabase.storage
-	// 		.from("docs-bucket")
-	// 		.upload(path, buffer);
-
-  // 	if (error) {
-  // 		throw new Error(`Upload failed: ${error.message}`);
-  // 	}
-
-  // 	return path;
-  // }
-
-  // a revised version of the uploadFile method (Should keep only 1)
-  async uploadFile(path, buffer, isItem) {
+  async uploadFile(path, buffer) {
     const { error } = await this.supabase.storage
-      .from(isItem ? "items-bucket" : "docs-bucket")
+      .from("docs-bucket")
       .upload(path, buffer);
 
     if (error) {
