@@ -92,6 +92,11 @@ exports.home = async (req, res, next) => {
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
   const { cat, q, isRetired, error } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const pageSize = 10; // items to show per page
+
+  // append query parameters to URL
+  let url = "/items?";
 
   // get all items from DB
   let items = await db.getItems();
@@ -105,19 +110,44 @@ exports.showItems = async (req, res) => {
 
   // filter by category
   if (cat) {
+    url += `cat=${cat}&`;
     items = items.filter(item => item.category === cat);
   }
 
   // search by name (case-insensitive)
   if (q) {
+    url += `q=${q}&`;
     items = items.filter(item =>
       item.name?.toLowerCase().includes(q.toLowerCase())
     );
   }
 
   if (isRetired) {
+    url += `isRetired=${isRetired}&`;
     items = items.filter(item => item.status === "Retired");
   }
+
+  // append page number to URL
+  if (!page) {
+    url += `page=${page}`
+    return res.redirect(url);
+  };
+
+  // calculate total pages
+  const total = items.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  // set page range
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  items = items.slice(start, end);
+
+  // pagination
+  const prevPage = page > 1 ? page - 1 : null;
+  const nextPage = page < totalPages ? page + 1 : null;
+
+  const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
   
   const statuses = [
     { name: "Available" },
@@ -129,6 +159,9 @@ exports.showItems = async (req, res) => {
     categories,
     items,
     statuses,
+    prevPage,
+    nextPage,
+    totalPages: pagesToRender,
     user: req.user || null,
     error: req.query.error || null,
     success: req.query.success || null, 

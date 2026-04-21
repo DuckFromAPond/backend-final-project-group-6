@@ -59,6 +59,12 @@
                 {{#each items}}
                     {{> itemCard}}
                 {{/each}}
+
+                <div
+                    class="w-full col-span-full"
+                >
+                    {{> itemPaginator}}
+                </div>
             </section>
         {{else}}
             <section class="w-full flex flex-col justify-center items-center gap-y-5">
