@@ -124,6 +124,7 @@ publicApp.use((req, res, next) => {
 });
 
 publicApp.use("/", authRoutes);
+publicApp.use('/', apiRoutes);
 publicApp.use('/', publicRoutes);
 
 
@@ -181,7 +182,16 @@ apiApp.use(apiRoutes)
 
 // ------ Main app ------
 const app = express();
+app.engine('handlebars', engine({
+  defaultLayout: 'no_nav_bar',
+  extname: '.handlebars',
+  layoutsDir: path.join(__dirname, 'views/layouts'),
+  partialsDir: path.join(__dirname, 'views/partials'),
+  helpers: hbsHelpers,
+}));
 
+app.set('view engine', 'handlebars');
+app.set('views', path.join(__dirname, 'views'));
 // safety 
 app.disable('x-powered-by');
 

@@ -10,12 +10,12 @@ const apiController = require("../controllers/api.controller");
 
 // router.get('/keys', apiProtect, requireRoleAPI("Admin"), apiController.getKeys)
 // router.get('/items', authOrApiKey, apiController.getItems)
-// router.get('/items/:id/history', apiProtect, apiController.getItemHist)
+// router.get('/items/:id/history', authOrApiKey, apiController.getItemHist)
 
 // router.post('/auth/login', loginLimiter, apiController.apiLogin);
 // router.post('/users', apiProtect, requireRoleAPI("Admin"), apiController.createUser); 
 // router.post('/keys', apiProtect, requireRoleAPI("Admin"), apiController.generateKey);
-// router.post('/items', apiProtect, apiController.createItem);
+// router.post('/items', authOrApiKey, apiController.createItem);
 // router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
 // router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
 

@@ -1,6 +1,8 @@
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
+const config = require('../config/app.config');
+
 exports.showLogin = (req, res) => {
   const errorMsg = req.query.error;
 
@@ -55,7 +57,7 @@ exports.login = async (req, res) => {
     // 4. set cookie
     res.cookie("accessToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: config.NODE_ENV === "production",
       maxAge: 1000 * 60 * 60, // 1 hour
     });
 
@@ -78,8 +80,12 @@ exports.showRegister = async (req, res) => {
     u => u.role === "Admin" && u.status === "Active"
   );
 
-  const noActiveAdmin = !hasActiveAdmin;
-  res.render("auth/register", { layout: "no_nav_bar", pageTitle: "Register", warning: "No active admin found. The newest registered account will be admin"});
+  const warningmsg = !hasActiveAdmin
+    ? "No active admin found. The newest registered account will be admin"
+    : null;
+
+  // const noActiveAdmin = !hasActiveAdmin;
+  res.render("auth/register", { layout: "no_nav_bar", pageTitle: "Register", warning: warningmsg});
 };
 
 exports.register = async (req, res) => {
@@ -88,7 +94,7 @@ exports.register = async (req, res) => {
 
     const db = getDbProvider();
 
-    const {user, hasAdmin} = await db.registerUser(email, password, name);
+    const user = await db.registerUser(email, password, name);
 
     // auto-login after register
     const token = generateToken(user);

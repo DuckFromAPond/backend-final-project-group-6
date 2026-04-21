@@ -7,8 +7,7 @@ const { verifyToken } = require("./authMiddleware")
 // APIPROTECT (API version of protect using JWT TOKEN)
 async function apiProtect(req, res, next) {
   try {
-       let token = req.cookies?.accessToken;
-    
+    let token = req.cookies?.accessToken;
 
     // 2. Bearer token (Postman / API standard)
     const authHeader = req.get("Authorization");
@@ -46,6 +45,12 @@ async function apiProtect(req, res, next) {
         });
     }
 
+    if (user.disabledAt && decoded.iat * 1000 < new Date(user.disabledAt).getTime()) {
+      return res.status(403).json({
+        message: "Session expired"
+      });
+    }
+
     req.user = user;
     req.authType = "jwt";
 
@@ -79,13 +84,30 @@ async function authOrApiKey(req, res, next) {
       if (decoded) {
         const user = await dbProvider.getUserById(decoded.id);
 
-        if (user && user.status !== "Disabled") {
-          req.user = user;
-          req.authType = "jwt";
-          return next();
+        if (!user) {
+          return res.status(403).json({
+            message: "Account disabled or invalid user"
+          });
         }
 
-        return res.status(403).json({ message: "Account disabled or invalid user" });
+        if (user.status === "Disabled") {
+          return res.status(403).json({
+            message: "Account disabled"
+          });
+        }
+
+        if (
+          user.disabledAt &&
+          decoded.iat * 1000 < new Date(user.disabledAt).getTime()
+        ) {
+          return res.status(403).json({
+            message: "Session expired"
+          });
+        }
+
+        req.user = user;
+        req.authType = "jwt";
+        return next();
       }
     }
 

@@ -530,7 +530,7 @@ exports.checkOut = async (req, res, next) => {
       referenceLink: filePath,
     });
 
-    return res.redirect("/items?success=Checked+in+successfully!");
+    return res.redirect("/owned");
 
   } catch (err) {
     next(err);

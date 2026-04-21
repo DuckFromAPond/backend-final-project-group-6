@@ -36,9 +36,19 @@ async function protect (req, res, next) {
   const dbProvider = getDbProvider();
   const user = await dbProvider.getUserById(decoded.id);
   
-  if (!user || user.status === "Disabled") {
+  if (!user) {
+    res.clearCookie("accessToken");
+    return res.redirect("/login?error=Account not found");
+  }
+
+  if (user.status === "Disabled") {
     res.clearCookie("accessToken");
     return res.redirect("/login?error=Account disabled");
+  }
+
+  if (user.disabledAt && decoded.iat * 1000 < new Date(user.disabledAt).getTime()) {
+    res.clearCookie("accessToken");
+    return res.redirect("/login?error=Session expired");
   }
 
   req.user = user;

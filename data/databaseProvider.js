@@ -8,7 +8,7 @@ class DatabaseProvider {
 	}
 
 	// ===== USER AUTHENTICATION =====
-	async registerUser(email, password) {throw new Error("missing implementation");}
+	async registerUser(email, password, name) {throw new Error("missing implementation");}
 	async findUserByEmail(email) {throw new Error("missing implementation");}
 	async verifyPassword(password, hash) {throw new Error("missing implementation");}
 	async getUserById(userId) {throw new Error("missing implementation");}

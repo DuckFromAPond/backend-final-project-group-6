@@ -165,9 +165,10 @@ class SupabaseProvider extends DatabaseProvider {
 			password_hash: passwordHash,
 			name: name,
 			role: roleToAssign ,
-			status: "Active"
+			status: "Active", 
+			disabled_at: null,
 			}])
-			.select("id, email, name, role, status, created_at")
+			.select("id, email, name, role, status, created_at, disabled_at")
 			.single();
 
 		if (error) throw error;
@@ -180,7 +181,7 @@ class SupabaseProvider extends DatabaseProvider {
 
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.USERS)
-			.select("id, email, role, password_hash, name, status, created_at")
+			.select("id, email, role, password_hash, name, status, created_at, disabled_at")
 			.eq("email", normalizedEmail)
 			.maybeSingle();
 
@@ -224,7 +225,7 @@ class SupabaseProvider extends DatabaseProvider {
 			.from(SUPABASE_TABLES.USERS)
 			.update(updates)
 			.eq("id", normalizedUserId)
-			.select("id, email, role, status")
+			.select("id, email, role, status, disabled_at")
 			.single();
 
 		if (error) {
@@ -576,22 +577,9 @@ class SupabaseProvider extends DatabaseProvider {
 		return data.map(mapApiKeyRowToModel);
 	}
 
-	// async uploadFile(path, buffer) {
-	// 	const { error } = await this.supabase.storage
-	// 		.from("docs-bucket")
-	// 		.upload(path, buffer);
-
-	// 	if (error) {
-	// 		throw new Error(`Upload failed: ${error.message}`);
-	// 	}
-
-	// 	return path;
-	// }
-
-	// a revised version of the uploadFile method (Should keep only 1)
-	async uploadFile(path, buffer, isItem) {
+	async uploadFile(path, buffer) {
 		const { error } = await this.supabase.storage
-			.from(isItem ? "items-bucket" : "docs-bucket")
+			.from("docs-bucket")
 			.upload(path, buffer);
 
 		if (error) {
@@ -600,6 +588,19 @@ class SupabaseProvider extends DatabaseProvider {
 
 		return path;
 	}
+
+	// a revised version of the uploadFile method (Should keep only 1)
+	// async uploadFile(path, buffer, isItem) {
+	// 	const { error } = await this.supabase.storage
+	// 		.from(isItem ? "items-bucket" : "docs-bucket")
+	// 		.upload(path, buffer);
+
+	// 	if (error) {
+	// 		throw new Error(`Upload failed: ${error.message}`);
+	// 	}
+
+	// 	return path;
+	// }
 
 	async uploadItem(path, buffer) {
 		const { error } = await this.supabase.storage

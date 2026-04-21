@@ -72,6 +72,7 @@ class MongoProvider extends DatabaseProvider {
       status: user.status,
       createdAt: user.createdAt,
       passwordHash: user.passwordHash,
+      disabledAt: user.disabledAt
     };
   }
 
@@ -155,7 +156,6 @@ class MongoProvider extends DatabaseProvider {
   async registerUser(email, password, name) {
     const existingAdmin =  await User.findOne({ role: "Admin", status: "Active" });
     let roleToAssign = existingAdmin ? "Technician" : "Admin";
-
     const normalizedEmail = this.normalizeEmail(email);
 
     const existing = await User.findOne({ email: normalizedEmail });
@@ -167,8 +167,9 @@ class MongoProvider extends DatabaseProvider {
       email: normalizedEmail,
       passwordHash: hash,
       name: name,
-      role: roleToAssign,
-      status: "Active"
+      role: existingAdmin,
+      status: "Active",
+      disabledAt: null
     });
 
     return this.mapUser(user.toObject());
@@ -187,6 +188,10 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getUserById(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return null; // or throw new Error("Invalid user id");
+    }
+
     const user = await User.findById(id).lean();
     return this.mapUser(user);
   }
@@ -220,6 +225,10 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getItemById(id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return null; // or throw new Error("Invalid item id");
+    }
+
     const item = await Item.findById(id).lean();
     return this.mapItem(item);
   }
@@ -346,7 +355,7 @@ class MongoProvider extends DatabaseProvider {
 
 		const history = await ItemHistory.create({
 			itemId,
-			userId: targetUserId,   // 👈 admin chooses user
+			userId: targetUserId,  
 			action,
 			duration: options.duration ?? null,
 			referenceLink: options.referenceLink ?? null,

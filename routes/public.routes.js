@@ -28,7 +28,7 @@ router.get("/report", protect, publicController.report);
 router.post("/transactions/checkin", protect, publicController.checkIn);
 router.post("/transactions/checkout", protect, publicController.checkOut);
 
-
+// router.get('/hisory', protect, requireRole("Admin"), adminController.createItem); 
 
 router.get("/users", protect, publicController.users);                          // <------------ move to admin later
 
