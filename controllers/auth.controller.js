@@ -1,60 +1,33 @@
 const { generateToken } = require("../middleware/authMiddleware");
-const { getDbProvider } = require("../utils/dbProviderShared");
+const userService = require("../services/userService"); // Import the service
 
 const config = require('../config/app.config');
 
 exports.showLogin = (req, res) => {
-  const errorMsg = req.query.error;
-
   res.render("auth/login", {
     layout: "no_nav_bar",
-    error: errorMsg,
-    pageTitle: "Login"
+    error: req.query.error,
+    pageTitle: "Login",
   });
 };
 
 exports.login = async (req, res) => {
   try {
-    const db = getDbProvider();
-
     const { email, password } = req.body;
 
-    // 1. find user in DB
-    const user = await db.findUserByEmail(email);
+    // Call the service for the "Thinking" part
+    const authResult = await userService.authenticateUser(email, password);
 
-
-    if (!user) {
+    if (!authResult.success) {
       return res.render("auth/login", {
         layout: "no_nav_bar",
-        error: "Invalid email or password",
-        pageTitle: "Login"
+        error: authResult.message,
+        pageTitle: "Login",
       });
     }
 
-    if (user.status === "Disabled") {
-      return res.render("auth/login", {
-        layout: "no_nav_bar",
-        error: "Account disabled",
-        pageTitle: "Login"
-      });
-    }
-
-    // 2. verify password (bcrypt in provider)
-    const isValid = await db.verifyPassword(password, user.passwordHash);
-
-    
-    if (!isValid) {
-      return res.render("auth/login", {
-        layout: "no_nav_bar",
-        error: "Invalid email or password",
-        pageTitle: "Login"
-      });
-    }
-
-    // 3. generate token
-    const token = generateToken(user);
-
-    // 4. set cookie
+    // Controller handles the HTTP specific stuff: Token and Cookie
+    const token = generateToken(authResult.user);
     res.cookie("accessToken", token, {
       httpOnly: true,
       secure: config.NODE_ENV === "production",
@@ -62,58 +35,47 @@ exports.login = async (req, res) => {
     });
 
     return res.redirect("/home");
-
   } catch (err) {
     console.error(err);
-    res.status(500).render('extra_pages/500', {
-    message: `Error message: ${err}`,
-    pageTitle: "505"
-  });
+    res
+      .status(500)
+      .render("extra_pages/500", { message: err, pageTitle: "505" });
   }
 };
 
 exports.showRegister = async (req, res) => {
-  const db = getDbProvider(); 
-  const users = await db.getAllUsers();
+  const hasAdmin = await userService.checkAdminAvailability();
 
-  const hasActiveAdmin = users.some(
-    u => u.role === "Admin" && u.status === "Active"
-  );
-
-  const warningmsg = !hasActiveAdmin
-    ? "No active admin found. The newest registered account will be admin"
-    : null;
-
-  // const noActiveAdmin = !hasActiveAdmin;
-  res.render("auth/register", { layout: "no_nav_bar", pageTitle: "Register", warning: warningmsg});
+  res.render("auth/register", {
+    layout: "no_nav_bar",
+    pageTitle: "Register",
+    warning: !hasAdmin
+      ? "No active admin found. The newest account will be admin."
+      : null,
+  });
 };
 
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
-    const db = getDbProvider();
-
-    const user = await db.registerUser(email, password, name);
-
+    const user = await userService.registerNewUser(name, email, password);
+    
     // auto-login after register
     const token = generateToken(user);
     res.cookie("accessToken", token, { httpOnly: true });
 
+    // After registration, redirect to login
     return res.redirect("/login");
-
   } catch (error) {
-    console.error("Register error:", error);
-
     return res.render("auth/register", {
       layout: "no_nav_bar",
       error: error.message || "Registration failed",
-      pageTitle: "Register"
+      pageTitle: "Register",
     });
   }
 };
 
 exports.logout = (req, res) => {
   res.clearCookie("accessToken");
-  return res.redirect('/login');
+  return res.redirect("/login");
 };

@@ -3,23 +3,23 @@ const secret = process.env.JWT_SECRET || "your-super-secret-key";
 const { getDbProvider } = require("../utils/dbProviderShared");
 
 // Generate a token for a user
-function generateToken (user) {
+function generateToken(user) {
   return jwt.sign({ id: user.id, email: user.email, role: user.role }, secret, {
     expiresIn: "6h",
   });
-};
+}
 
 // Verify the token from the cookie
-function verifyToken (token) {
+function verifyToken(token) {
   try {
     return jwt.verify(token, secret);
   } catch (err) {
     return null;
   }
-};
+}
 
 // PROTECT (JWT TOKEN FOR UI ONLY)
-async function protect (req, res, next) {
+async function protect(req, res, next) {
   const token = req.cookies?.accessToken;
 
   if (!token) {
@@ -54,9 +54,9 @@ async function protect (req, res, next) {
   req.user = user;
   res.locals.user = user;
   next();
-};
+}
 
-function redirectIfAuth (req, res, next) {
+function redirectIfAuth(req, res, next) {
   const token = req.cookies?.accessToken;
   const user = token ? verifyToken(token) : null;
 
@@ -65,5 +65,38 @@ function redirectIfAuth (req, res, next) {
   next();
 }
 
+async function apiProtect(req, res, next) {
+  // Check the Authorization Header: "Bearer [token]"
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1];
 
-module.exports = { generateToken, verifyToken, protect, redirectIfAuth }
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "No token provided. Please use Bearer token." });
+  }
+
+  const decoded = jwt.verify(token, secret); // Using your secret variable
+  if (!decoded) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+
+  const dbProvider = getDbProvider();
+  const user = await dbProvider.getUserById(decoded.id);
+
+  if (!user || user.status === "Disabled") {
+    return res.status(403).json({ message: "Account disabled or not found" });
+  }
+
+  req.user = user; // This allows requireRoleAPI("Admin") to work!
+  next();
+}
+
+// Remember to update your module.exports!
+module.exports = {
+  generateToken,
+  verifyToken,
+  protect,
+  redirectIfAuth,
+  apiProtect,
+};

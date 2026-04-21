@@ -3,13 +3,12 @@ const crypto = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 const DatabaseProvider = require("./databaseProvider");
 const {
-	SUPABASE_TABLES,
-	mapUserRowToModel,
-	mapItemRowToModel,
-	mapItemHistoryRowToModel,
-	mapApiKeyRowToModel,
+  SUPABASE_TABLES,
+  mapUserRowToModel,
+  mapItemRowToModel,
+  mapItemHistoryRowToModel,
+  mapApiKeyRowToModel,
 } = require("./models/supabaseModels");
-
 
 class SupabaseProvider extends DatabaseProvider {
 	constructor() {
@@ -402,217 +401,205 @@ class SupabaseProvider extends DatabaseProvider {
 			created_at,
 			reference_link,
 			items!inner(id, name, serial, model, brand, category, sub_category, status, description, date_acquired, image_alt, image_name)
-			`)
-			.eq("user_id", normalizedUserId)
-			.order("created_at", { ascending: false });
+			`,
+      )
+      .eq("user_id", normalizedUserId)
+      .order("created_at", { ascending: false });
 
-		if (error) throw error;
+    if (error) throw error;
 
-		// get latest per item
-		const latest = this.getLatestCheckoutRows(data, r => r.item_id);
+    // get latest per item
+    const latest = this.getLatestCheckoutRows(data, (r) => r.item_id);
 
-		return latest.map(r => ({
-			id: r.id,
-			userId: r.user_id,
-			itemId: r.item_id,
-			action: r.action,
-			duration: r.duration,
-			createdAt: r.created_at,
+    return latest.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      itemId: r.item_id,
+      action: r.action,
+      duration: r.duration,
+      createdAt: r.created_at,
 
-			referenceUrl: this.getReferenceUrl(r.reference_link),
+      referenceUrl: this.getReferenceUrl(r.reference_link),
 
-			item: {
-			id: r.items.id,
-			name: r.items.name,
-			serial: r.items.serial,
-			model: r.items.model,
-			brand: r.items.brand,
-			category: r.items.category,
-			sub_category: r.items.sub_category, 
-			status: r.items.status,
-			description: r.items.description, 
-			dateAcquired: r.items.date_acquired,
-			imageAlt: r.items.image_alt,
-			imageUrl: this.getImageUrl(r.items.image_name),
-			},
-		}));
-	}
+      item: {
+        id: r.items.id,
+        name: r.items.name,
+        serial: r.items.serial,
+        model: r.items.model,
+        brand: r.items.brand,
+        category: r.items.category,
+        sub_category: r.items.sub_category,
+        status: r.items.status,
+        description: r.items.description,
+        dateAcquired: r.items.date_acquired,
+        imageAlt: r.items.image_alt,
+        imageUrl: this.getImageUrl(r.items.image_name),
+      },
+    }));
+  }
 
-	async updateUserItem(itemId, newUserId, adminId, options = {}) {
-		const normalizedItemId = this.toSupabaseId(itemId);
-		const normalizedNewUserId = this.toSupabaseId(newUserId);
-		const normalizedAdminId = this.toSupabaseId(adminId);
+  async updateUserItem(itemId, newUserId, adminId, options = {}) {
+    const normalizedItemId = this.toSupabaseId(itemId);
+    const normalizedNewUserId = this.toSupabaseId(newUserId);
+    const normalizedAdminId = this.toSupabaseId(adminId);
 
-		// 1. check admin
-		const admin = await this.getUserById(normalizedAdminId);
+    // 1. check admin
+    const admin = await this.getUserById(normalizedAdminId);
 
-		if (!admin || admin.role !== "Admin") {
-			throw new Error("Unauthorized");
-		}
+    if (!admin || admin.role !== "Admin") {
+      throw new Error("Unauthorized");
+    }
 
-		// 2. check item exists
-		const item = await this.getItemById(normalizedItemId);
+    // 2. check item exists
+    const item = await this.getItemById(normalizedItemId);
 
-		if (!item) {
-			throw new Error("Item not found");
-		}
+    if (!item) {
+      throw new Error("Item not found");
+    }
 
-		// 3. get current owner (latest active checkout)
-		const { data: existing, error: fetchError } = await this.supabase
-			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.select("*")
-			.eq("item_id", normalizedItemId)
-			.is("returned_at", null)
-			.maybeSingle();
+    // 3. get current owner (latest active checkout)
+    const { data: existing, error: fetchError } = await this.supabase
+      .from(SUPABASE_TABLES.ITEM_HISTORIES)
+      .select("*")
+      .eq("item_id", normalizedItemId)
+      .is("returned_at", null)
+      .maybeSingle();
 
-		if (fetchError) throw fetchError;
+    if (fetchError) throw fetchError;
 
-		// 4. RULE: already owned by same user
-		if (
-			existing &&
-			existing.user_id === normalizedNewUserId &&
-			existing.action === "checkout"
-		) {
-			throw new Error("User already owns this item");
-		}
+    // 4. RULE: already owned by same user
+    if (
+      existing &&
+      existing.user_id === normalizedNewUserId &&
+      existing.action === "checkout"
+    ) {
+      throw new Error("User already owns this item");
+    }
 
-		// 5. RULE: prevent double ownership
-		if (existing && existing.user_id !== normalizedNewUserId) {
-			throw new Error("Item is already owned by another user");
-		}
+    // 5. RULE: prevent double ownership
+    if (existing && existing.user_id !== normalizedNewUserId) {
+      throw new Error("Item is already owned by another user");
+    }
 
-		// 6. optional: close previous ownership (if you want forced transfer)
-		if (existing) {
-			await this.supabase
-			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.update({
-				returned_at: new Date(),
-			})
-			.eq("id", existing.id);
-		}
+    // 6. optional: close previous ownership (if you want forced transfer)
+    if (existing) {
+      await this.supabase
+        .from(SUPABASE_TABLES.ITEM_HISTORIES)
+        .update({
+          returned_at: new Date(),
+        })
+        .eq("id", existing.id);
+    }
 
-		// 7. create new ownership record
-		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.ITEM_HISTORIES)
-			.insert([
-			{
-				item_id: normalizedItemId,
-				user_id: normalizedNewUserId,
-				action: "checkout",
-				reference_link: options.referenceLink ?? null,
-				created_at: new Date(),
-			},
-			])
-			.select()
-			.single();
+    // 7. create new ownership record
+    const { data, error } = await this.supabase
+      .from(SUPABASE_TABLES.ITEM_HISTORIES)
+      .insert([
+        {
+          item_id: normalizedItemId,
+          user_id: normalizedNewUserId,
+          action: "checkout",
+          reference_link: options.referenceLink ?? null,
+          created_at: new Date(),
+        },
+      ])
+      .select()
+      .single();
 
-		if (error) throw error;
+    if (error) throw error;
 
-		return this.mapItemHistoryRowToModel(data);
-	}
+    return this.mapItemHistoryRowToModel(data);
+  }
 
+  // ===== APIKEYS =====
+  async createApiKey(adminId, data) {
+    const keyValue = crypto.randomBytes(32).toString("hex");
 
+    const { data: inserted, error } = await this.supabase
+      .from("api_keys")
+      .insert([
+        {
+          key: keyValue,
+          name: data?.name ?? null,
+          admin_id: adminId,
+          revoked: false,
+          created_at: new Date(),
+        },
+      ])
+      .select()
+      .single();
 
-	// ===== APIKEYS =====
-	async createApiKey(adminId, data) {
-		const keyValue = crypto.randomBytes(32).toString("hex");
+    if (error) throw error;
 
-		const { data: inserted, error } = await this.supabase
-			.from("api_keys")
-			.insert([{
-			key: keyValue,
-			name: data?.name ?? null,
-			admin_id: adminId,
-			revoked: false,
-			created_at: new Date(),
-			}])
-			.select()
-			.single();
+    return mapApiKeyRowToModel(inserted);
+  }
 
-		if (error) throw error;
+  async getApiKeys() {
+    const { data, error } = await this.supabase
+      .from("api_keys")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-		return mapApiKeyRowToModel(inserted);
-	}
+    if (error) throw error;
 
-	async getApiKeys() {
-		const { data, error } = await this.supabase
-			.from("api_keys")
-			.select("*")
-			.order("created_at", { ascending: false });
+    return data.map(mapApiKeyRowToModel);
+  }
 
-		if (error) throw error;
+  async getApiKeyByKey(key) {
+    const { data, error } = await this.supabase
+      .from(SUPABASE_TABLES.API_KEYS)
+      .select("*")
+      .eq("key", key)
+      .eq("revoked", false)
+      .maybeSingle();
 
-		return data.map(mapApiKeyRowToModel);
-	}
+    if (error) throw error;
 
-	async getApiKeyByKey(key) {
-		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.API_KEYS)
-			.select("*")
-			.eq("key", key)
-			.eq("revoked", false)
-			.maybeSingle();
+    return data ? mapApiKeyRowToModel(data) : null;
+  }
 
-		if (error) throw error;
+  async revokeApiKey(adminId, id) {
+    const admin = await this.getUserById(adminId);
 
-		return data ? mapApiKeyRowToModel(data) : null;
-	}
+    if (!admin || admin.role !== "Admin") {
+      throw new Error("Only admins can revoke keys");
+    }
 
-	async revokeApiKey(adminId, id) {
-		const admin = await this.getUserById(adminId);
+    const { data, error } = await this.supabase
+      .from("api_keys")
+      .update({ revoked: true })
+      .eq("id", id)
+      .select()
+      .single();
 
-		if (!admin || admin.role !== "Admin") {
-			throw new Error("Only admins can revoke keys");
-		}
+    if (error) throw error;
 
-		const { data, error } = await this.supabase
-			.from("api_keys")
-			.update({ revoked: true })
-			.eq("id", id)
-			.select()
-			.single();
+    return data.map(mapApiKeyRowToModel);
+  }
 
-		if (error) throw error;
+  async uploadFile(path, buffer) {
+  	const { error } = await this.supabase.storage
+  		.from("docs-bucket")
+  		.upload(path, buffer);
 
-		return data.map(mapApiKeyRowToModel);
-	}
+  	if (error) {
+  		throw new Error(`Upload failed: ${error.message}`);
+  	}
 
-	async uploadFile(path, buffer) {
-		const { error } = await this.supabase.storage
-			.from("docs-bucket")
-			.upload(path, buffer);
+  	return path;
+  }
 
-		if (error) {
-			throw new Error(`Upload failed: ${error.message}`);
-		}
+  async uploadItem(path, buffer) {
+    const { error } = await this.supabase.storage
+      .from("items-bucket")
+      .upload(path, buffer);
 
-		return path;
-	}
+    if (error) {
+      throw new Error(`Image upload failed: ${error.message}`);
+    }
 
-	// a revised version of the uploadFile method (Should keep only 1)
-	// async uploadFile(path, buffer, isItem) {
-	// 	const { error } = await this.supabase.storage
-	// 		.from(isItem ? "items-bucket" : "docs-bucket")
-	// 		.upload(path, buffer);
-
-	// 	if (error) {
-	// 		throw new Error(`Upload failed: ${error.message}`);
-	// 	}
-
-	// 	return path;
-	// }
-
-	async uploadItem(path, buffer) {
-		const { error } = await this.supabase.storage
-			.from("items-bucket")
-			.upload(path, buffer);
-
-		if (error) {
-			throw new Error(`Image upload failed: ${error.message}`);
-		}
-
-		return path;
-	}
+    return path;
+  }
 }
 
 module.exports = SupabaseProvider;
