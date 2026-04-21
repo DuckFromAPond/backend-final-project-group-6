@@ -76,7 +76,7 @@ async function apiProtect(req, res, next) {
       .json({ message: "No token provided. Please use Bearer token." });
   }
 
-  const decoded = jwt.verify(token, secret); // Using your secret variable
+  const decoded = jwt.verify(token, secret); // Using secret variable
   if (!decoded) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
@@ -88,11 +88,10 @@ async function apiProtect(req, res, next) {
     return res.status(403).json({ message: "Account disabled or not found" });
   }
 
-  req.user = user; // This allows requireRoleAPI("Admin") to work!
+  req.user = user; // allows requireRoleAPI("Admin") to work
   next();
 }
 
-// Remember to update your module.exports!
 module.exports = {
   generateToken,
   verifyToken,

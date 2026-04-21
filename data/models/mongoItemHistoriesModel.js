@@ -11,7 +11,7 @@ const ItemHistorySchema = new mongoose.Schema({
     ref: "User",
     default: null
   },
-  duration: Number,
+  duration: {type:Number,default: null},
   referenceLink: String,
 
   action: {

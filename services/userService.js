@@ -22,17 +22,17 @@ exports.authenticateUser = async (email, password) => {
 
 exports.checkAdminAvailability = async () => {
   const db = getDbProvider();
-  const users = await db.getAllUsers();
-  const hasActiveAdmin = users.some(
-    (u) => u.role === "Admin" && u.status === "Active",
-  );
-  return hasActiveAdmin;
+  return await db.hasActiveAdmin();
 };
 
 // register
 exports.registerNewUser = async (name, email, password) => {
   const db = getDbProvider();
-  return await db.registerUser(email, password, name);
+  
+  const hasAdmin = await db.hasActiveAdmin();
+  const role = hasAdmin ? "Technician" : "Admin";
+
+  return await db.registerUser(email, password, name, role);
 };
 
 // list
@@ -42,12 +42,14 @@ exports.getAllUsers = async () => {
 };
 
 // update role and status
-exports.updateUserRole = async (userId, newRole) => {
-  const db = getDbProvider();
-  return await db.updateUser(userId, { role: newRole });
-};
-
 exports.updateUserStatus = async (userId, newStatus) => {
   const db = getDbProvider();
-  return await db.updateUser(userId, { status: newStatus });
+
+  const user = await db.updateUser(userId, { status: newStatus });
+
+  if (newStatus === "Disabled") {
+    await db.revokeOwnedApiKeys(userId);
+  }
+
+  return user;
 };

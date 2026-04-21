@@ -8,6 +8,7 @@ module.exports = {
   PORT:        process.env.PORT        || 3000,
   DOMAIN:      process.env.DOMAIN      || 'localhost',
   NODE_ENV:    process.env.NODE_ENV    || 'development',
+  BASE_URL:    process.env.BASE_URL    || "http://localhost:3000",
 
   DB_PROVIDER:  process.env.DB_PROVIDER || 'mongodb',
   SUPABASE_URL:process.env.SUPABASE_URL || 'No DB',

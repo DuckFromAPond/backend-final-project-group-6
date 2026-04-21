@@ -30,9 +30,9 @@ function mapUserRowToModel(row) {
     email: row.email,
     role: row.role,
     status: row.status,
-    createdAt: row.created_at,
-    passwordHash: row.password_hash,
-	disabledAt: row.disabled_at,
+    createdAt: row.createdAt,
+    passwordHash: row.passwordHash,
+	disabledAt: row.disabledAt,
   };
 }
 
@@ -46,23 +46,24 @@ function mapItemRowToModel(row) {
 		model: row.model,
 		brand: row.brand,
 		category: row.category,
-		sub_category: row.sub_category,
+		subCategory: row.subCategory,
 		status: row.status,
-		dateAcquired: toDateValue(row.date_acquired),
+		dateAcquired: toDateValue(row.dateAcquired),
+		currentOwner: row.currentOwner,
 		description: row.description,
-		imageName: row.image_name,
-		imageAlt: row.image_alt
+		imageName: row.imageName,
+		imageAlt: row.imageAlt
 	};
 }
 
 function mapItemHistoryRowToModel(row) {
   return {
 		id: toIdString(row.id),
-		itemId: toIdString(row.item_id),
-		userId: toIdString(row.user_id),
+		itemId: toIdString(row.itemId),
+		userId: toIdString(row.userId),
 		duration: row.duration,
-		referenceLink: row.reference_link,
-		createdAt: row.created_at,
+		referenceLink: row.referenceLink,
+		createdAt: row.createdAt,
 		action: row.action,
   };
 }
@@ -72,7 +73,8 @@ function mapApiKeyRowToModel(row) {
     id: toIdString(row.id),
     key: row.key,
     name: row.name,
-    createdAt: row.created_at,
+	adminId: row.adminId,
+    createdAt: row.createdAt,
     revoked: row.revoked,
   };
 }

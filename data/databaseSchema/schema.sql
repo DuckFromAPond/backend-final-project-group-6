@@ -25,16 +25,17 @@ CREATE TABLE items (
     model TEXT,
     brand TEXT,
     category TEXT NOT NULL,
-    sub_category TEXT NOT NULL,
+    subCategory TEXT NOT NULL,
 
     status TEXT NOT NULL CHECK (
         status IN ('Available', 'In-Use', 'Maintenance', 'Retired')
     ),
     
-    date_acquired DATE,
+    dateAcquired DATE,
     description TEXT,
-    image_name TEXT,
-    image_alt TEXT
+    currentOwner INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    imageName TEXT,
+    imageAlt TEXT
 );
 
 -- =========================
@@ -42,12 +43,12 @@ CREATE TABLE items (
 -- =========================
 CREATE TABLE item_histories (
     id SERIAL PRIMARY KEY,
-    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    duration INTEGER,
-    reference_link TEXT,
+    itemId INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    userId INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    duration INTEGER DEFAULT NULL,
+    referenceLink TEXT,
     action TEXT CHECK (action IN ('checkout', 'checkin')),
-    created_at TIMESTAMP DEFAULT NOW()
+    createdAt TIMESTAMP DEFAULT NOW()
 );
 
 -- =========================
@@ -57,7 +58,7 @@ CREATE TABLE api_keys (
     id SERIAL PRIMARY KEY,
     key TEXT UNIQUE NOT NULL,
     name TEXT,
-    admin_id INTEGER NOT NULL REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT NOW(),
+    adminId INTEGER NOT NULL REFERENCES users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
     revoked BOOLEAN DEFAULT FALSE
 );

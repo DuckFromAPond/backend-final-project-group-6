@@ -80,21 +80,6 @@ class SupabaseProvider extends DatabaseProvider {
 		return data.publicUrl;
 	}
 
-	getLatestCheckoutRows(rows, getItemId) {
-		const latestMap = new Map();
-
-		for (const row of rows) {
-			const itemId = getItemId(row);
-			if (!itemId) continue;
-
-			if (!latestMap.has(itemId)) {
-			latestMap.set(itemId, row);
-			}
-		}
-
-		return [...latestMap.values()].filter(r => r.action === "checkout");
-	}
-
 	async initializeDatabase() {
 		// USERS
 		const { error: userError } = await this.supabase
@@ -129,19 +114,8 @@ class SupabaseProvider extends DatabaseProvider {
 		if (apiError) throw new Error("API keys table missing");
 	}
 
-	// ===== USER AUTHENTICATION =====
-	async registerUser(email, password, name) {
-		const { data: existingAdmin } = await this.supabase
-			.from(SUPABASE_TABLES.USERS)
-			.select("id")
-			.eq("role", "Admin")
-			.eq("status", "Active")
-			.limit(1)
-			.maybeSingle();
-
-
-		let roleToAssign = existingAdmin ? "Technician" : "Admin";
-
+	// ===== USER =====
+	async registerUser(email, password, name, role) {
 		const normalizedEmail = this.normalizeEmail(email);
 
 		const { data: existingUser } = await this.supabase
@@ -161,13 +135,13 @@ class SupabaseProvider extends DatabaseProvider {
 			.from(SUPABASE_TABLES.USERS)
 			.insert([{
 			email: normalizedEmail,
-			password_hash: passwordHash,
+			passwordHash: passwordHash,
 			name: name,
-			role: roleToAssign ,
+			role: role,
 			status: "Active", 
-			disabled_at: null,
+			disabledAt: null,
 			}])
-			.select("id, email, name, role, status, created_at, disabled_at")
+			.select("id, email, name, role, status, createdAt, disabledAt")
 			.single();
 
 		if (error) throw error;
@@ -180,17 +154,14 @@ class SupabaseProvider extends DatabaseProvider {
 
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.USERS)
-			.select("id, email, role, password_hash, name, status, created_at, disabled_at")
+			.select("*")
 			.eq("email", normalizedEmail)
 			.maybeSingle();
 
 		if (error) throw error;
 		if (!data) return null;
 
-		return {
-			...mapUserRowToModel(data),
-			passwordHash: data.password_hash
-		};
+		return mapUserRowToModel(data);
 	}
 
 	async verifyPassword(password, hash) {
@@ -224,22 +195,23 @@ class SupabaseProvider extends DatabaseProvider {
 			.from(SUPABASE_TABLES.USERS)
 			.update(updates)
 			.eq("id", normalizedUserId)
-			.select("id, email, role, status, disabled_at")
+			.select("*")
 			.single();
 
-		if (error) {
-			throw error;
-		}
-
-		// business rule: if user is disabled then revoke keys
-		if (updates.status === "Disabled") {
-			await this.supabase
-			.from(SUPABASE_TABLES.API_KEYS)
-			.update({ revoked: true })
-			.eq("admin_id", normalizedUserId);
-		}
+		if (error) throw error;
 
 		return mapUserRowToModel(data);
+	}
+
+	async revokeOwnedApiKeys(userId) {
+		const normalizedUserId = this.toSupabaseId(userId);
+
+		const { error } = await this.supabase
+			.from(SUPABASE_TABLES.API_KEYS)
+			.update({ revoked: true })
+			.eq("adminId", normalizedUserId);
+
+		if (error) throw error;
 	}
 
 	async getAllUsers () {		
@@ -252,6 +224,38 @@ class SupabaseProvider extends DatabaseProvider {
 		return data.map(mapUserRowToModel);
 	}
 
+  async hasActiveAdmin() {
+    const { data, error } = await this.supabase
+      .from("users")
+      .select("id")
+      .eq("role", "Admin")
+      .eq("status", "Active")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return !!data;
+  }
+
+  async findActiveCheckout(itemId) {
+	const normalizedId = this.toSupabaseId(itemId);
+
+	const { data, error } = await this.supabase
+		.from(SUPABASE_TABLES.ITEM_HISTORIES)
+		.select("*")
+		.eq("itemId", normalizedId)
+		.eq("action", "checkout")
+		.order("createdAt", { ascending: false })
+		.limit(1)
+		.maybeSingle();
+
+	if (error) throw error;
+
+	return data ? mapItemHistoryRowToModel(data) : null;
+	}
 
 
 	// ===== ITEMS =====
@@ -269,7 +273,7 @@ class SupabaseProvider extends DatabaseProvider {
 
 			return {
 				...mapped,
-				imageUrl: this.getImageUrl(item.image_name),
+				imageUrl: this.getImageUrl(item.imageName),
 			};
 		});
 	}
@@ -295,7 +299,26 @@ class SupabaseProvider extends DatabaseProvider {
 
 		return {
 			...mapped,
-			imageUrl: this.getImageUrl(data.image_name),
+			imageUrl: this.getImageUrl(data.imageName),
+		};
+	}
+
+	async getItemBySerial(serial) {
+		const { data, error } = await this.supabase
+			.from(SUPABASE_TABLES.ITEMS)
+			.select("*")
+			.eq("serial", serial)
+			.maybeSingle();
+
+		if (error) throw error;
+
+		if (!data) return null;
+
+		const mapped = mapItemRowToModel(data);
+
+		return {
+			...mapped,
+			imageUrl: this.getImageUrl(data.imageName),
 		};
 	}
 
@@ -312,7 +335,7 @@ class SupabaseProvider extends DatabaseProvider {
 
 		return {
 			...mapItemRowToModel(inserted),
-			imageUrl: this.getImageUrl(inserted.image_name),
+			imageUrl: this.getImageUrl(inserted.imageName),
 		};
 	}
 
@@ -337,13 +360,13 @@ class SupabaseProvider extends DatabaseProvider {
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.ITEM_HISTORIES)
 			.select("*")
-			.order("created_at", { ascending: false });
+			.order("createdAt", { ascending: false });
 
 		if (error) throw error;
 
 		return data.map(row => ({
 			...mapItemHistoryRowToModel(row),
-			referenceUrl: this.getReferenceUrl(row.reference_link)
+			referenceUrl: this.getReferenceUrl(row.referenceLink)
 		}));
 	}
 	
@@ -353,25 +376,25 @@ class SupabaseProvider extends DatabaseProvider {
 		const { data, error } = await this.supabase
 			.from(SUPABASE_TABLES.ITEM_HISTORIES)
 			.select("*")
-			.eq("item_id", normalizedId)
-			.order("created_at", { ascending: false });
+			.eq("itemId", normalizedId)
+			.order("createdAt", { ascending: false });
 
 		if (error) throw error;
 
 		return data.map(row => ({
 			...mapItemHistoryRowToModel(row),
-			referenceUrl: this.getReferenceUrl(row.reference_link)
+			referenceUrl: this.getReferenceUrl(row.referenceLink)
 		}));
 	}
 
 	async addItemHistory(itemId, data) {
 		const payload = {
-			item_id: this.toSupabaseId(itemId),
-			user_id: this.toSupabaseId(data.userId),
+			itemId: this.toSupabaseId(itemId),
+			userId: this.toSupabaseId(data.userId),
 			action: data.action,
 			duration: data.duration,
-			reference_link: data.referenceLink ?? null,
-			created_at: new Date()
+			referenceLink: data.referenceLink ?? null,
+			createdAt: new Date()
 		};
 
 		const { data: inserted, error } = await this.supabase
@@ -386,130 +409,63 @@ class SupabaseProvider extends DatabaseProvider {
 	}
 
 
-
 	async getUserItems(userId) {
 		const normalizedUserId = this.toSupabaseId(userId);
 
 		const { data, error } = await this.supabase
-			.from(SUPABASE_TABLES.ITEM_HISTORIES)
+			.from(SUPABASE_TABLES.ITEMS)
 			.select(`
 			id,
-			user_id,
-			item_id,
-			duration,
-			action,
-			created_at,
-			reference_link,
-			items!inner(id, name, serial, model, brand, category, sub_category, status, description, date_acquired, image_alt, image_name)
-			`,
-      )
-      .eq("user_id", normalizedUserId)
-      .order("created_at", { ascending: false });
+			name,
+			serial,
+			model,
+			brand,
+			category,
+			subCategory,
+			status,
+			description,
+			dateAcquired,
+			imageAlt,
+			imageName,
+			currentOwner,
+			item_histories (
+				id,
+				userId,
+				itemId,
+				action,
+				duration,
+				createdAt,
+				referenceLink
+			)
+			`)
+			.eq("currentOwner", normalizedUserId)
+			.order("createdAt", {
+			foreignTable: "item_histories",
+			ascending: false,
+			});
 
-    if (error) throw error;
+		if (error) throw error;
 
-    // get latest per item
-    const latest = this.getLatestCheckoutRows(data, (r) => r.item_id);
+		return data.map(item => {
+			// item_histories is already sorted desc (latest first)
+			const latestHistory = item.item_histories?.[0] || null;
 
-    return latest.map((r) => ({
-      id: r.id,
-      userId: r.user_id,
-      itemId: r.item_id,
-      action: r.action,
-      duration: r.duration,
-      createdAt: r.created_at,
+			return {
+			id: item.id,
 
-      referenceUrl: this.getReferenceUrl(r.reference_link),
+			item: {
+				...mapItemRowToModel(item),
+				imageUrl: this.getImageUrl(item.imageName),
+			},
 
-      item: {
-        id: r.items.id,
-        name: r.items.name,
-        serial: r.items.serial,
-        model: r.items.model,
-        brand: r.items.brand,
-        category: r.items.category,
-        sub_category: r.items.sub_category,
-        status: r.items.status,
-        description: r.items.description,
-        dateAcquired: r.items.date_acquired,
-        imageAlt: r.items.image_alt,
-        imageUrl: this.getImageUrl(r.items.image_name),
-      },
-    }));
-  }
+			lastHistory: latestHistory
+				? mapItemHistoryRowToModel(latestHistory)
+				: null,
+			};
+		});
+	}
 
-  async updateUserItem(itemId, newUserId, adminId, options = {}) {
-    const normalizedItemId = this.toSupabaseId(itemId);
-    const normalizedNewUserId = this.toSupabaseId(newUserId);
-    const normalizedAdminId = this.toSupabaseId(adminId);
 
-    // 1. check admin
-    const admin = await this.getUserById(normalizedAdminId);
-
-    if (!admin || admin.role !== "Admin") {
-      throw new Error("Unauthorized");
-    }
-
-    // 2. check item exists
-    const item = await this.getItemById(normalizedItemId);
-
-    if (!item) {
-      throw new Error("Item not found");
-    }
-
-    // 3. get current owner (latest active checkout)
-    const { data: existing, error: fetchError } = await this.supabase
-      .from(SUPABASE_TABLES.ITEM_HISTORIES)
-      .select("*")
-      .eq("item_id", normalizedItemId)
-      .is("returned_at", null)
-      .maybeSingle();
-
-    if (fetchError) throw fetchError;
-
-    // 4. RULE: already owned by same user
-    if (
-      existing &&
-      existing.user_id === normalizedNewUserId &&
-      existing.action === "checkout"
-    ) {
-      throw new Error("User already owns this item");
-    }
-
-    // 5. RULE: prevent double ownership
-    if (existing && existing.user_id !== normalizedNewUserId) {
-      throw new Error("Item is already owned by another user");
-    }
-
-    // 6. optional: close previous ownership (if you want forced transfer)
-    if (existing) {
-      await this.supabase
-        .from(SUPABASE_TABLES.ITEM_HISTORIES)
-        .update({
-          returned_at: new Date(),
-        })
-        .eq("id", existing.id);
-    }
-
-    // 7. create new ownership record
-    const { data, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEM_HISTORIES)
-      .insert([
-        {
-          item_id: normalizedItemId,
-          user_id: normalizedNewUserId,
-          action: "checkout",
-          reference_link: options.referenceLink ?? null,
-          created_at: new Date(),
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return this.mapItemHistoryRowToModel(data);
-  }
 
   // ===== APIKEYS =====
   async createApiKey(adminId, data) {
@@ -521,9 +477,9 @@ class SupabaseProvider extends DatabaseProvider {
         {
           key: keyValue,
           name: data?.name ?? null,
-          admin_id: adminId,
+          adminId: adminId,
           revoked: false,
-          created_at: new Date(),
+          createdAt: new Date(),
         },
       ])
       .select()
@@ -538,7 +494,7 @@ class SupabaseProvider extends DatabaseProvider {
     const { data, error } = await this.supabase
       .from("api_keys")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("createdAt", { ascending: false });
 
     if (error) throw error;
 
@@ -574,7 +530,7 @@ class SupabaseProvider extends DatabaseProvider {
 
     if (error) throw error;
 
-    return data.map(mapApiKeyRowToModel);
+    return mapApiKeyRowToModel(data);
   }
 
   async uploadFile(path, buffer) {
