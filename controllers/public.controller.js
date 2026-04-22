@@ -394,22 +394,12 @@ exports.deleteItem = async (req, res, next) => {
   try {
     const db = getDbProvider();
     const item = await db.getItemById(id);
-    item['date_acquired'] = item['dateAcquired'];
-    item['image_alt'] = item['imageAlt'];
-    item['image_name'] = item['imageName'];
-    delete item['dateAcquired'];
-    delete item['imageAlt'];
-    delete item['imageName'];
-    delete item['imageUrl'];
     const newItem = {
       ...item,
       status: "Retired"
     };
 
     await db.updateItem(id, newItem);
-    
-    // uncomment this for hard delete
-    // await db.deleteItem(id);
     
     return res.json({
         type: 'success',
@@ -423,27 +413,27 @@ exports.deleteItem = async (req, res, next) => {
 
 exports.showItemHistory = (req, res) => {
     const { id } = req.params;
-
+    const db = getDbProvider();
+    const item = db.getItemHistoryByItemId(id);
     const context = {
-        item: itemData.items.find((item) => String(item.id) === String(id)),
-        itemHistories: itemData.itemHistories.find(
-            (item) => String(item.id) === String(id),
-        ),
+        item,
     };
 
-    const history = context.itemHistories;
+    console.log(context);
 
-    if (history) {
-        history.histories = history.histories.map(h => {
-            // find username using id 
-            const user = users.find(u => u.id === h.user_id);
+    // const history = context.itemHistories;
 
-            return {
-                ...h,
-                assignee: user ? user.name : "No name given"
-            };
-        });
-    }
+    // if (history) {
+    //     history.histories = history.histories.map(h => {
+    //         // find username using id 
+    //         const user = users.find(u => u.id === h.user_id);
+
+    //         return {
+    //             ...h,
+    //             assignee: user ? user.name : "No name given"
+    //         };
+    //     });
+    // }
 
     res.render("items/itemHistory", context);
 };

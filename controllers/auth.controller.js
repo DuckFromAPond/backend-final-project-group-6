@@ -28,13 +28,8 @@ exports.login = async (req, res) => {
     const token = generateToken(authResult.user);
     res.cookie("accessToken", token, {
       httpOnly: true,
-<<<<<<<<< Temporary merge branch 1
-      secure: config.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60, // 1 hour
-=========
       secure: process.env.NODE_ENV === "production",
       maxAge: 1000 * 60 * 60,
->>>>>>>>> Temporary merge branch 2
     });
 
     return res.redirect("/home");
