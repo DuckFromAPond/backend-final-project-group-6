@@ -2,7 +2,6 @@ const userService = require("../services/userService");
 
 exports.listUsers = async (req, res) => {
   const users = await userService.getAllUsers();
-  console.log(users);
   res.render("users", { users, pageTitle: "Manage Users" });
 };
 

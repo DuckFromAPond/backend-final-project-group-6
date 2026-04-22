@@ -13,7 +13,6 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Call the service for the "Thinking" part
     const authResult = await userService.authenticateUser(email, password);
 
     if (!authResult.success) {

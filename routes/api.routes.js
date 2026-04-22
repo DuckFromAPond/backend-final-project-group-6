@@ -9,6 +9,13 @@ const apiController = require("../controllers/api.controller");
 // users
 router.post("/login", loginLimiter, apiController.apiLogin);
 
+router.get(
+  "/users",
+  apiProtect,
+  requireRoleAPI("Admin"),
+  apiController.getAllUsers,
+);
+
 router.post(
   "/users",
   apiProtect,
@@ -42,12 +49,12 @@ router.patch(
 // router.delete('/keys/:id', apiProtect, requireRoleAPI("Admin"), apiController.deleteKey);
 
 // API ROUTES FOR ITEMS
-router.get('/items', authOrApiKey, apiController.showItems);
-router.get('/items/:id', apiProtect, apiController.showItemDetail);
-router.post('/items', authOrApiKey, apiController.createItem);
+router.get("/items", authOrApiKey, apiController.showItems);
+router.get("/items/:id", apiProtect, apiController.showItemDetail);
+router.post("/items", authOrApiKey, apiController.createItem);
 // router.get('/api/items/:id/history', authOrApiKey, apiController.getItemHistory);
-router.delete('/items/:id', apiProtect, apiController.deleteItem);
-router.put('/items/:id', apiProtect, apiController.editItem)
+router.delete("/items/:id", apiProtect, apiController.deleteItem);
+router.put("/items/:id", apiProtect, apiController.editItem);
 
 // error 404
 // router.use(apiController.notFound);
