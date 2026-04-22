@@ -151,13 +151,6 @@ class MongoProvider extends DatabaseProvider {
     return [...latestMap.values()].filter((r) => r.action === "checkout");
   }
 
-  // ===== USER AUTHENTICATION =====
-  async registerUser(email, password, name) {
-    const existingAdmin = await User.findOne({
-      role: "Admin",
-      status: "Active",
-    });
-    let roleToAssign = existingAdmin ? "Technician" : "Admin";
   getImageUrl(fileId) {
     if (!fileId) return null;
 
@@ -165,14 +158,19 @@ class MongoProvider extends DatabaseProvider {
   }
 
   getDocumentUrl(fileId) {
-  if (!fileId) return null;
+    if (!fileId) return null;
 
-  return `${config.BASE_URL}/files/docs/${fileId}`;
-}
+    return `${config.BASE_URL}/files/docs/${fileId}`;
+  }
   
 
 	// ===== USER =====
   async registerUser(email, password, name, role) {
+    const existingAdmin = await User.findOne({
+      role: "Admin",
+      status: "Active",
+    });
+    let roleToAssign = existingAdmin ? "Technician" : "Admin";
     const normalizedEmail = this.normalizeEmail(email);
 
     const existing = await User.findOne({ email: normalizedEmail });
