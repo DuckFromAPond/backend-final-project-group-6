@@ -31,6 +31,7 @@ router.post("/transactions/checkout", protect, publicController.checkOut);
 
 // router.get('/hisory', protect, requireRole("Admin"), adminController.createItem);
 
+// Admin-only Routes
 router.get("/users", protect, requireRole("Admin"), adminController.listUsers); // <------------ kinda weird... i think it's easier to just require "Admin role" instead of moving to Admin
 router.post(
   "/users/:id/role",
