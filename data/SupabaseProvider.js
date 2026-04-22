@@ -354,7 +354,6 @@ class SupabaseProvider extends DatabaseProvider {
     return mapItemRowToModel(data);
   }
 
-
   // ===== HISTORY =====
   async getItemHistories() {
     const { data, error } = await this.supabase
@@ -369,7 +368,6 @@ class SupabaseProvider extends DatabaseProvider {
       referenceUrl: this.getReferenceUrl(row.referenceLink)
     }));
   }
-
   async getItemHistoryByItemId(itemId) {
     const normalizedId = this.toSupabaseId(itemId);
 
@@ -407,7 +405,6 @@ class SupabaseProvider extends DatabaseProvider {
 
     return mapItemHistoryRowToModel(inserted);
   }
-
 
   async getUserItems(userId) {
     const normalizedUserId = this.toSupabaseId(userId);
@@ -463,143 +460,6 @@ class SupabaseProvider extends DatabaseProvider {
           : null,
       };
     });
-  }
-
-  async createItem(data) {
-    const { data: inserted, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEMS)
-      .insert([data])
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return {
-      ...mapItemRowToModel(inserted),
-      imageUrl: this.getImageUrl(inserted.image_name),
-    };
-  }
-
-  async updateItem(id, updates) {
-    const normalizedId = this.toSupabaseId(id);
-
-    const { data, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEMS)
-      .update(updates)
-      .eq("id", normalizedId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return mapItemRowToModel(data);
-  }
-
-  // ===== HISTORY =====
-  async getItemHistories() {
-    const { data, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEM_HISTORIES)
-      .select("*")
-      .order("createdAt", { ascending: false });
-
-    if (error) throw error;
-
-    return data.map((row) => ({
-      ...mapItemHistoryRowToModel(row),
-      referenceUrl: this.getReferenceUrl(row.reference_link),
-    }));
-  }
-
-  async getItemHistoryByItemId(itemId) {
-    const normalizedId = this.toSupabaseId(itemId);
-
-    const { data, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEM_HISTORIES)
-      .select("*")
-      .eq("itemId", normalizedId)
-      .order("createdAt", { ascending: false });
-
-    if (error) throw error;
-
-    return data.map((row) => ({
-      ...mapItemHistoryRowToModel(row),
-      referenceUrl: this.getReferenceUrl(row.reference_link),
-    }));
-  }
-
-  async addItemHistory(itemId, data) {
-    const payload = {
-      itemId: this.toSupabaseId(itemId),
-      userId: this.toSupabaseId(data.userId),
-      action: data.action,
-      duration: data.duration,
-      reference_link: data.referenceLink ?? null,
-      createdAt: new Date(),
-    };
-
-    const { data: inserted, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEM_HISTORIES)
-      .insert([payload])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return mapItemHistoryRowToModel(inserted);
-  }
-
-  async getUserItems(userId) {
-    const normalizedUserId = this.toSupabaseId(userId);
-
-    const { data, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEM_HISTORIES)
-      .select(
-        `
-			id,
-			userId,
-			itemId,
-			duration,
-			action,
-			createdAt,
-			reference_link,
-			items!inner(id, name, serial, model, brand, category, sub_category, status, description, date_acquired, image_alt, image_name)
-			`,
-      )
-      .eq("userId", normalizedUserId)
-      .order("createdAt", { ascending: false });
-
-    if (error) throw error;
-
-    // get latest per item
-    const latest = this.getLatestCheckoutRows(data, (r) => r.itemId);
-
-    return latest.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      itemId: r.itemId,
-      action: r.action,
-      duration: r.duration,
-      createdAt: r.createdAt,
-
-      referenceUrl: this.getReferenceUrl(r.reference_link),
-
-      item: {
-        id: r.items.id,
-        name: r.items.name,
-        serial: r.items.serial,
-        model: r.items.model,
-        brand: r.items.brand,
-        category: r.items.category,
-        sub_category: r.items.sub_category,
-        status: r.items.status,
-        description: r.items.description,
-        dateAcquired: r.items.date_acquired,
-        imageAlt: r.items.image_alt,
-        imageUrl: this.getImageUrl(r.items.image_name),
-      },
-    }));
   }
 
   async updateUserItem(itemId, newUserId, adminId, options = {}) {

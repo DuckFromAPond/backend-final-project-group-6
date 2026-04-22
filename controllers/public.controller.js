@@ -195,7 +195,7 @@ exports.addItem = async (req, res, next) => {
         const brand = fields.brand?.[0] ?? '';
         const model = fields.model?.[0] ?? '';
         const category = fields.category?.[0] ?? '';
-        const subCategory = fields.subcategory?.[0] ?? '';
+        const subCategory = fields.subCategory?.[0] ?? '';
         const serial = fields.serial?.[0] ?? '';
         const status = fields.status?.[0] ?? '';
         const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
@@ -241,7 +241,7 @@ exports.addItem = async (req, res, next) => {
             imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
         };
 
-    await db.createItem(newItem);
+        await db.createItem(newItem);
 
         return res.redirect("/items?success=Item+added+successfully");
     }
@@ -275,9 +275,7 @@ exports.showItemDetail = async (req, res) => {
 
   const statuses = [
     { name: "Available" },
-    { name: "In-Use" },
     { name: "Maintenance" },
-    { name: "Retired" },
   ];
 
   let context = {
@@ -287,6 +285,7 @@ exports.showItemDetail = async (req, res) => {
     isEdit: false,
     isDelete: false,
     isRetired: item.status === "Retired",
+    pageTitle: "ItemDetail",
   };
 
   if (!context) {
@@ -353,7 +352,7 @@ exports.editItem = async (req, res, next) => {
     const brand = fields.brand?.[0] ?? "";
     const model = fields.model?.[0] ?? "";
     const category = fields.category?.[0] ?? "";
-    const subCategory = fields.subcategory?.[0] ?? "";
+    const subCategory = fields.subCategory?.[0] ?? "";
     const serial = fields.serial?.[0] ?? "";
     const status = fields.status?.[0] ?? "";
     const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
@@ -386,13 +385,15 @@ exports.editItem = async (req, res, next) => {
       brand,
       model,
       category,
-      subCategory: "",
+      subCategory,
       serial,
       status,
       dateAcquired,
       imageName: fileName ?? item.image_name,
       imageAlt: `Image of ${name}`,
     };
+
+    console.log(newItem);
 
     await db.updateItem(id, newItem);
 
@@ -428,29 +429,49 @@ exports.deleteItem = async (req, res, next) => {
   }
 };
 
-exports.showItemHistory = (req, res) => {
-    const { id } = req.params;
-    const db = getDbProvider();
-    const item = db.getItemHistoryByItemId(id);
-    const context = {
-        item,
-    };
+exports.showItemHistory = async (req, res) => {
+  const { id } = req.params;
+  const db = getDbProvider();
+  const itemHistory = await db.getItemHistoryByItemId(id);
+  const item = await db.getItemById(id);
+  const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
+  
+  const users = await Promise.all(userPromises);
 
-    console.log(context);
+  let context = {
+    item,
+    itemHistories: itemHistory,
+    isEmpty: false,
+    pageTitle: "Item History",
+  };
 
-    // const history = context.itemHistories;
+  if(itemHistory.length === 0) {
+    context = {
+      ...context,
+      isEmpty: true
+    }
+  }
 
-    // if (history) {
-    //     history.histories = history.histories.map(h => {
-    //         // find username using id 
-    //         const user = users.find(u => u.id === h.user_id);
+  let history = context.itemHistories;
 
-    //         return {
-    //             ...h,
-    //             assignee: user ? user.name : "No name given"
-    //         };
-    //     });
-    // }
+  if (history) {
+      history = history.map(h => {
+        // find username using id 
+        const user = users.find(u => u.id === h.userId);
+
+        return {
+            ...h,
+            assignee: user ? user.name : "No name given"
+        };
+      });
+
+      context = {
+        ...context,
+        itemHistories: history
+      }
+  }
+
+  console.log(context);
 
   res.render("items/itemHistory", context);
 };
@@ -529,6 +550,7 @@ exports.checkIn = async (req, res, next) => {
 
 exports.checkOut = async (req, res, next) => {
   try {
+    const db = getDbProvider();
     const { fields, files } = await new Promise((resolve, reject) => {
       const form = new multiparty.Form();
 

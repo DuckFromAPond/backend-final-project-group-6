@@ -162,7 +162,6 @@ class MongoProvider extends DatabaseProvider {
 
     return `${config.BASE_URL}/files/docs/${fileId}`;
   }
-  
 
 	// ===== USER =====
   async registerUser(email, password, name, role) {
