@@ -40,7 +40,7 @@ class MongoProvider extends DatabaseProvider {
 
       await this.initializeDatabase();
       console.log("Connected to MongoDB:", mongoose.connection.name);
-    } catch(error) {
+    } catch (error) {
       console.error("MongoDB connection error:", error);
       throw error;
     }
@@ -72,7 +72,7 @@ class MongoProvider extends DatabaseProvider {
       status: user.status,
       createdAt: user.createdAt,
       passwordHash: user.passwordHash,
-      disabledAt: user.disabledAt
+      disabledAt: user.disabledAt,
     };
   }
 
@@ -105,7 +105,7 @@ class MongoProvider extends DatabaseProvider {
       revoked: key.revoked,
       createdAt: key.createdAt,
     };
-}
+  }
 
   mapItemHistory(history) {
     if (!history) return null;
@@ -124,13 +124,13 @@ class MongoProvider extends DatabaseProvider {
 
   getImageStream(fileId) {
     return this.itemsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId)
+      new mongoose.Types.ObjectId(fileId),
     );
   }
 
   getDocumentStream(fileId) {
     return this.docsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId)
+      new mongoose.Types.ObjectId(fileId),
     );
   }
 
@@ -146,15 +146,15 @@ class MongoProvider extends DatabaseProvider {
       }
     }
 
-    return [...latestMap.values()].filter(r => r.action === "checkout");
+    return [...latestMap.values()].filter((r) => r.action === "checkout");
   }
 
-
-
-
-	// ===== USER AUTHENTICATION =====
+  // ===== USER AUTHENTICATION =====
   async registerUser(email, password, name) {
-    const existingAdmin =  await User.findOne({ role: "Admin", status: "Active" });
+    const existingAdmin = await User.findOne({
+      role: "Admin",
+      status: "Active",
+    });
     let roleToAssign = existingAdmin ? "Technician" : "Admin";
     const normalizedEmail = this.normalizeEmail(email);
 
@@ -167,9 +167,9 @@ class MongoProvider extends DatabaseProvider {
       email: normalizedEmail,
       passwordHash: hash,
       name: name,
-      role: existingAdmin,
+      role: roleToAssign,
       status: "Active",
-      disabledAt: null
+      disabledAt: null,
     });
 
     return this.mapUser(user.toObject());
@@ -177,7 +177,7 @@ class MongoProvider extends DatabaseProvider {
 
   async findUserByEmail(email) {
     const user = await User.findOne({
-      email: this.normalizeEmail(email)
+      email: this.normalizeEmail(email),
     }).lean();
 
     return this.mapUser(user);
@@ -201,10 +201,7 @@ class MongoProvider extends DatabaseProvider {
 
     // business rule: revoke API keys
     if (user.status === "Disabled") {
-      await ApiKey.updateMany(
-        { adminId: userId },
-        { revoked: true }
-      );
+      await ApiKey.updateMany({ adminId: userId }, { revoked: true });
     }
 
     return this.mapUser(user.toObject());
@@ -212,16 +209,13 @@ class MongoProvider extends DatabaseProvider {
 
   async getAllUsers() {
     const users = await User.find().lean();
-    return users.map(u => this.mapUser(u));
+    return users.map((u) => this.mapUser(u));
   }
 
-
-
-  
-	// ===== ITEMS =====
+  // ===== ITEMS =====
   async getItems() {
     const items = await Item.find().lean();
-    return items.map(i => this.mapItem(i));
+    return items.map((i) => this.mapItem(i));
   }
 
   async getItemById(id) {
@@ -247,21 +241,17 @@ class MongoProvider extends DatabaseProvider {
     const item = await Item.findByIdAndUpdate(
       id,
       { status },
-      { new: true }
+      { new: true },
     ).lean();
 
     return this.mapItem(item);
   }
 
-
-
-	// ===== HISTORY =====
+  // ===== HISTORY =====
   async getItemHistories() {
-    const histories = await ItemHistory.find()
-      .sort({ createdAt: -1 })
-      .lean();
+    const histories = await ItemHistory.find().sort({ createdAt: -1 }).lean();
 
-    return histories.map(h => this.mapItemHistory(h));
+    return histories.map((h) => this.mapItemHistory(h));
   }
 
   async getItemHistoryByItemId(itemId) {
@@ -269,7 +259,7 @@ class MongoProvider extends DatabaseProvider {
       .sort({ createdAt: -1 })
       .lean();
 
-    return histories.map(h => this.mapItemHistory(h));
+    return histories.map((h) => this.mapItemHistory(h));
   }
 
   async addItemHistory(itemId, data) {
@@ -291,12 +281,11 @@ class MongoProvider extends DatabaseProvider {
       .sort({ createdAt: -1 })
       .lean();
 
-    const latest = this.getLatestCheckoutRows(
-      histories,
-      r => r.itemId?._id?.toString()
+    const latest = this.getLatestCheckoutRows(histories, (r) =>
+      r.itemId?._id?.toString(),
     );
 
-    return latest.map(r => ({
+    return latest.map((r) => ({
       id: r._id.toString(),
       userId: r.userId.toString(),
       itemId: r.itemId._id.toString(),
@@ -324,53 +313,52 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
-		const item = await Item.findById(itemId);
-		if (!item) throw new Error("Item not found");
+    const item = await Item.findById(itemId);
+    if (!item) throw new Error("Item not found");
 
-		const admin = await User.findById(adminId);
-		if (!admin || admin.role !== "Admin") {
-			throw new Error("Unauthorized");
-		}
+    const admin = await User.findById(adminId);
+    if (!admin || admin.role !== "Admin") {
+      throw new Error("Unauthorized");
+    }
 
-		if (!["checkout", "checkin"].includes(action)) {
-			throw new Error("Invalid action");
-		}
+    if (!["checkout", "checkin"].includes(action)) {
+      throw new Error("Invalid action");
+    }
 
-		
-		// business rule check (same as normal flow)
-		if (action === "checkout") {
-			const existing = await ItemHistory.findOne({
-			itemId,
-			returnedAt: null,
-			});
+    // business rule check (same as normal flow)
+    if (action === "checkout") {
+      const existing = await ItemHistory.findOne({
+        itemId,
+        returnedAt: null,
+      });
 
-			if (existing) {
-				if (existing.userId.toString() === targetUserId.toString()) {
-					throw new Error("User already owns this item");
-				}
+      if (existing) {
+        if (existing.userId.toString() === targetUserId.toString()) {
+          throw new Error("User already owns this item");
+        }
 
-				throw new Error("Item is already checked out");
-			}
-		}
+        throw new Error("Item is already checked out");
+      }
+    }
 
-		const history = await ItemHistory.create({
-			itemId,
-			userId: targetUserId,  
-			action,
-			duration: options.duration ?? null,
-			referenceLink: options.referenceLink ?? null,
-			createdAt: new Date(),
-			returnedAt: action === "checkin" ? new Date() : null,
-		});
+    const history = await ItemHistory.create({
+      itemId,
+      userId: targetUserId,
+      action,
+      duration: options.duration ?? null,
+      referenceLink: options.referenceLink ?? null,
+      createdAt: new Date(),
+      returnedAt: action === "checkin" ? new Date() : null,
+    });
 
-		// sync item status (same logic as normal flow)
-		await this.setItemStatus(
-			itemId,
-			action === "checkout" ? "In-Use" : "Available"
-		);
+    // sync item status (same logic as normal flow)
+    await this.setItemStatus(
+      itemId,
+      action === "checkout" ? "In-Use" : "Available",
+    );
 
-		return history;
-	}
+    return history;
+  }
 
   // =========================
   // API KEYS
@@ -405,11 +393,7 @@ class MongoProvider extends DatabaseProvider {
       throw new Error("Only admins can revoke keys");
     }
 
-    return ApiKey.findByIdAndUpdate(
-      id,
-      { revoked: true },
-      { new: true }
-    );
+    return ApiKey.findByIdAndUpdate(id, { revoked: true }, { new: true });
   }
 
   // GRIDFS FILE UPLOAD

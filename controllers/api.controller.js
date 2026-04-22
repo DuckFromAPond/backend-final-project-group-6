@@ -69,8 +69,9 @@ exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Using the same service as your register page!
-    const { user } = await userService.registerNewUser(name, email, password);
+    // Using the same service as register page
+    // const { user } = await userService.registerNewUser(name, email, password);
+    const user = await userService.registerNewUser(name, email, password);
 
     // If a specific role was requested and service allows it
     if (role) {
