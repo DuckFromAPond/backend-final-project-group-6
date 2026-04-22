@@ -25,6 +25,15 @@
                 {{/each}}
 
                 <li>
+                    <button
+                    class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                    onclick="openSubcategory()"
+                    >
+                    Subcategories
+                    </button>
+                </li>
+
+                <li>
                     <a href="/items?isRetired=true"
                     class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
                     >
@@ -73,10 +82,25 @@
                 <p class="text-gray-500">Try searching for something else or adding a new item.</p>
             </section>
         {{/if}}
-
     </section>
 
+    {{!-- HIDDEN FORM PAGE --}}
+    <div id="subcategoryModal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeSubcategory()">
+        {{!-- make closeform only work for background --}}
+        <div onclick="event.stopPropagation()">     
+            {{> subCategoryModal title="Subcategories"}}
+        </div>
+    </div>
+
     <script>
+        function openSubcategory() {
+            document.getElementById("subcategoryModal").classList.remove("hidden");
+        }
+
+        function closeSubcategory() {
+            document.getElementById("subcategoryModal").classList.add("hidden");
+        }
+
         function openForm(id) {
             document.getElementById("modal").classList.remove("hidden");
 

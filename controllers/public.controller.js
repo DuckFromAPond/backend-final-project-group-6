@@ -8,17 +8,6 @@ const { items, itemHistories, users, dashboardData } = require("../data/data");
 const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
 
-// this data might be important (remove later)
-const itemData = {
-  categories: [
-    { name: "Computers", subCategories: [] },
-    { name: "Peripherals", subCategories: [] },
-  ],
-  //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-  items: items, // Use the imported items here
-  itemHistories: itemHistories,
-};
-
 // GET: /HOME ----------------
 exports.home = async (req, res, next) => {
   try {
@@ -83,9 +72,25 @@ exports.home = async (req, res, next) => {
 // GET: /items ----------------
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q, isRetired, error, success } = req.query;
+  const { cat, q, subcat, isRetired, error, success } = req.query;
   let page = req.query.page;
   const pageSize = 10; // items to show per page
+
+  // manually add categories
+  const categories = [
+    { name: "Peripherals", subCategories: [
+      { name: "Monitor" },
+      { name: "Keyboard" },
+      { name: "Mouse" },
+      { name: "Scanner" },
+      { name: "Printer" },
+    ] },
+    { name: "Computers", subCategories: [
+      { name: "Laptop" },
+      { name: "Desktop" },
+      { name: "Server" },
+    ] },
+  ];
 
   // append query parameters to URL
   let url = "/items?";
@@ -93,10 +98,11 @@ exports.showItems = async (req, res) => {
   // get all items from DB
   let items = await db.getItems();
 
-  // derive categories dynamically
-  const categories = [...new Set(items.map((item) => item.category))].map(
-    (name) => ({ name }),
-  );
+  // filter by subcategory
+  if(subcat) {
+    url += `subcat=${subcat}&`;
+    items = items.filter((item) => item.subCategory === subcat);
+  }
 
   // filter by category
   if (cat) {
@@ -251,6 +257,22 @@ exports.showItemDetail = async (req, res) => {
 
   let item = await db.getItemById(id);
 
+  // manually add categories
+  const categories = [
+    { name: "Peripherals", subCategories: [
+      { name: "Monitor" },
+      { name: "Keyboard" },
+      { name: "Mouse" },
+      { name: "Scanner" },
+      { name: "Printer" },
+    ] },
+    { name: "Computers", subCategories: [
+      { name: "Laptop" },
+      { name: "Desktop" },
+      { name: "Server" },
+    ] },
+  ];
+
   const statuses = [
     { name: "Available" },
     { name: "In-Use" },
@@ -259,7 +281,8 @@ exports.showItemDetail = async (req, res) => {
   ];
 
   let context = {
-    item,
+    ...item,
+    categories,
     statuses,
     isEdit: false,
     isDelete: false,
@@ -330,10 +353,10 @@ exports.editItem = async (req, res, next) => {
     const brand = fields.brand?.[0] ?? "";
     const model = fields.model?.[0] ?? "";
     const category = fields.category?.[0] ?? "";
-    const sub_category = fields.subcategory?.[0] ?? "";
+    const subCategory = fields.subcategory?.[0] ?? "";
     const serial = fields.serial?.[0] ?? "";
     const status = fields.status?.[0] ?? "";
-    const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
     // upload file
     let filePath = null;
@@ -363,12 +386,12 @@ exports.editItem = async (req, res, next) => {
       brand,
       model,
       category,
-      sub_category: "",
+      subCategory: "",
       serial,
       status,
-      date_acquired,
-      image_name: fileName ?? item.image_name,
-      image_alt: `Image of ${name}`,
+      dateAcquired,
+      imageName: fileName ?? item.image_name,
+      imageAlt: `Image of ${name}`,
     };
 
     await db.updateItem(id, newItem);

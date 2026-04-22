@@ -135,11 +135,6 @@ exports.showItems = async (req, res) => {
   // get all items from DB
   let items = await db.getItems();
 
-  // derive categories dynamically
-  const categories = [...new Set(items.map((item) => item.category))].map(
-    (name) => ({ name }),
-  );
-
   // filter by category
   if (cat) {
     items = items.filter((item) => item.category === cat);

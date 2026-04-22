@@ -46,6 +46,7 @@ const hbsHelpers = {
     },
     eq: (a, b) => a === b,
     formatDate: (date) => new Date(date).toISOString().split('T')[0], // return YYYY-MM-DD
+    json: (context) => JSON.stringify(context),
 }
 
 

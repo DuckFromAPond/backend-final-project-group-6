@@ -35,74 +35,29 @@
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
-        {{!-- <label for="category">Category:</label>
-        <input
-        name="category"
-        id="category"
-        list="categoryList"
-        placeholder="Type or select category..."
-        class="w-full border-gray-500 border p-2 rounded-lg"
-        required
-        />
-
-        <datalist id="categoryList">
-        {{#each categories}}
-            <option value="{{this.name}}">
-        {{/each}}
-        </datalist> --}}
-
         {{!-- FOR NOW just use fixed 2 categories --}}
-        <label for="category">Status:</label>
+        <label for="category">Category:</label>
         <select
         name="category"
         id="category"
-        list="categoryList"
         class="w-full border-gray-500 border p-2 rounded-lg"
         required
         >
-        <option value="" disabled selected>Select category...</option>
-            <option value="Computers">
-            Computers
-            </option>
-            <option value="Peripherals">
-            Peripherals
-            </option>
+            <option value="" disabled selected>Select category...</option>
+            <option value="Computers">Computers</option>
+            <option value="Peripherals">Peripherals</option>
         </select>
 
-        <label for="subcategory">Sub category:</label>
-        <input
-        name="subcategory"
-        id="subcategory"
-        list="subcategoryList"
-        placeholder="Type or select category..."
+        <label for="subCategory">Subcategory:</label>
+        <select
+        name="subCategory"
+        id="subCategory"
         class="w-full border-gray-500 border p-2 rounded-lg"
         required
-        />
-
-        <datalist id="subcategoryList">
-        {{#each categories}}
-            <option value="{{this.name}}">
-        {{/each}}
-        </datalist>
-
-{{!-- ONLY 4 STATUS EXIST (adding status might be possible but not planned for it) --}}
-        {{!-- <label for="status">Change status:</label>
-        <input
-        name="status"
-        id="status"
-        list="statusList"
-        placeholder="Type or select status..."
-        class="w-full border-gray-500 border p-2 rounded-lg"
-        required
-        /> --}}
-
-
-        {{!-- <datalist id="statusList">
-        {{#each statuses}}
-            <option value="{{this.name}}">{{this.name}}</option>
-        {{/each}}
-        </datalist> --}}
-
+        >
+            <option value="" disabled selected>Select subcategory...</option>
+            
+        </select>
 
         <label for="status">Status:</label>
         <select
@@ -111,12 +66,10 @@
         class="w-full border-gray-500 border p-2 rounded-lg"
         required
         >
-        <option value="" disabled selected>Select status...</option>
-        {{#each statuses}}
-            <option value="{{this.name}}">
-            {{this.name}}
-            </option>
-        {{/each}}
+            <option value="" disabled selected>Select status...</option>
+            {{#each statuses}}
+                <option value="{{this.name}}">{{this.name}}</option>
+            {{/each}}
         </select>
 
         <label for="image">Item image: </label>
@@ -166,38 +119,39 @@
         >
 
         <label for="category">Category:</label>
-        <input
+        <select
         name="category"
         id="category"
-        list="categoryList"
-        placeholder="Type or select category..."
         class="w-full border-gray-500 border p-2 rounded-lg"
-        value="{{this.category}}"
         required
-        />
+        >
+            <option value="" disabled selected>Select category...</option>
+            <option value="Computers">Computers</option>
+            <option value="Peripherals">Peripherals</option>
+        </select>
 
-        <datalist id="categoryList">
-            {{#each categories}}
-                <option value="{{this.name}}">
-            {{/each}}
-        </datalist>
+        <label for="subCategory">Subcategory:</label>
+        <select
+        name="subCategory"
+        id="subCategory"
+        class="w-full border-gray-500 border p-2 rounded-lg"
+        required
+        >
+            <option value="" disabled selected>Select subcategory...</option>
+        </select>
 
-        <label for="status">Change status:</label>
-        <input
+        <label for="status">Status:</label>
+        <select
         name="status"
         id="status"
-        list="statusList"
-        placeholder="Type or select status..."
         class="w-full border-gray-500 border p-2 rounded-lg"
-        value="{{this.status}}"
         required
-        />
-
-        <datalist id="statusList">
+        >
+            <option value="" disabled selected>Select status...</option>
             {{#each statuses}}
                 <option value="{{this.name}}">{{this.name}}</option>
             {{/each}}
-        </datalist>
+        </select>
 
         <label for="image">Item image: </label>
         <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"
@@ -209,6 +163,30 @@
 
 <script>
     const form = document.querySelector('#updateForm');
+    const category = document.querySelector('#category');
+
+    // grab the right subcategories based on user selected category
+    if (category) {
+        let categories = {{{json categories}}};
+
+        category.addEventListener('change', (event) => {
+            const selectedCategory = event.target.value;
+            const subCategory = document.querySelector('#subCategory');
+            subCategory.innerHTML = '<option value="" disabled selected>Select subcategory...</option>';
+            const selected = selectedCategory;
+
+            categories.forEach(cat => {
+                if (cat.name === selected) {
+                    cat.subCategories.forEach(sub => {
+                        const option = document.createElement('option');
+                        option.value = sub.name;
+                        option.textContent = sub.name;
+                        subCategory.appendChild(option);
+                    });
+                }
+            });
+        });
+    }
 
     if (form) {
         const itemId = "{{id}}";
