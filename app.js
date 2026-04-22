@@ -3,6 +3,7 @@
 const express = require("express");
 const vhost = require("vhost");
 const { engine } = require("express-handlebars");
+const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const morgan = require("morgan");
@@ -31,24 +32,23 @@ let dbProvider;
 
 // HELPERS ───────────────────────────────────
 const hbsHelpers = {
-    // section set up (prob not needed)
-    section: function (name, options) {
-        if (!this._sections) this._sections = {};
-        this._sections[name] = options.fn(this);
-        return null;
-    },
-    // if contain string
-    ifContains: function (container, stringToFind, options) {
-        if (container && container.includes(stringToFind)) {
-            return options.fn(this);
-        }
-        return options.inverse(this);
-    },
-    eq: (a, b) => a === b,
-    formatDate: (date) => new Date(date).toISOString().split('T')[0], // return YYYY-MM-DD
-    json: (context) => JSON.stringify(context),
-}
-
+  // section set up (prob not needed)
+  section: function (name, options) {
+    if (!this._sections) this._sections = {};
+    this._sections[name] = options.fn(this);
+    return null;
+  },
+  // if contain string
+  ifContains: function (container, stringToFind, options) {
+    if (container && container.includes(stringToFind)) {
+      return options.fn(this);
+    }
+    return options.inverse(this);
+  },
+  eq: (a, b) => a === b,
+  formatDate: (date) => new Date(date).toISOString().split("T")[0], // return YYYY-MM-DD
+  json: (context) => JSON.stringify(context),
+};
 
 // CORS configuration
 const whitelist = new Set([
@@ -114,7 +114,8 @@ publicApp.use((req, res, next) => {
   res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
   res.locals.navCheckin = pathName.startsWith("/owned");
   res.locals.navReport = pathName.startsWith("/report");
-  res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
+  res.locals.navUsers = pathName.startsWith("/users"); //
+  res.locals.navKeys = pathName.startsWith("/keys"); //
 
   res.locals.config = config;
   next();
@@ -155,6 +156,7 @@ adminApp.use((req, res, next) => {
   res.locals.navCheckin = pathName.startsWith("/owned");
   res.locals.navReport = pathName.startsWith("/report");
   res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
+  res.locals.navKeys = pathName.startsWith("/keys"); //
 
   res.locals.config = config;
   next();
@@ -173,17 +175,32 @@ apiApp.use(apiRoutes);
 
 // ------ Main app ------
 const app = express();
-app.engine('handlebars', engine({
-  extname: '.handlebars',
-  layoutsDir: path.join(__dirname, 'views/layouts'),
-  partialsDir: path.join(__dirname, 'views/partials'),
-  helpers: hbsHelpers,
-}));
+app.engine(
+  "handlebars",
+  engine({
+    extname: ".handlebars",
+    layoutsDir: path.join(__dirname, "views/layouts"),
+    partialsDir: path.join(__dirname, "views/partials"),
+    helpers: hbsHelpers,
+  }),
+);
 
-app.set('view engine', 'handlebars');
-app.set('views', path.join(__dirname, 'views'));
-// safety 
-app.disable('x-powered-by');
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "SESSION_SECRET",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Set to true if using HTTPS/Production
+      maxAge: 1000 * 60 * 60, // 1 hour
+    },
+  }),
+);
+
+app.set("view engine", "handlebars");
+app.set("views", path.join(__dirname, "views"));
+// safety
+app.disable("x-powered-by");
 
 // Morgan logging
 if (config.NODE_ENV === "production") {
@@ -201,7 +218,7 @@ app.use((error, req, res, next) => {
   console.error(error);
 
   return res.status(500).render("extra_pages/500", {
-    layout: 'no_nav_bar',
+    layout: "no_nav_bar",
     pageTitle: "500",
     message: error.message || "Internal Server Error",
   });

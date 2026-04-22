@@ -93,20 +93,32 @@ class MongoProvider extends DatabaseProvider {
       dateAcquired: item.dateAcquired,
       currentOwner: item.currentOwner,
       imageName: item.imageName,
-      imageAlt: item.imageAlt
+      imageAlt: item.imageAlt,
     };
   }
 
-  mapApiKey(key) {
-    if (!key) return null;
+  // mapApiKey(key) {
+  //   if (!key) return null;
 
+  //   return {
+  //     id: String(key._id),
+  //     name: key.name,
+  //     adminId: String(key.adminId),
+  //     key: key.key, // remove this if showing in UI
+  //     revoked: key.revoked,
+  //     createdAt: key.createdAt,
+  //   };
+  // }
+
+  // Helper to keep the data format consistent (id vs _id)
+  mapApiKey(key) {
     return {
-      id: String(key._id),
+      id: key._id.toString(),
+      hashedKey: key.hashedKey,
       name: key.name,
-      adminId: String(key.adminId),
-      key: key.key, // remove this if showing in UI
-      revoked: key.revoked,
+      userId: key.userId.toString(),
       createdAt: key.createdAt,
+      revoked: key.revoked,
     };
   }
 
@@ -163,7 +175,7 @@ class MongoProvider extends DatabaseProvider {
     return `${config.BASE_URL}/files/docs/${fileId}`;
   }
 
-	// ===== USER =====
+  // ===== USER =====
   async registerUser(email, password, name, role) {
     const existingAdmin = await User.findOne({
       role: "Admin",
@@ -222,7 +234,8 @@ class MongoProvider extends DatabaseProvider {
     return this.mapUser(user.toObject());
   }
 
-  async revokeOwnedApiKeys(userId) {    // for business rule to remove all owned by a disabled acc
+  async revokeOwnedApiKeys(userId) {
+    // for business rule to remove all owned by a disabled acc
     await ApiKey.updateMany({ admin_id: userId }, { revoked: true });
   }
 
@@ -234,7 +247,7 @@ class MongoProvider extends DatabaseProvider {
   async hasActiveAdmin() {
     const admin = await User.findOne({
       role: "Admin",
-      status: "Active"
+      status: "Active",
     }).lean();
 
     return !!admin;
@@ -242,20 +255,21 @@ class MongoProvider extends DatabaseProvider {
 
   async findActiveCheckout(itemId) {
     return await ItemHistory.findOne({
-      itemId:itemId,
+      itemId: itemId,
       action: "checkout",
-      returnedAt: null
+      returnedAt: null,
     })
       .sort({ created_at: -1 })
       .lean();
   }
 
-
-  
-	// ===== ITEMS =====
+  // ===== ITEMS =====
   async getItems() {
     const items = await Item.find().lean();
-    return items.map(i => ({...this.mapItem(i), imageUrl: this.getImageUrl(i.imageName)}));
+    return items.map((i) => ({
+      ...this.mapItem(i),
+      imageUrl: this.getImageUrl(i.imageName),
+    }));
   }
 
   async getItemById(id) {
@@ -273,15 +287,15 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getItemBySerial(serial) {
-  const item = await Item.findOne({ serial }).lean();
+    const item = await Item.findOne({ serial }).lean();
 
-  if (!item) return null;
+    if (!item) return null;
 
-  return {
-    ...this.mapItem(item),
-    imageUrl: this.getImageUrl(item.imageName),
-  };
-}
+    return {
+      ...this.mapItem(item),
+      imageUrl: this.getImageUrl(item.imageName),
+    };
+  }
 
   async createItem(data) {
     const item = await Item.create(data);
@@ -334,10 +348,10 @@ class MongoProvider extends DatabaseProvider {
   async getUserItems(userId) {
     const items = await Item.find({ currentOwner: userId }).lean();
 
-    const itemIds = items.map(i => i._id);
+    const itemIds = items.map((i) => i._id);
 
     const histories = await ItemHistory.find({
-      itemId: { $in: itemIds }
+      itemId: { $in: itemIds },
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -425,37 +439,48 @@ class MongoProvider extends DatabaseProvider {
   // API KEYS
   // =========================
 
-  async createApiKey(adminId, data) {
-    const keyValue = crypto.randomBytes(32).toString("hex");
+  async createApiKey(userId, data) {
+    // generate the raw random key
+    const rawKey = crypto.randomBytes(32).toString("hex");
+
+    // hash the key for secure storage (Requirement 4.3)
+    const salt = await bcryptjs.genSalt(10);
+    const hashedKey = await bcryptjs.hash(rawKey, salt);
 
     const apiKey = await ApiKey.create({
-      key: keyValue,
-      name: data?.name ?? null,
-      adminId: adminId,
+      hashedKey: hashedKey,
+      name: data?.name || "Unnamed Key",
+      userId: userId,
       revoked: false,
       createdAt: new Date(),
     });
 
-    return apiKey;
+    // return the rawKey so the service/controller can show it once
+    const mappedKey = this.mapApiKey(apiKey.toObject());
+    return { ...mappedKey, rawKey };
   }
 
   async getApiKeys() {
-    return ApiKey.find().sort({ createdAt: -1 }).lean();
+    const keys = await ApiKey.find().sort({ createdAt: -1 }).lean();
+    return keys.map((key) => this.mapApiKey(key));
   }
 
-  async getApiKeyByKey(key) {
-    return ApiKey.findOne({ key, revoked: false }).lean();
+  // change this to find by the hashed version or just fetch all for service-side comparison
+  async getApiKeyByHash(hashedKey) {
+    const keyRecord = await ApiKey.findOne({
+      hashedKey,
+      revoked: false,
+    }).lean();
+    return keyRecord ? this.mapApiKey(keyRecord) : null;
   }
 
-  async revokeApiKey(adminId, id) {
-    const admin = await User.findById(adminId);
-
-    // ----------------------------------------------------- move this check to service later
-    if (!admin || admin.role !== "Admin") {
-      throw new Error("Only admins can revoke keys");
-    }
-
-    return ApiKey.findByIdAndUpdate(id, { revoked: true }, { new: true });
+  async updateApiKey(id, updateData) {
+    const updated = await ApiKey.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { returnDocument: "after" },
+    ).lean();
+    return updated ? this.mapApiKey(updated) : null;
   }
 
   // GRIDFS FILE UPLOAD

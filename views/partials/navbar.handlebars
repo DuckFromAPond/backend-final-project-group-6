@@ -14,8 +14,9 @@
                 {{/if}}
 
                 {{#if (eq user.role "Admin")}}
-                    <a href="http://admin.{{config.DOMAIN}}:{{config.PORT}}" class="{{#if navAdmin}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} px-3 py-1 rounded-lg transition">Admin</a>
+                    <a href="/keys" class="{{#if navKeys}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} p-3 py-1 rounded-lg transition">Keys</a>
                 {{/if}}
+
             </nav>
             <div>
                 <a href="/logout" 
