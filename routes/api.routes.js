@@ -52,7 +52,7 @@ router.patch(
 router.get("/items", authOrApiKey, apiController.showItems);
 router.get("/items/:id", apiProtect, apiController.showItemDetail);
 router.post("/items", authOrApiKey, apiController.createItem);
-// router.get('/api/items/:id/history', authOrApiKey, apiController.getItemHistory);
+router.get('/items/:id/history', authOrApiKey, apiController.showItemHistory);
 router.delete("/items/:id", apiProtect, apiController.deleteItem);
 router.put("/items/:id", apiProtect, apiController.editItem);
 

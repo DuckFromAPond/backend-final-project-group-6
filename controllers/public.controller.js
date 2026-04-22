@@ -8,6 +8,22 @@ const { items, itemHistories, users, dashboardData } = require("../data/data");
 const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
 
+// static data
+const categories = [
+  { name: "Peripherals", subCategories: [
+    { name: "Monitor" },
+    { name: "Keyboard" },
+    { name: "Mouse" },
+    { name: "Scanner" },
+    { name: "Printer" },
+  ] },
+  { name: "Computers", subCategories: [
+    { name: "Laptop" },
+    { name: "Desktop" },
+    { name: "Server" },
+  ] },
+];
+
 // GET: /HOME ----------------
 exports.home = async (req, res, next) => {
   try {
@@ -257,22 +273,6 @@ exports.showItemDetail = async (req, res) => {
 
   let item = await db.getItemById(id);
 
-  // manually add categories
-  const categories = [
-    { name: "Peripherals", subCategories: [
-      { name: "Monitor" },
-      { name: "Keyboard" },
-      { name: "Mouse" },
-      { name: "Scanner" },
-      { name: "Printer" },
-    ] },
-    { name: "Computers", subCategories: [
-      { name: "Laptop" },
-      { name: "Desktop" },
-      { name: "Server" },
-    ] },
-  ];
-
   const statuses = [
     { name: "Available" },
     { name: "Maintenance" },
@@ -357,11 +357,16 @@ exports.editItem = async (req, res, next) => {
     const status = fields.status?.[0] ?? "";
     const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
+    if(!["Available", "Maintenance"].includes(status)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+      });
+    }
+
     // upload file
     let filePath = null;
     let fileName = null;
-
-    // console.log(files)
 
     if (files?.image?.length > 0 && files?.image[0]?.size > 0) {
       const file = files.image[0];
@@ -393,8 +398,6 @@ exports.editItem = async (req, res, next) => {
       imageAlt: `Image of ${name}`,
     };
 
-    console.log(newItem);
-
     await db.updateItem(id, newItem);
 
     return res.json({
@@ -417,6 +420,13 @@ exports.deleteItem = async (req, res, next) => {
       ...item,
       status: "Retired",
     };
+
+    if(item.status === "In-Use") {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Item+in-use+cannot+be+retired`,
+      });
+    }
 
     await db.updateItem(id, newItem);
     

@@ -5,6 +5,22 @@ const userService = require("../services/userService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
+// static data
+const categories = [
+  { name: "Peripherals", subCategories: [
+    { name: "Monitor" },
+    { name: "Keyboard" },
+    { name: "Mouse" },
+    { name: "Scanner" },
+    { name: "Printer" },
+  ] },
+  { name: "Computers", subCategories: [
+    { name: "Laptop" },
+    { name: "Desktop" },
+    { name: "Server" },
+  ] },
+];
+
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
   try {
@@ -130,14 +146,19 @@ exports.generateKey = async (req, res) => {
 // GET /api/items
 exports.showItems = async (req, res) => {
   const db = getDbProvider();
-  const { cat, q, isRetired, error, success } = req.query;
+  const { cat, q, subcat, isRetired, error, success } = req.query;
 
   // get all items from DB
   let items = await db.getItems();
 
+  // filter by subcategory
+  if(subcat) {
+    items = items.filter((item) => item.subCategory === subcat);
+  }
+
   // filter by category
   if (cat) {
-    items = items.filter((item) => item.category === cat);
+    items = items.filter((item) => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
   }
 
   // search by name (case-insensitive)
@@ -164,6 +185,8 @@ exports.showItems = async (req, res) => {
     items,
     statuses,
     user: req.user || null,
+    error,
+    success,
   });
 };
 
@@ -235,7 +258,7 @@ exports.createItem = async (req, res, next) => {
 
 // GET /api/items/:id
 exports.showItemDetail = async (req, res) => {
-  const { id } = req.params;
+  const { id, success, error } = req.params;
   const db = getDbProvider();
 
   let item = await db.getItemById(id);
@@ -248,6 +271,8 @@ exports.showItemDetail = async (req, res) => {
   let context = {
     item,
     statuses,
+    error,
+    success,
     isRetired: item.status === "Retired",
   };
 
@@ -295,6 +320,13 @@ exports.editItem = async (req, res) => {
     const status = fields.status?.[0] ?? "";
     const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
+    if(!["Available", "Maintenance"].includes(status)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+      });
+    }
+
     // upload file
     let filePath = null;
     let fileName = null;
@@ -304,7 +336,7 @@ exports.editItem = async (req, res) => {
       const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
       if (file.size > MAX_SIZE) {
-        return res.redirect("/api/items?error=File+too+large+(max+50MB)");
+        return res.redirect(`/api/items/${id}?error=File+too+large+(max+50MB)`);
       }
 
       const fileBuffer = fs.readFileSync(file.path);
@@ -344,15 +376,20 @@ exports.deleteItem = async (req, res) => {
   try {
     const db = getDbProvider();
     const item = await db.getItemById(id);
+    
+    if(item.status === "In-Use") {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Item+in-use+cannot+be+retired`,
+      });
+    }
+
     const newItem = {
       ...item,
       status: "Retired",
     };
 
     await db.updateItem(id, newItem);
-
-    // uncomment this for hard delete
-    // await db.deleteItem(id);
 
     return res.redirect(`/api/items/${id}?success=Item+retired+successfully`);
   } catch (err) {
