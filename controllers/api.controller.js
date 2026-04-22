@@ -164,9 +164,6 @@ exports.showItems = async (req, res) => {
     items,
     statuses,
     user: req.user || null,
-    error: error || null,
-    success: success || null,
-    pageTitle: "Items",
   });
 };
 
@@ -189,10 +186,10 @@ exports.createItem = async (req, res, next) => {
     const brand = fields.brand?.[0] ?? "";
     const model = fields.model?.[0] ?? "";
     const category = fields.category?.[0] ?? "";
-    const sub_category = fields.subcategory?.[0] ?? "";
+    const subCategory = fields.subCategory?.[0] ?? "";
     const serial = fields.serial?.[0] ?? "";
     const status = fields.status?.[0] ?? "";
-    const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
     // upload file
     let filePath = null;
@@ -220,12 +217,12 @@ exports.createItem = async (req, res, next) => {
       brand,
       model,
       category,
-      sub_category,
+      subCategory,
       serial,
       status,
-      date_acquired,
-      image_name: fileName,
-      image_alt: `Image of ${name}`,
+      dateAcquired,
+      imageName: fileName,
+      imageAlt: `Image of ${name}`,
     };
 
     await db.createItem(newItem);
@@ -239,57 +236,26 @@ exports.createItem = async (req, res, next) => {
 // GET /api/items/:id
 exports.showItemDetail = async (req, res) => {
   const { id } = req.params;
-  const { edit, del, error, success } = req.query;
   const db = getDbProvider();
 
   let item = await db.getItemById(id);
 
   const statuses = [
     { name: "Available" },
-    { name: "In-Use" },
     { name: "Maintenance" },
-    { name: "Retired" },
   ];
 
   let context = {
     item,
     statuses,
-    isEdit: false,
-    isDelete: false,
     isRetired: item.status === "Retired",
   };
 
   if (!context) {
-    res.status(404);
-    return res.render("404");
-  }
-
-  if (edit || (edit?.length !== 0 && edit === "true")) {
-    context = {
-      ...context,
-      isEdit: true,
-    };
-  }
-
-  if (del || (del?.length !== 0 && del === "true")) {
-    context = {
-      ...context,
-      isDelete: true,
-    };
-  }
-
-  if (error) {
-    context = {
-      ...context,
-      error,
-    };
-  }
-
-  if (success) {
-    context = {
-      ...context,
-      success,
-    };
+    return res.status(404).json({
+      type: "error",
+      message: "Item not found",
+    });
   }
 
   return res.json(context);
@@ -324,10 +290,10 @@ exports.editItem = async (req, res) => {
     const brand = fields.brand?.[0] ?? "";
     const model = fields.model?.[0] ?? "";
     const category = fields.category?.[0] ?? "";
-    const sub_category = fields.subcategory?.[0] ?? "";
+    const subCategory = fields.subCategory?.[0] ?? "";
     const serial = fields.serial?.[0] ?? "";
     const status = fields.status?.[0] ?? "";
-    const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
     // upload file
     let filePath = null;
@@ -355,12 +321,12 @@ exports.editItem = async (req, res) => {
       brand,
       model,
       category,
-      sub_category: "",
+      subCategory,
       serial,
       status,
-      date_acquired,
-      image_name: fileName ?? item.image_name,
-      image_alt: `Image of ${name}`,
+      dateAcquired,
+      imageName: fileName ?? item.imageName,
+      imageAlt: `Image of ${name}`,
     };
 
     await db.updateItem(id, newItem);
@@ -378,13 +344,6 @@ exports.deleteItem = async (req, res) => {
   try {
     const db = getDbProvider();
     const item = await db.getItemById(id);
-    item["date_acquired"] = item["dateAcquired"];
-    item["image_alt"] = item["imageAlt"];
-    item["image_name"] = item["imageName"];
-    delete item["dateAcquired"];
-    delete item["imageAlt"];
-    delete item["imageName"];
-    delete item["imageUrl"];
     const newItem = {
       ...item,
       status: "Retired",
@@ -399,4 +358,41 @@ exports.deleteItem = async (req, res) => {
   } catch (err) {
     next(err);
   }
+};
+
+// GET /api/items/:id/history
+exports.showItemHistory = async (req, res) => {
+  const { id } = req.params;
+  const db = getDbProvider();
+  const itemHistory = await db.getItemHistoryByItemId(id);
+  const item = await db.getItemById(id);
+  const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
+  
+  const users = await Promise.all(userPromises);
+
+  let context = {
+    item,
+    itemHistories: itemHistory,
+  };
+
+  let history = context.itemHistories;
+
+  if (history) {
+      history = history.map(h => {
+        // find username using id 
+        const user = users.find(u => u.id === h.userId);
+
+        return {
+            ...h,
+            assignee: user ? user.name : "No name given"
+        };
+      });
+
+      context = {
+        ...context,
+        itemHistories: history
+      }
+  }
+
+  return res.json(context);
 };

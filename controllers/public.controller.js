@@ -471,8 +471,6 @@ exports.showItemHistory = async (req, res) => {
       }
   }
 
-  console.log(context);
-
   res.render("items/itemHistory", context);
 };
 
