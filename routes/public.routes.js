@@ -32,6 +32,18 @@ router.post("/transactions/checkout", protect, publicController.checkOut);
 // router.get('/hisory', protect, requireRole("Admin"), adminController.createItem);
 
 router.get("/users", protect, requireRole("Admin"), adminController.listUsers); // <------------ kinda weird... i think it's easier to just require "Admin role" instead of moving to Admin
+router.post(
+  "/users/:id/role",
+  protect,
+  requireRole("Admin"),
+  adminController.changeRole,
+); // <-- or post here if want since it don't matter
+router.post(
+  "/users/:id/status",
+  protect,
+  requireRole("Admin"),
+  adminController.toggleStatus,
+); // disable/enable user
 
 // autorender can go down here if want to add later
 
