@@ -1,21 +1,21 @@
-'use strict';   // for debugging
+"use strict"; // for debugging
 
 const multiparty = require("multiparty");
 const fs = require("fs");
 const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
-const { items, itemHistories, users, dashboardData } = require('../data/data');
+const { items, itemHistories, users, dashboardData } = require("../data/data");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
-// this data might be important (remove later) 
+// this data might be important (remove later)
 const itemData = {
-    categories: [
-        { name: "Computers", subCategories: [] },
-        { name: "Peripherals", subCategories: [] },
-    ],
-    //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-    items: items, // Use the imported items here
-    itemHistories: itemHistories,
+  categories: [
+    { name: "Computers", subCategories: [] },
+    { name: "Peripherals", subCategories: [] },
+  ],
+  //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
+  items: items, // Use the imported items here
+  itemHistories: itemHistories,
 };
 
 // GET: /HOME ----------------
@@ -26,7 +26,7 @@ exports.home = async (req, res, next) => {
     const [users, items, histories] = await Promise.all([
       db.getAllUsers ? db.getAllUsers() : Promise.resolve([]),
       db.getItems(),
-      db.getItemHistories()
+      db.getItemHistories(),
     ]);
 
     const totalUsers = users.length;
@@ -35,7 +35,7 @@ exports.home = async (req, res, next) => {
     // latest per item
     const latestMap = new Map();
     const sortedHistories = [...histories].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
     );
 
     for (const h of sortedHistories) {
@@ -44,38 +44,36 @@ exports.home = async (req, res, next) => {
       }
     }
 
-    const pendingCheckouts = [...latestMap.values()]
-      .filter(h => h.action === "checkout").length;
+    const pendingCheckouts = [...latestMap.values()].filter(
+      (h) => h.action === "checkout",
+    ).length;
 
     // lookup maps
-    const userMap = new Map(users.map(u => [u.id, u]));
-    const itemMap = new Map(items.map(i => [i.id, i]));
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    const recentTransactions = sortedHistories
-      .slice(0, 5)
-      .map(h => {
-        const user = userMap.get(h.userId);
-        const item = itemMap.get(h.itemId);
+    const recentTransactions = sortedHistories.slice(0, 5).map((h) => {
+      const user = userMap.get(h.userId);
+      const item = itemMap.get(h.itemId);
 
-        return {
-          id: h.id,
-          user: user?.name || "Unknown",
-          item: item?.name || "Unknown",
-          type: h.action === "checkout" ? "Checkout" : "Checkin",
-          date: new Date(h.createdAt).toLocaleString()
-        };
-      });
+      return {
+        id: h.id,
+        user: user?.name || "Unknown",
+        item: item?.name || "Unknown",
+        type: h.action === "checkout" ? "Checkout" : "Checkin",
+        date: new Date(h.createdAt).toLocaleString(),
+      };
+    });
 
     res.render("home", {
       dashboardData: {
         totalUsers,
         totalItems,
         pendingCheckouts,
-        recentTransactions
+        recentTransactions,
       },
-      pageTitle: "Home"
+      pageTitle: "Home",
     });
-
   } catch (err) {
     next(err);
   }
@@ -93,40 +91,38 @@ exports.showItems = async (req, res) => {
 
   // get all items from DB
   let items = await db.getItems();
-  
+
   // derive categories dynamically
-  const categories = [
-    ...new Set(items.map(item => item.category))
-  ].map(name => ({ name }));
+  const categories = [...new Set(items.map((item) => item.category))].map(
+    (name) => ({ name }),
+  );
 
   // filter by category
   if (cat) {
     url += `cat=${cat}&`;
-    items = items.filter(item => item.category === cat);
+    items = items.filter((item) => item.category === cat);
   }
 
   // search by name (case-insensitive)
   if (q) {
     url += `q=${q}&`;
-    items = items.filter(item =>
-      item.name?.toLowerCase().includes(q.toLowerCase())
+    items = items.filter((item) =>
+      item.name?.toLowerCase().includes(q.toLowerCase()),
     );
   }
 
   if (isRetired) {
     url += `isRetired=${isRetired}&`;
-    items = items.filter(item => 
-      item.status === "Retired");
-  }
-  else {
-    items = items.filter(item => item.status !== "Retired");
+    items = items.filter((item) => item.status === "Retired");
+  } else {
+    items = items.filter((item) => item.status !== "Retired");
   }
 
-  if(error) {
+  if (error) {
     url += `error=${error}&`;
   }
 
-  if(success) {
+  if (success) {
     url += `success=${success}&`;
   }
 
@@ -134,7 +130,7 @@ exports.showItems = async (req, res) => {
   if (!page) {
     url += `page=1`;
     return res.redirect(url);
-  };
+  }
 
   page = parseInt(page);
 
@@ -153,7 +149,7 @@ exports.showItems = async (req, res) => {
   const nextPage = page < totalPages ? page + 1 : null;
 
   const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
-  
+
   const statuses = [
     { name: "Available" },
     { name: "In-Use" },
@@ -169,217 +165,215 @@ exports.showItems = async (req, res) => {
     totalPages: pagesToRender,
     user: req.user || null,
     error: error || null,
-    success: success || null, 
-    pageTitle: "Items"
+    success: success || null,
+    pageTitle: "Items",
   });
 };
 
 exports.addItem = async (req, res, next) => {
   try {
-      const db = getDbProvider();
-      const form = new multiparty.Form();
+    const db = getDbProvider();
+    const form = new multiparty.Form();
 
-      const { fields, files } = await new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-          if (err) return reject(err);
-          resolve({ fields, files });
-        });
+    const { fields, files } = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err);
+        resolve({ fields, files });
       });
+    });
 
-      // extract fields
-      const name = fields.name?.[0] ?? '';
-      const description = fields.description?.[0] ?? '';
-      const brand = fields.brand?.[0] ?? '';
-      const model = fields.model?.[0] ?? '';
-      const category = fields.category?.[0] ?? '';
-      const sub_category = fields.subcategory?.[0] ?? '';
-      const serial = fields.serial?.[0] ?? '';
-      const status = fields.status?.[0] ?? '';
-      const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+    // extract fields
+    const name = fields.name?.[0] ?? "";
+    const description = fields.description?.[0] ?? "";
+    const brand = fields.brand?.[0] ?? "";
+    const model = fields.model?.[0] ?? "";
+    const category = fields.category?.[0] ?? "";
+    const sub_category = fields.subcategory?.[0] ?? "";
+    const serial = fields.serial?.[0] ?? "";
+    const status = fields.status?.[0] ?? "";
+    const date_acquired = fields.dateAcquired?.[0] ?? new Date();
 
-      // upload file 
-      let filePath = null;
-      let fileName = null;
+    // upload file
+    let filePath = null;
+    let fileName = null;
 
-      // console.log(files)
+    // console.log(files)
 
-      if (files?.image?.length > 0) {
-        const file = files.image[0];
-        const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+    if (files?.image?.length > 0) {
+      const file = files.image[0];
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
-        if (file.size > MAX_SIZE) {
-            return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
-
-        const fileBuffer = fs.readFileSync(file.path);
-
-        fileName = `${Date.now()}_${file.originalFilename}`;
-        filePath = `${fileName}`;
-
-        await db.uploadItem(filePath, fileBuffer, true);
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/items?error=File+too+large+(max+50MB)");
       }
 
-      const newItem = {
-          name,
-          description,
-          brand,
-          model,
-          category,
-          sub_category,
-          serial,
-          status,
-          date_acquired,
-          image_name: fileName,
-          image_alt: image_alt || `Image of ${name}`,
-      };
+      const fileBuffer = fs.readFileSync(file.path);
 
-      await db.createItem(newItem);
+      fileName = `${Date.now()}_${file.originalFilename}`;
+      filePath = `${fileName}`;
 
-      return res.redirect("/items?success=Item+added+successfully");
-  }
-  catch (err) {
-    next(err);
-  }
-}
+      await db.uploadItem(filePath, fileBuffer, true);
+    }
 
-exports.showItemDetail = async (req, res) => {
-    const { id } = req.params;
-    const { edit, del, error, success } = req.query;
-    const db = getDbProvider();
-
-    let item = await db.getItemById(id);
-
-    const statuses = [
-      { name: "Available" },
-      { name: "In-Use" },
-      { name: "Maintenance" },
-      { name: "Retired" }
-    ];
-
-    let context = {
-        item,
-        statuses,
-        isEdit: false,
-        isDelete: false,
-        isRetired: item.status === "Retired",
+    const newItem = {
+      name,
+      description,
+      brand,
+      model,
+      category,
+      sub_category,
+      serial,
+      status,
+      date_acquired,
+      image_name: fileName,
+      image_alt: image_alt || `Image of ${name}`,
     };
 
-    if (!context) {
-        res.status(404)
-        return res.render('404')
-    }
+    await db.createItem(newItem);
 
-    if (edit || edit?.length !== 0 && edit === 'true') {
-        context = {
-            ...context,
-            isEdit: true
-        }
-    }
+    return res.redirect("/items?success=Item+added+successfully");
+  } catch (err) {
+    next(err);
+  }
+};
 
-    if (del || del?.length !== 0 && del === 'true') {
-        context = {
-            ...context,
-            isDelete: true
-        }
-    }
+exports.showItemDetail = async (req, res) => {
+  const { id } = req.params;
+  const { edit, del, error, success } = req.query;
+  const db = getDbProvider();
 
-    if(error) {
-        context = {
-            ...context,
-            error
-        }
-    }
+  let item = await db.getItemById(id);
 
-    if(success) {
-      context = {
-          ...context,
-          success
-      }
-    }
+  const statuses = [
+    { name: "Available" },
+    { name: "In-Use" },
+    { name: "Maintenance" },
+    { name: "Retired" },
+  ];
 
-    res.render('items/itemDetail', context)
+  let context = {
+    item,
+    statuses,
+    isEdit: false,
+    isDelete: false,
+    isRetired: item.status === "Retired",
+  };
+
+  if (!context) {
+    res.status(404);
+    return res.render("404");
+  }
+
+  if (edit || (edit?.length !== 0 && edit === "true")) {
+    context = {
+      ...context,
+      isEdit: true,
+    };
+  }
+
+  if (del || (del?.length !== 0 && del === "true")) {
+    context = {
+      ...context,
+      isDelete: true,
+    };
+  }
+
+  if (error) {
+    context = {
+      ...context,
+      error,
+    };
+  }
+
+  if (success) {
+    context = {
+      ...context,
+      success,
+    };
+  }
+
+  res.render("items/itemDetail", context);
 };
 
 exports.editItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-      const db = getDbProvider();
-      const item = await db.getItemById(id);
-      const form = new multiparty.Form();
+    const db = getDbProvider();
+    const item = await db.getItemById(id);
+    const form = new multiparty.Form();
 
-      const { fields, files } = await new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-          if (err) return reject(err);
-          resolve({ fields, files });
-        });
+    const { fields, files } = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err);
+        resolve({ fields, files });
       });
+    });
 
-      if(item.status === "In-Use") {
-        return res.json({
-          type: 'error',
-          redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`
-        });
-      }
-
-      // extract fields
-      const name = fields.name?.[0] ?? '';
-      const description = fields.description?.[0] ?? '';
-      const brand = fields.brand?.[0] ?? '';
-      const model = fields.model?.[0] ?? '';
-      const category = fields.category?.[0] ?? '';
-      const sub_category = fields.subcategory?.[0] ?? '';
-      const serial = fields.serial?.[0] ?? '';
-      const status = fields.status?.[0] ?? '';
-      const date_acquired = fields.dateAcquired?.[0] ?? new Date();
-
-      // upload file 
-      let filePath = null;
-      let fileName = null;
-
-      // console.log(files)
-
-      if (files?.image?.length > 0 && files?.image[0]?.size > 0) {
-        const file = files.image[0];
-        const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-
-        if (file.size > MAX_SIZE) {
-          return res.redirect(`/items/${id}?error=File+too+large+(max+50MB)`);
-        }
-
-        const fileBuffer = fs.readFileSync(file.path);
-
-        fileName = `${Date.now()}_${file.originalFilename}`;
-        filePath = `${fileName}`;
-
-        await db.uploadFile(filePath, fileBuffer, true);
-      }
-
-      const newItem = {
-          name,
-          description,
-          brand,
-          model,
-          category,
-          sub_category: '',
-          serial,
-          status,
-          date_acquired,
-          image_name: fileName ?? item.image_name,
-          image_alt: `Image of ${name}`
-      };
-
-      await db.updateItem(id, newItem);
-
+    if (item.status === "In-Use") {
       return res.json({
-        type: "success",
-        redirect: `/items/${id}?success=Item+updated+successfully`
+        type: "error",
+        redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`,
       });
-  }
-  catch (err) {
+    }
+
+    // extract fields
+    const name = fields.name?.[0] ?? "";
+    const description = fields.description?.[0] ?? "";
+    const brand = fields.brand?.[0] ?? "";
+    const model = fields.model?.[0] ?? "";
+    const category = fields.category?.[0] ?? "";
+    const sub_category = fields.subcategory?.[0] ?? "";
+    const serial = fields.serial?.[0] ?? "";
+    const status = fields.status?.[0] ?? "";
+    const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+
+    // upload file
+    let filePath = null;
+    let fileName = null;
+
+    // console.log(files)
+
+    if (files?.image?.length > 0 && files?.image[0]?.size > 0) {
+      const file = files.image[0];
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+      if (file.size > MAX_SIZE) {
+        return res.redirect(`/items/${id}?error=File+too+large+(max+50MB)`);
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+
+      fileName = `${Date.now()}_${file.originalFilename}`;
+      filePath = `${fileName}`;
+
+      await db.uploadFile(filePath, fileBuffer, true);
+    }
+
+    const newItem = {
+      name,
+      description,
+      brand,
+      model,
+      category,
+      sub_category: "",
+      serial,
+      status,
+      date_acquired,
+      image_name: fileName ?? item.image_name,
+      image_alt: `Image of ${name}`,
+    };
+
+    await db.updateItem(id, newItem);
+
+    return res.json({
+      type: "success",
+      redirect: `/items/${id}?success=Item+updated+successfully`,
+    });
+  } catch (err) {
     next(err);
   }
-}
+};
 
 // soft deletes only
 exports.deleteItem = async (req, res, next) => {
@@ -388,62 +382,60 @@ exports.deleteItem = async (req, res, next) => {
   try {
     const db = getDbProvider();
     const item = await db.getItemById(id);
-    item['date_acquired'] = item['dateAcquired'];
-    item['image_alt'] = item['imageAlt'];
-    item['image_name'] = item['imageName'];
-    delete item['dateAcquired'];
-    delete item['imageAlt'];
-    delete item['imageName'];
-    delete item['imageUrl'];
+    item["date_acquired"] = item["dateAcquired"];
+    item["image_alt"] = item["imageAlt"];
+    item["image_name"] = item["imageName"];
+    delete item["dateAcquired"];
+    delete item["imageAlt"];
+    delete item["imageName"];
+    delete item["imageUrl"];
     const newItem = {
       ...item,
-      status: "Retired"
+      status: "Retired",
     };
 
     await db.updateItem(id, newItem);
-    
+
     // uncomment this for hard delete
     // await db.deleteItem(id);
-    
+
     return res.json({
-        type: 'success',
-        redirect: `/items/${id}?success=Item+retired+successfully`
-    })
-  }
-  catch(err) {
+      type: "success",
+      redirect: `/items/${id}?success=Item+retired+successfully`,
+    });
+  } catch (err) {
     next(err);
   }
-}
-
-exports.showItemHistory = (req, res) => {
-    const { id } = req.params;
-
-    const context = {
-        item: itemData.items.find((item) => String(item.id) === String(id)),
-        itemHistories: itemData.itemHistories.find(
-            (item) => String(item.id) === String(id),
-        ),
-    };
-
-    const history = context.itemHistories;
-
-    if (history) {
-        history.histories = history.histories.map(h => {
-            // find username using id 
-            const user = users.find(u => u.id === h.user_id);
-
-            return {
-                ...h,
-                assignee: user ? user.name : "No name given"
-            };
-        });
-    }
-
-    res.render("items/itemHistory", context);
 };
 
+exports.showItemHistory = (req, res) => {
+  const { id } = req.params;
 
-// POST: /CHECKIN 
+  const context = {
+    item: itemData.items.find((item) => String(item.id) === String(id)),
+    itemHistories: itemData.itemHistories.find(
+      (item) => String(item.id) === String(id),
+    ),
+  };
+
+  const history = context.itemHistories;
+
+  if (history) {
+    history.histories = history.histories.map((h) => {
+      // find username using id
+      const user = users.find((u) => u.id === h.user_id);
+
+      return {
+        ...h,
+        assignee: user ? user.name : "No name given",
+      };
+    });
+  }
+
+  res.render("items/itemHistory", context);
+};
+
+// POST: /CHECKIN
 exports.checkIn = async (req, res, next) => {
   try {
     const db = getDbProvider();
@@ -457,7 +449,7 @@ exports.checkIn = async (req, res, next) => {
       });
     });
 
-    const itemId = fields.itemId?.[0];   
+    const itemId = fields.itemId?.[0];
     const duration = fields.duration?.[0];
     const userId = req.user.id;
 
@@ -475,7 +467,7 @@ exports.checkIn = async (req, res, next) => {
       return res.redirect("/items?error=Item+not+checked+out");
     }
 
-    // 1. upload file 
+    // 1. upload file
     let filePath = null;
 
     if (files?.document?.length > 0 && db.providerLabel === "Supabase") {
@@ -506,7 +498,7 @@ exports.checkIn = async (req, res, next) => {
     await db.addItemHistory(itemId, {
       userId,
       action: "checkin",
-      referenceLink: filePath
+      referenceLink: filePath,
     });
 
     return res.redirect("/items?success=Checked+in+successfully!");
@@ -538,7 +530,10 @@ exports.checkOut = async (req, res, next) => {
       return res.redirect("/items?error=Item+not+found");
     }
 
-    if (item.status !== "Available" || ["Maintenance", "Retired"].includes(item.status)) {
+    if (
+      item.status !== "Available" ||
+      ["Maintenance", "Retired"].includes(item.status)
+    ) {
       return res.redirect("/items?error=Item+not+available");
     }
 
@@ -575,7 +570,6 @@ exports.checkOut = async (req, res, next) => {
     });
 
     return res.redirect("/owned");
-
   } catch (err) {
     next(err);
   }
@@ -588,7 +582,7 @@ exports.showOwned = async (req, res, next) => {
 
     const items = await db.getUserItems(currentUserId);
 
-    const allOwned = items.map(row => {
+    const allOwned = items.map((row) => {
       let status = "unknown";
       let dueDate = null;
 
@@ -601,56 +595,41 @@ exports.showOwned = async (req, res, next) => {
         const now = new Date();
 
         status = now > dueDate ? "overdue" : "active";
-
       }
 
       const created = row.createdAt ? new Date(row.createdAt) : null;
 
       return {
-        id: row.itemId, 
+        id: row.itemId,
         name: row.item.name,
         createdAt: created.toISOString().split("T")[0],
         dueDate: dueDate ? dueDate.toISOString().split("T")[0] : null,
-        status: status
-      }
+        status: status,
+      };
     });
 
     res.render("owned", {
       items: allOwned,
-      pageTitle: "Owned"
+      pageTitle: "Owned",
     });
-
   } catch (err) {
     next(err);
   }
 };
 
-
 exports.report = (req, res) => {
-    res.render("report");
+  res.render("report");
 };
 
-
-
-
-
-
-
-// ++++++++++ List-user page
-exports.users = (req, res) => {
-    // MOCK DATA
-    res.render("users", { users });
-};
-
-// 404 handler 
+// 404 handler
 exports.notFound = (req, res) => {
-  res.status(404).render('extra_pages/404', {
-    message: 'The page you are looking for does not exist.',
-    pageTitle: "404"
+  res.status(404).render("extra_pages/404", {
+    message: "The page you are looking for does not exist.",
+    pageTitle: "404",
   });
 };
 
-// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT 
+// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT
 
 // middle-ware to render 404 (bad)
 // app.use((req, res, next) => {
