@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { GridFSBucket } = require("mongodb");
 const bcryptjs = require("bcryptjs");
 const DatabaseProvider = require("./databaseProvider");
+const config = require("../config/app.config");
 
 const User = require("./models/mongoUserModel");
 const Item = require("./models/mongoItemsModel");
@@ -86,11 +87,13 @@ class MongoProvider extends DatabaseProvider {
       model: item.model,
       brand: item.brand,
       category: item.category,
+      subCategory: item.subCategory,
       status: item.status,
+      description: item.description,
       dateAcquired: item.dateAcquired,
+      currentOwner: item.currentOwner,
       imageName: item.imageName,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
+      imageAlt: item.imageAlt
     };
   }
 
@@ -117,7 +120,6 @@ class MongoProvider extends DatabaseProvider {
       action: history.action, // checkout / checkin
       duration: history.duration || null,
       referenceLink: history.referenceLink || null,
-      returnedAt: history.returnedAt || null,
       createdAt: history.createdAt,
     };
   }
@@ -134,42 +136,36 @@ class MongoProvider extends DatabaseProvider {
     );
   }
 
-  getLatestCheckoutRows(rows, getItemId) {
-    const latestMap = new Map();
+  getImageUrl(fileId) {
+    if (!fileId) return null;
 
-    for (const row of rows) {
-      const itemId = getItemId(row);
-      if (!itemId) continue;
-
-      if (!latestMap.has(itemId)) {
-        latestMap.set(itemId, row);
-      }
-    }
-
-    return [...latestMap.values()].filter(r => r.action === "checkout");
+    return `${config.BASE_URL}/files/items/${fileId}`;
   }
 
+  getDocumentUrl(fileId) {
+  if (!fileId) return null;
 
+  return `${config.BASE_URL}/files/docs/${fileId}`;
+}
+  
 
-
-	// ===== USER AUTHENTICATION =====
-  async registerUser(email, password, name) {
-    const existingAdmin =  await User.findOne({ role: "Admin", status: "Active" });
-    let roleToAssign = existingAdmin ? "Technician" : "Admin";
+	// ===== USER =====
+  async registerUser(email, password, name, role) {
     const normalizedEmail = this.normalizeEmail(email);
 
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) throw new Error("Email already exists");
 
-    const hash = await bcryptjs.hash(password, 10);
+    const salt = await bcryptjs.genSalt(10);
+    const passwordHash = await bcryptjs.hash(password, salt);
 
     const user = await User.create({
       email: normalizedEmail,
-      passwordHash: hash,
+      passwordHash: passwordHash,
       name: name,
-      role: existingAdmin,
-      status: "Active",
-      disabledAt: null
+      role: role,
+      status: "Active", 
+      disabledAt: null, 
     });
 
     return this.mapUser(user.toObject());
@@ -199,15 +195,11 @@ class MongoProvider extends DatabaseProvider {
   async updateUser(userId, updates) {
     const user = await User.findByIdAndUpdate(userId, updates, { new: true });
 
-    // business rule: revoke API keys
-    if (user.status === "Disabled") {
-      await ApiKey.updateMany(
-        { adminId: userId },
-        { revoked: true }
-      );
-    }
-
     return this.mapUser(user.toObject());
+  }
+
+  async revokeOwnedApiKeys(userId) {    // for business rule to remove all owned by a disabled acc
+    await ApiKey.updateMany({ admin_id: userId }, { revoked: true });
   }
 
   async getAllUsers() {
@@ -215,23 +207,57 @@ class MongoProvider extends DatabaseProvider {
     return users.map(u => this.mapUser(u));
   }
 
+  async hasActiveAdmin() {
+    const admin = await User.findOne({
+      role: "Admin",
+      status: "Active"
+    }).lean();
+
+    return !!admin;
+  }
+
+  async findActiveCheckout(itemId) {
+    return await ItemHistory.findOne({
+      itemId:itemId,
+      action: "checkout",
+      returnedAt: null
+    })
+      .sort({ created_at: -1 })
+      .lean();
+  }
 
 
   
 	// ===== ITEMS =====
   async getItems() {
     const items = await Item.find().lean();
-    return items.map(i => this.mapItem(i));
+    return items.map(i => ({...this.mapItem(i), imageUrl: this.getImageUrl(i.imageName)}));
   }
 
   async getItemById(id) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return null; // or throw new Error("Invalid item id");
+      return null;
     }
 
     const item = await Item.findById(id).lean();
-    return this.mapItem(item);
+    if (!item) return null;
+
+    return {
+      ...this.mapItem(item),
+      imageUrl: this.getImageUrl(item.imageName),
+    };
   }
+
+  async getItemBySerial(serial) {
+  const item = await Item.findOne({ serial }).lean();
+
+  if (!item) return null;
+
+  return {
+    ...this.mapItem(item),
+    imageUrl: this.getImageUrl(item.imageName),
+  };
+}
 
   async createItem(data) {
     const item = await Item.create(data);
@@ -243,17 +269,8 @@ class MongoProvider extends DatabaseProvider {
     return this.mapItem(item);
   }
 
-  async setItemStatus(id, status) {
-    const item = await Item.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).lean();
 
-    return this.mapItem(item);
-  }
-
-
+  
 
 	// ===== HISTORY =====
   async getItemHistories() {
@@ -265,7 +282,7 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getItemHistoryByItemId(itemId) {
-    const histories = await ItemHistory.find({ itemId })
+    const histories = await ItemHistory.find({ itemId: itemId })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -274,7 +291,7 @@ class MongoProvider extends DatabaseProvider {
 
   async addItemHistory(itemId, data) {
     const history = await ItemHistory.create({
-      itemId,
+      itemId: itemId,
       userId: data.userId,
       action: data.action,
       duration: data.duration ?? null,
@@ -286,91 +303,32 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getUserItems(userId) {
-    const histories = await ItemHistory.find({ userId })
-      .populate("itemId")
+    const items = await Item.find({ currentOwner: userId }).lean();
+
+    const itemIds = items.map(i => i._id);
+
+    const histories = await ItemHistory.find({
+      itemId: { $in: itemIds }
+    })
       .sort({ createdAt: -1 })
       .lean();
 
-    const latest = this.getLatestCheckoutRows(
-      histories,
-      r => r.itemId?._id?.toString()
-    );
+    return items.map(item => {
+      const history = histories.find(h =>
+        h.createdAt.toString() === item._id.toString()
+      );
 
-    return latest.map(r => ({
-      id: r._id.toString(),
-      userId: r.userId.toString(),
-      itemId: r.itemId._id.toString(),
-      action: r.action,
-      duration: r.duration,
-      createdAt: r.createdAt,
+      return {
+        id: item._id.toString(),
 
-      referenceUrl: r.referenceLink ?? null,
+        item: this.mapItem(item),
 
-      item: {
-        id: r.itemId._id.toString(),
-        name: r.itemId.name,
-        serial: r.itemId.serial,
-        model: r.itemId.model,
-        brand: r.itemId.brand,
-        category: r.itemId.category,
-        sub_category: r.itemId.sub_category,
-        status: r.itemId.status,
-        description: r.itemId.description,
-        dateAcquired: r.itemId.date_acquired,
-        imageAlt: r.itemId.image_alt,
-        imageUrl: this.getImageUrl(r.itemId.image_name),
-      },
-    }));
+        lastHistory: history
+          ? this.mapItemHistory(history)
+          : null
+      };
+    });
   }
-
-  async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
-		const item = await Item.findById(itemId);
-		if (!item) throw new Error("Item not found");
-
-		const admin = await User.findById(adminId);
-		if (!admin || admin.role !== "Admin") {
-			throw new Error("Unauthorized");
-		}
-
-		if (!["checkout", "checkin"].includes(action)) {
-			throw new Error("Invalid action");
-		}
-
-		
-		// business rule check (same as normal flow)
-		if (action === "checkout") {
-			const existing = await ItemHistory.findOne({
-			itemId,
-			returnedAt: null,
-			});
-
-			if (existing) {
-				if (existing.userId.toString() === targetUserId.toString()) {
-					throw new Error("User already owns this item");
-				}
-
-				throw new Error("Item is already checked out");
-			}
-		}
-
-		const history = await ItemHistory.create({
-			itemId,
-			userId: targetUserId,  
-			action,
-			duration: options.duration ?? null,
-			referenceLink: options.referenceLink ?? null,
-			createdAt: new Date(),
-			returnedAt: action === "checkin" ? new Date() : null,
-		});
-
-		// sync item status (same logic as normal flow)
-		await this.setItemStatus(
-			itemId,
-			action === "checkout" ? "In-Use" : "Available"
-		);
-
-		return history;
-	}
 
   // =========================
   // API KEYS
@@ -382,7 +340,7 @@ class MongoProvider extends DatabaseProvider {
     const apiKey = await ApiKey.create({
       key: keyValue,
       name: data?.name ?? null,
-      adminId,
+      adminId: adminId,
       revoked: false,
       createdAt: new Date(),
     });
@@ -401,6 +359,7 @@ class MongoProvider extends DatabaseProvider {
   async revokeApiKey(adminId, id) {
     const admin = await User.findById(adminId);
 
+    // ----------------------------------------------------- move this check to service later
     if (!admin || admin.role !== "Admin") {
       throw new Error("Only admins can revoke keys");
     }

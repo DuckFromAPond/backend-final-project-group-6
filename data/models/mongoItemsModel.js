@@ -28,6 +28,12 @@ const ItemSchema = new mongoose.Schema({
     default: "Available"
   },
 
+  currentOwner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null
+  },
+
   dateAcquired: Date,
   description: String,
 

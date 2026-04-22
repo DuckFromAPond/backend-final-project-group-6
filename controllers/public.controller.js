@@ -6,6 +6,7 @@ const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require('../data/data');
 const { getDbProvider } = require("../utils/dbProviderShared");
+const itemService = require("../services/itemService"); 
 
 // this data might be important (remove later) 
 const itemData = {
@@ -186,22 +187,27 @@ exports.addItem = async (req, res, next) => {
         });
       });
 
-      // extract fields
-      const name = fields.name?.[0] ?? '';
-      const description = fields.description?.[0] ?? '';
-      const brand = fields.brand?.[0] ?? '';
-      const model = fields.model?.[0] ?? '';
-      const category = fields.category?.[0] ?? '';
-      const sub_category = fields.subcategory?.[0] ?? '';
-      const serial = fields.serial?.[0] ?? '';
-      const status = fields.status?.[0] ?? '';
-      const date_acquired = fields.dateAcquired?.[0] ?? new Date();
+        // extract fields
+        const name = fields.name?.[0] ?? '';
+        const description = fields.description?.[0] ?? '';
+        const brand = fields.brand?.[0] ?? '';
+        const model = fields.model?.[0] ?? '';
+        const category = fields.category?.[0] ?? '';
+        const subCategory = fields.subcategory?.[0] ?? '';
+        const serial = fields.serial?.[0] ?? '';
+        const status = fields.status?.[0] ?? '';
+        const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
-      // upload file 
-      let filePath = null;
-      let fileName = null;
+        const existing = await db.getItemBySerial(serial);
 
-      // console.log(files)
+        if (existing) {
+          return res.redirect("/items?error=Serial+already+exists");
+        }
+
+        // upload file 
+        let filePath = null;
+        let fileName = null;
+        let fileId = null;
 
       if (files?.image?.length > 0) {
         const file = files.image[0];
@@ -216,30 +222,30 @@ exports.addItem = async (req, res, next) => {
         fileName = `${Date.now()}_${file.originalFilename}`;
         filePath = `${fileName}`;
 
-        await db.uploadItem(filePath, fileBuffer, true);
-      }
+          fileId = await db.uploadItem(filePath, fileBuffer);
+        }
 
-      const newItem = {
-          name,
-          description,
-          brand,
-          model,
-          category,
-          sub_category,
-          serial,
-          status,
-          date_acquired,
-          image_name: fileName,
-          image_alt: image_alt || `Image of ${name}`,
-      };
+        const newItem = {
+            name,
+            description,
+            brand,
+            model,
+            category,
+            subCategory,
+            serial,
+            status,
+            dateAcquired,
+            imageName: fileId || fileName,
+            imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
+        };
 
       await db.createItem(newItem);
 
-      return res.redirect("/items?success=Item+added+successfully");
-  }
-  catch (err) {
-    next(err);
-  }
+        return res.redirect("/items?success=Item+added+successfully");
+    }
+    catch (err) {
+      next(err);
+    }
 }
 
 exports.showItemDetail = async (req, res) => {
@@ -517,8 +523,6 @@ exports.checkIn = async (req, res, next) => {
 
 exports.checkOut = async (req, res, next) => {
   try {
-    const db = getDbProvider();
-
     const { fields, files } = await new Promise((resolve, reject) => {
       const form = new multiparty.Form();
 
@@ -532,46 +536,29 @@ exports.checkOut = async (req, res, next) => {
     const duration = fields.duration?.[0];
     const userId = req.user.id;
 
-    const item = await db.getItemById(itemId);
-
-    if (!item) {
-      return res.redirect("/items?error=Item+not+found");
-    }
-
-    if (item.status !== "Available" || ["Maintenance", "Retired"].includes(item.status)) {
-      return res.redirect("/items?error=Item+not+available");
-    }
-
     let filePath = null;
 
-    if (files?.document?.length > 0 && db.providerLabel === "Supabase") {
+    if (files?.document?.length > 0) {
       const file = files.document[0];
-      const MAX_SIZE = 50 * 1024 * 1024;
 
-      if (file.size > MAX_SIZE) {
-        return res.redirect("/items?error=File+too+large+(max+50MB)");
+      if (db.providerLabel === "Supabase") {
+        const MAX_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+50MB)");
+        }
       }
 
       const fileBuffer = fs.readFileSync(file.path);
       const fileName = `${Date.now()}_${file.originalFilename}`;
 
       filePath = await db.uploadFile(fileName, fileBuffer);
-    } else {
-      const file = files.document[0];
-
-      const fileBuffer = fs.readFileSync(file.path);
-      const fileName = `${Date.now()}_${file.originalFilename}`;
-
-      filePath = await db.uploadFile(fileName, fileBuffer);
     }
 
-    await db.updateItem(itemId, { status: "In-Use" });
-
-    await db.addItemHistory(itemId, {
+    await itemService.checkoutItem({
+      itemId,
       userId,
-      action: "checkout",
-      duration: duration ?? null,
-      referenceLink: filePath,
+      duration,
+      referenceLink: filePath
     });
 
     return res.redirect("/owned");
@@ -605,9 +592,10 @@ exports.showOwned = async (req, res, next) => {
       }
 
       const created = row.createdAt ? new Date(row.createdAt) : null;
-
+      console.log(row.referenceUrl)
       return {
-        id: row.itemId, 
+        id: row.item_id, 
+        referenceUrl: row.referenceUrl,
         name: row.item.name,
         createdAt: created.toISOString().split("T")[0],
         dueDate: dueDate ? dueDate.toISOString().split("T")[0] : null,

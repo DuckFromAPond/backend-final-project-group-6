@@ -172,9 +172,17 @@ apiApp.use(apiRoutes);
 
 // ------ Main app ------
 const app = express();
+app.engine('handlebars', engine({
+  extname: '.handlebars',
+  layoutsDir: path.join(__dirname, 'views/layouts'),
+  partialsDir: path.join(__dirname, 'views/partials'),
+  helpers: hbsHelpers,
+}));
 
-// safety
-app.disable("x-powered-by");
+app.set('view engine', 'handlebars');
+app.set('views', path.join(__dirname, 'views'));
+// safety 
+app.disable('x-powered-by');
 
 // Morgan logging
 if (config.NODE_ENV === "production") {
@@ -192,6 +200,7 @@ app.use((error, req, res, next) => {
   console.error(error);
 
   return res.status(500).render("extra_pages/500", {
+    layout: 'no_nav_bar',
     pageTitle: "500",
     message: error.message || "Internal Server Error",
   });
@@ -201,13 +210,57 @@ async function startServer() {
   try {
     dbProvider = await createDatabaseProvider();
     setDbProvider(dbProvider);
-    console.log(`Connected to ${dbProvider.providerLabel} database provider`);
+    console.log(`Connected to ${dbProvider.providerKey} database provider`);
+
+    // for getting img on the mongo side
+    if (dbProvider.providerKey === "mongodb") {
+      app.get("/files/items/:id", (req, res) => {
+        try {
+          const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+          const stream = dbProvider.itemsBucket.openDownloadStream(fileId);
+
+          stream.on("error", () => {
+            return res.status(404).send("Image not found");
+          });
+
+          res.setHeader("Content-Type", "image/*");
+
+          stream.pipe(res);
+        } catch (err) {
+          res.status(400).send("Invalid file id");
+        }
+      });
+
+      app.get("/files/docs/:id", (req, res) => {
+        try {
+          const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+          const stream = dbProvider.getDocumentStream(fileId);
+
+          stream.on("error", () => {
+            res.status(404).send("File not found");
+          });
+
+          stream.pipe(res);
+        } catch (err) {
+          res.status(500).send("Server error");
+        }
+      });
+    }
 
     app.listen(config.PORT, () => {
-      console.log(`Using ${config.NODE_ENV} environment`);
-      console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
-      console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
-      console.log(`Database provider: ${dbProvider.providerLabel}`);
+      if (config.NODE_ENV === "development") {
+        console.log(`Using ${config.NODE_ENV} environment`);
+        console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
+        console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
+        console.log(`Database provider: ${dbProvider.providerLabel}`);
+      } else {
+        console.log(`Using ${config.NODE_ENV} environment`);
+        console.log(`  Public : http://${config.BASE_URL}`);
+        console.log(`  Admin  : http://admin.${config.BASE_URL}`);
+        console.log(`Database provider: ${dbProvider.providerLabel}`);
+      }
     });
   } catch (error) {
     if (error && error.message) {
