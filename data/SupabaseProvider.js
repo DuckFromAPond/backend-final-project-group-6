@@ -110,9 +110,32 @@ class SupabaseProvider extends DatabaseProvider {
       .from(SUPABASE_TABLES.API_KEYS)
       .select("id")
       .limit(1);
-
-    if (apiError) throw new Error("API keys table missing");
   }
+  
+	async getFile(bucket, id) {
+		if (!id) return null;
+
+		let targetBucket;
+
+		if (bucket === "items") {
+			targetBucket = "items-bucket";
+		} else if (bucket === "docs") {
+			targetBucket = "docs-bucket";
+		} else {
+			return null;
+		}
+
+		const { data } = this.supabase.storage
+			.from(targetBucket)
+			.getPublicUrl(id);
+
+		if (!data?.publicUrl) return null;
+
+		return {
+			type: "url",
+			data: data.publicUrl
+		};
+	}
 
   // ===== USER =====
   async registerUser(email, password, name, role) {
@@ -539,11 +562,15 @@ class SupabaseProvider extends DatabaseProvider {
   async createApiKey(adminId, data) {
     const keyValue = crypto.randomBytes(32).toString("hex");
 
+    // hash the key for secure storage (Requirement 4.3)
+    const salt = await bcryptjs.genSalt(10);
+    const hashedKey = await bcryptjs.hash(keyValue, salt);
+
     const { data: inserted, error } = await this.supabase
       .from("api_keys")
       .insert([
         {
-          key: keyValue,
+          hashedKey: hashedKey,
           name: data?.name ?? null,
           adminId: adminId,
           revoked: false,
@@ -569,11 +596,11 @@ class SupabaseProvider extends DatabaseProvider {
     return data.map(mapApiKeyRowToModel);
   }
 
-  async getApiKeyByKey(key) {
+  async getApiKeyByKey(hashedKey) {
     const { data, error } = await this.supabase
       .from(SUPABASE_TABLES.API_KEYS)
       .select("*")
-      .eq("key", key)
+      .eq("hashedKey", hashedKey)
       .eq("revoked", false)
       .maybeSingle();
 

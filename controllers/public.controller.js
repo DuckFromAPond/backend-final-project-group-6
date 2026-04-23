@@ -92,33 +92,43 @@ exports.showItems = async (req, res) => {
   let page = req.query.page;
   const pageSize = 10; // items to show per page
 
-  // manually add categories
-  const categories = [
-    { name: "Peripherals", subCategories: [
-      { name: "Monitor" },
-      { name: "Keyboard" },
-      { name: "Mouse" },
-      { name: "Scanner" },
-      { name: "Printer" },
-    ] },
-    { name: "Computers", subCategories: [
-      { name: "Laptop" },
-      { name: "Desktop" },
-      { name: "Server" },
-    ] },
-  ];
-
   // append query parameters to URL
   let url = "/items?";
 
   // get all items from DB
   let items = await db.getItems();
 
+  items = items.filter(item => item.status !== "Retired");
+
+  items = items.map(item => {
+  if (!item.image) return item;
+
+  // Mongo (GridFS)
+  if (db.providerKey === "mongodb") {
+    item.imageUrl = `/api/files/items/${item.image}`;
+  }
+
+  // Supabase
+  if (db.providerKey === "mongodb") {
+    item.imageUrl = dbProvider.getImageUrl(item.image);
+  }
+
+  return item;
+  });
+  
+  // derive categories dynamically
+  const categories = [
+    ...new Set(items.map(item => item.category))
+  ].map(name => ({ name }));
   // filter by subcategory
   if(subcat) {
     url += `subcat=${subcat}&`;
     items = items.filter((item) => item.subCategory === subcat);
   }
+
+  const subCategories = [
+    ...new Set(items.map(item => item.subCategories))
+  ].map(name => ({ name }));
 
   // filter by category
   if (cat) {
@@ -670,16 +680,3 @@ exports.notFound = (req, res) => {
     pageTitle: "404",
   });
 };
-
-// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT
-
-// middle-ware to render 404 (bad)
-// app.use((req, res, next) => {
-//   const publicRoutes = ["/", "/login", "/register"];
-//   // If it's a known public route, let it pass to the gate or routes
-//   if (publicRoutes.includes(req.path)) {
-//     return next();
-//   }
-//   // Otherwise, it's a dead end—render 404 now!
-//   // res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
-// });

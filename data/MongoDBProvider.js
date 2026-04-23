@@ -136,43 +136,60 @@ class MongoProvider extends DatabaseProvider {
     };
   }
 
-  getImageStream(fileId) {
+  getImageStream(imageName) {
     return this.itemsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId),
+      new mongoose.Types.ObjectId(imageName)
     );
   }
 
-  getDocumentStream(fileId) {
+  getDocumentStream(imageName) {
     return this.docsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId),
+      new mongoose.Types.ObjectId(imageName)
     );
   }
 
-  getLatestCheckoutRows(rows, getItemId) {
-    const latestMap = new Map();
+  getImageUrl(imageName) {
+    if (!imageName) return null;
 
-    for (const row of rows) {
-      const itemId = getItemId(row);
-      if (!itemId) continue;
+    return `${config.BASE_URL}/api/files/items/${imageName}`;
+  }
 
-      if (!latestMap.has(itemId)) {
-        latestMap.set(itemId, row);
-      }
+  getDocumentUrl(imageName) {
+    if (!imageName) return null;
+
+    return `${config.BASE_URL}/api/files/docs/${imageName}`;
+  }
+  
+  
+  async getFile(bucket, id) {
+    const valid = mongoose.Types.ObjectId.isValid(id);
+    if (!valid) return null;
+
+    let gridBucket;
+
+    if (bucket === "items") {
+      gridBucket = this.itemsBucket;
+    } else if (bucket === "docs") {
+      gridBucket = this.docsBucket;
+    } else {
+      return null;
     }
 
-    return [...latestMap.values()].filter((r) => r.action === "checkout");
-  }
+    const file = await mongoose.connection.db
+      .collection(`${bucket}.files`)
+      .findOne({ _id: new mongoose.Types.ObjectId(id) });
 
-  getImageUrl(fileId) {
-    if (!fileId) return null;
+    if (!file) return null;
 
-    return `${config.BASE_URL}/files/items/${fileId}`;
-  }
+    const stream = gridBucket.openDownloadStream(
+      new mongoose.Types.ObjectId(id)
+    );
 
-  getDocumentUrl(fileId) {
-    if (!fileId) return null;
-
-    return `${config.BASE_URL}/files/docs/${fileId}`;
+    return {
+      type: "stream",
+      data: stream,
+      contentType: file.contentType
+    };
   }
 
   // ===== USER =====

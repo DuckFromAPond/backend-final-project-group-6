@@ -12,7 +12,7 @@ router.get("/", protect, publicController.home);
 router.get("/home", protect, publicController.home);
 
 // CRUD (missing integration)
-router.get("/items", protect, publicController.showItems); // setting up apikey early
+router.get("/items", protect, publicController.showItems);
 router.get("/items/:id", protect, publicController.showItemDetail);
 router.get("/items/:id/history", protect, publicController.showItemHistory);
 
@@ -69,8 +69,6 @@ router.post(
   requireRole("Admin"),
   keyController.handleRevokeKey,
 );
-
-module.exports = router;
 
 // autorender can go down here if want to add later
 

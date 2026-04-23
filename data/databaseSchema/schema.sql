@@ -56,7 +56,7 @@ CREATE TABLE item_histories (
 -- =========================
 CREATE TABLE api_keys (
     id SERIAL PRIMARY KEY,
-    key TEXT UNIQUE NOT NULL,
+    hashKey TEXT UNIQUE NOT NULL,
     name TEXT,
     adminId INTEGER NOT NULL REFERENCES users(id),
     createdAt TIMESTAMP DEFAULT NOW(),
