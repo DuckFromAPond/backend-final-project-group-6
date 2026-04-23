@@ -1,7 +1,9 @@
 "use strict"; // for debugging
 const mongoose = require("mongoose");
 const express = require("express");
+
 const vhost = require("vhost");
+
 const { engine } = require("express-handlebars");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
@@ -98,13 +100,6 @@ publicApp.use(express.json());
 
 // Morgan logging
 // publicApp.use(morgan('dev'));
-
-// replace this for db + bucket --------------------------------------------- remove later I assume
-// const uploadsDir = path.join(__dirname, 'public', 'images');
-// if (!fs.existsSync(uploadsDir)) {
-//     fs.mkdirSync(uploadsDir, { recursive: true });
-//     console.log(`✓ Created uploads directory at ${uploadsDir}`);
-// }
 
 // temp (will change when nav is finalized)
 publicApp.use((req, res, next) => {
@@ -209,7 +204,6 @@ if (config.NODE_ENV === "production") {
   app.use(morgan("dev"));
 }
 
-app.use(vhost("admin." + config.DOMAIN, adminApp)); // admin subdomain first
 app.use("/api", apiApp);
 app.use(publicApp); // fallback → public app
 

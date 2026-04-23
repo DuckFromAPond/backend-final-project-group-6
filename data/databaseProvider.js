@@ -37,7 +37,7 @@ class DatabaseProvider {
 	// ===== API KEYS ===== (need to add to auth middleware/auth controller/admin controller later)
 	async createApiKey(adminId, data) {throw new Error("missing implementation");}        			// for admin 
 	async getApiKeys() {throw new Error("missing implementation");}              						// for admin
-	async getApiKeyByKey(key) {throw new Error("missing implementation");}       						// for middleware
+	async getApiKeyByKey(hashedKey) {throw new Error("missing implementation");}       						// for middleware
 	async revokeApiKey(adminId, id) {throw new Error("missing implementation");}          			// for admin
 
 	// add more database manip or func here if want 

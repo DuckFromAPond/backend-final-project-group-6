@@ -83,7 +83,7 @@ function mapApiKeyRowToModel(row) {
 function mapCategoryRowToModel(row) {
   return {
     id: toIdString(row.id),
-    key: row.key,
+	hashKey: row.hashKey,
     name: row.name,
 	adminId: row.adminId,
     createdAt: row.createdAt,
