@@ -69,7 +69,7 @@ const corsOptions = {
         }
     }
 };
-app.use(cors(corsOptions));
+app.use('/api', cors(corsOptions));
 
 // Morgan logging
 app.use(morgan('dev'));
