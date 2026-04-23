@@ -1,9 +1,16 @@
-<div class="min-h-screen flex flex-col items-center bg-gray-100 p-6">
-  <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-6">
+{{!-- 
+
+    NOTE: THIS SHOULD ONLY BE EXCLUSIVE TO ADMIN ACCOUNTS 
+
+ --}}
+
+<div class="flex flex-col items-center p-6">
+  <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-6 ">
     
     <h1 class="text-2xl font-bold mb-6 text-center">Users List</h1>
 
-    <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="min-w-full border border-gray-200 rounded-lg">
       <thead class="bg-blue-500 text-white">
         <tr>
           <th class="px-4 py-2 text-left">ID</th>
@@ -16,15 +23,38 @@
       <tbody>
         {{#each users}}
           <tr class="border-b hover:bg-gray-50">
-            <td class="px-4 py-2">{{this.id}}</td>
+            <td class="px-4 py-2 font-mono text-xs">{{this.id}}</td>
             <td class="px-4 py-2">{{this.name}}</td>
             <td class="px-4 py-2">{{this.email}}</td>
-            <td class="px-4 py-2">{{this.role}}</td>
-            <td class="px-4 py-2">{{this.status}}</td>
+            
+            <td class="px-4 py-2">
+              <form action="/users/{{this.id}}/role" method="POST" class="flex items-center gap-2">
+                <select name="role" onchange="this.form.submit()" class="border rounded px-2 py-1 text-sm bg-white">
+                  <option value="Technician" {{#if (eq this.role "Technician")}}selected{{/if}}>Technician</option>
+                  <option value="Admin" {{#if (eq this.role "Admin")}}selected{{/if}}>Admin</option>
+                </select>
+              </form>
+            </td>
+
+            <td class="px-4 py-2">
+              <form action="/users/{{this.id}}/status" method="POST">
+                {{#if (eq this.status "Active")}}
+                  <input type="hidden" name="status" value="Disabled">
+                  <button type="submit" class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-red-200 transition">
+                    Active
+                  </button>
+                {{else}}
+                  <input type="hidden" name="status" value="Active">
+                  <button type="submit" class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-200 transition">
+                    Disabled
+                  </button>
+                {{/if}}
+              </form>
+            </td>
           </tr>
         {{/each}}
       </tbody>
     </table>
-
+    </div>
   </div>
 </div>

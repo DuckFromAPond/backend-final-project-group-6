@@ -1,0 +1,37 @@
+{{!--  FILE: views/404.handlebars --}}
+
+<section class="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
+
+  {{!-- error code --}}
+  <div class="text-6xl font-bold text-gray-300">
+    404
+  </div>
+
+  {{!-- title --}}
+  <h1 class="text-2xl font-semibold text-gray-800 mt-4">
+    Page Not Found
+  </h1>
+
+  {{!-- message --}}
+  <p class="text-gray-500 mt-2 max-w-md">
+    {{#if message}}
+      {{message}}
+    {{else}}
+      The page you are looking for does not exist or has been moved.
+    {{/if}}
+  </p>
+
+  <!-- Actions -->
+  <div class="mt-6 flex gap-3">
+    <a href="/"
+       class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+      Go Home →
+    </a>
+
+    <a href="/items"
+       class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-300 transition">
+      View Items
+    </a>
+  </div>
+
+</section>

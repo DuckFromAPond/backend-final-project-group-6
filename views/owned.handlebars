@@ -1,0 +1,130 @@
+{{!-- 
+
+SHOWS CURRENTLY OWNED ITEMS  
+
+--}}
+
+{{!-- style later --}}
+<div class="flex flex-col items-center p-6 ">
+    {{!-- header --}}
+    <div class="w-full max-w-6xl mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Owned Items</h1>
+        <p class="text-gray-500 mt-1">Items currently checked out to you</p>
+    </div>
+
+    <div class="w-full max-w-6xl overflow-hidden rounded-2xl shadow-lg bg-white">
+        <table class="w-full text-left">
+
+            {{!-- table header --}}
+            <thead class="bg-blue-500/50 text-black text-xs uppercase tracking-wider border-b border-gray-400">
+                <tr>
+                    <th class="p-4 border-r border-gray-400">ID</th>
+                    <th class="p-4 border-r border-gray-400">Item</th>
+                    <th class="p-4 border-r border-gray-400">Date Received</th>
+                    <th class="p-4 border-r border-gray-400">Return Date</th>
+                    <th class="p-4 border-r border-gray-400">Status</th>
+                    <th class="p-4">Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {{#if items.length}}
+                    {{#each items}}
+                    <tr class="border-t border-gray-400 hover:bg-gray-100 transition">
+
+                        {{!-- ID --}}
+                        <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">
+                            {{this.id}}
+                        </td>
+
+                        {{!-- NAME --}}
+                        <td class="p-4 border-r border-gray-400">
+                            <a href="/items/{{this.id}}" class="font-medium text-blue-600 hover:underline">
+                                {{this.name}}
+                            </a>
+                        </td>
+
+                        <!-- RECEIVED -->
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.createdAt}}
+                                {{this.createdAt}}
+                            {{else}}
+                                <span class="text-gray-400">No data</span>
+                            {{/if}}
+                        </td>
+
+                        <!-- DUE -->
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.dueDate}}
+                                {{this.dueDate}}
+                            {{else}}
+                                <span class="text-gray-400">Not set</span>
+                            {{/if}}
+                        </td>
+
+                        <!-- Status -->
+                        <td class="p-4 border-r border-gray-400">
+                            {{#if (eq this.status "overdue")}}
+                                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800">
+                                    Overdue
+                                </span>
+                            {{else if (eq this.status "active")}}
+                                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                    Active
+                                </span>
+                            {{else}}
+                                <span class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-800">
+                                    Unknown
+                                </span>
+                            {{/if}}
+                        </td>
+
+                        <!-- Action -->
+                        <td class="p-4">
+                            <button
+                                type="button"
+                                onclick="openForm('{{this.id}}')"
+                                class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 rounded-lg transition shadow-sm"
+                            >
+                                Check In
+                            </button>
+                        </td>
+
+                    </tr>
+                    {{/each}}
+                {{else}}
+                    <tr>
+                        <td colspan="6" class="p-6 text-center text-gray-400">
+                            No currently owned items
+                        </td>
+                    </tr>
+                {{/if}}
+            </tbody>
+
+        </table>
+    </div>
+
+    {{!-- HIDDEN FORM PAGE --}}
+    <div id="modal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeForm()">
+        {{!-- make closeform only work for background --}}
+        <div onclick="event.stopPropagation()">     
+            {{> form title="Check-in" action="checkin"}}
+        </div>
+    </div>
+
+    <script>
+        function openForm(id) {
+            document.getElementById("modal").classList.remove("hidden");
+
+            document.getElementById("file_item").value = id;
+        }
+
+        function closeForm() {
+            document.getElementById("modal").classList.add("hidden");
+        }
+        
+        function setDuration(hours) {
+            document.getElementById("duration").value = hours;
+        }
+    </script>
+</div>

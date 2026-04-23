@@ -1,411 +1,276 @@
-const express = require('express')
-const { engine } = require('express-handlebars')
-require('dotenv').config()
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
-const multiparty = require('multiparty');
-const { randomUUID } = require('crypto');
+"use strict"; // for debugging
 
-const PORT = process.env.PORT || 3000;
+const express = require("express");
+const vhost = require("vhost");
+const { engine } = require("express-handlebars");
+const cookieParser = require("cookie-parser");
+const path = require("path");
+const morgan = require("morgan");
+const cors = require("cors");
+const fs = require("fs");
+const multiparty = require("multiparty");
+const { randomUUID } = require("crypto");
 
-const app = express();
+const { protect } = require("./middleware/authMiddleware");
 
-// configurations for app
-app.engine(
+const { setDbProvider } = require("./utils/dbProviderShared");
+
+const config = require("./config/app.config");
+const authRoutes = require("./routes/auth.routes");
+const publicRoutes = require("./routes/public.routes");
+const adminRoutes = require("./routes/admin.routes");
+const apiRoutes = require("./routes/api.routes");
+
+const createDatabaseProvider = require("./utils/createDBProvider");
+
+// fix for nodeJS v22.22 not being able to connect to mongoDB
+const dns = require("node:dns/promises");
+dns.setServers(["1.1.1.1", "1.0.0.1"]);
+
+let dbProvider;
+
+// HELPERS ───────────────────────────────────
+const hbsHelpers = {
+    // section set up (prob not needed)
+    section: function (name, options) {
+        if (!this._sections) this._sections = {};
+        this._sections[name] = options.fn(this);
+        return null;
+    },
+    // if contain string
+    ifContains: function (container, stringToFind, options) {
+        if (container && container.includes(stringToFind)) {
+            return options.fn(this);
+        }
+        return options.inverse(this);
+    },
+    eq: (a, b) => a === b,
+    formatDate: (date) => new Date(date).toISOString().split('T')[0], // return YYYY-MM-DD
+    json: (context) => JSON.stringify(context),
+}
+
+
+// CORS configuration
+const whitelist = new Set([
+  `http://localhost:${config.PORT}`,
+  `http://admin.localhost:${config.PORT}`,
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "https://websitename.com", // <--------------------------- change when host on cloudflare later btw
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow Postman / server-to-server
+    if (!origin) return callback(null, true);
+
+    if (whitelist.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+// configurations for public app ───────────────────────────────────
+const publicApp = express();
+publicApp.engine(
   "handlebars",
   engine({
     defaultLayout: "main",
-    partialsDir: __dirname + "/views/partials",
-    helpers: {
-        section: function (name, options) {
-            if (!this._sections) this._sections = {}
-            this._sections[name] = options.fn(this)
-            return null
-        },
-        ifContains: function (container, stringToFind, options) {
-            if (container && container.includes(stringToFind)) {
-                return options.fn(this)
-            }
-            return options.inverse(this)
-        },
-        isActive: function (page, currentPage, options) {
-          return page === currentPage
-            ? "text-blue-500 font-semibold"
-            : "text-gray-700 hover:text-blue-500";
-        },
-    }
-}))
-app.set('view engine', 'handlebars')
-app.set('views', __dirname + '/views')
+    layoutsDir: path.join(__dirname, "views/layouts"),
+    partialsDir: path.join(__dirname, "views/partials"),
+    helpers: hbsHelpers,
+  }),
+);
+publicApp.set("view engine", "handlebars");
+publicApp.set("views", path.join(__dirname, "views"));
 
-// middleware
-app.use(express.static(__dirname + "/public"));
-app.use(express.urlencoded({ extended: true })); // for forms (login/register)
-
-// Rate limiting configuration
-option = {
-    windowMs: 1 * 60 * 1000, // 1 minutes
-    max: 20, // limit each IP to 20 requests
-    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after 1 minutes'
-}
-app.use(rateLimit(option));
-
-// CORS configuration
-const whitelist = [
-    `http://localhost:${PORT}`,
-];
-const corsOptions = {
-    origin: (origin, callback) => {
-        // !origin allows server-to-server or tools like Postman/Curl
-        if (!origin || whitelist.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    }
-};
-app.use('/api', cors(corsOptions));
+// middleware ───────────────────────────────────
+publicApp.use(cors(corsOptions));
+publicApp.use(cookieParser());
+publicApp.use(express.static(path.join(__dirname, "public")));
+publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
+publicApp.use(express.json());
 
 // Morgan logging
-app.use(morgan('dev'));
+// publicApp.use(morgan('dev'));
 
-// replace this for db + bucket
-const uploadsDir = path.join(__dirname, 'public', 'images');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log(`✓ Created uploads directory at ${uploadsDir}`);
+// replace this for db + bucket --------------------------------------------- remove later I assume
+// const uploadsDir = path.join(__dirname, 'public', 'images');
+// if (!fs.existsSync(uploadsDir)) {
+//     fs.mkdirSync(uploadsDir, { recursive: true });
+//     console.log(`✓ Created uploads directory at ${uploadsDir}`);
+// }
+
+// temp (will change when nav is finalized)
+publicApp.use((req, res, next) => {
+  const pathName = req.path;
+
+  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
+  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
+  res.locals.navCheckin = pathName.startsWith("/owned");
+  res.locals.navReport = pathName.startsWith("/report");
+  res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
+
+  res.locals.config = config;
+  next();
+});
+
+publicApp.use("/", authRoutes);
+publicApp.use("/", publicRoutes);
+
+// ------ adminApp ------
+const adminApp = express();
+
+adminApp.engine(
+  "handlebars",
+  engine({
+    defaultLayout: "main",
+    extname: ".handlebars",
+    layoutsDir: path.join(__dirname, "views/layouts"),
+    partialsDir: path.join(__dirname, "views/partials"),
+    helpers: hbsHelpers,
+  }),
+);
+
+adminApp.set("view engine", "handlebars");
+adminApp.set("views", path.join(__dirname, "views"));
+
+// adminApp middleware
+adminApp.use(cors(corsOptions));
+adminApp.use(express.urlencoded({ extended: false }));
+adminApp.use(express.static(path.join(__dirname, "public")));
+adminApp.use(cookieParser());
+
+// temp (will change when nav is finalized)
+adminApp.use((req, res, next) => {
+  const pathName = req.path;
+
+  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
+  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
+  res.locals.navCheckin = pathName.startsWith("/owned");
+  res.locals.navReport = pathName.startsWith("/report");
+  res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
+
+  res.locals.config = config;
+  next();
+});
+
+adminApp.use("/", authRoutes);
+adminApp.use("/", adminRoutes);
+
+// ---------- API -----------------
+const apiApp = express();
+apiApp.use(cors(corsOptions));
+apiApp.use(express.json());
+apiApp.use(express.urlencoded({ extended: false }));
+apiApp.use(cookieParser());
+apiApp.use(apiRoutes);
+
+// ------ Main app ------
+const app = express();
+app.engine('handlebars', engine({
+  extname: '.handlebars',
+  layoutsDir: path.join(__dirname, 'views/layouts'),
+  partialsDir: path.join(__dirname, 'views/partials'),
+  helpers: hbsHelpers,
+}));
+
+app.set('view engine', 'handlebars');
+app.set('views', path.join(__dirname, 'views'));
+// safety 
+app.disable('x-powered-by');
+
+// Morgan logging
+if (config.NODE_ENV === "production") {
+  app.use(morgan("combined"));
+} else {
+  app.use(morgan("dev"));
 }
 
-const itemData = {
-    categories: [
-        { name: 'Computers', subCategories: []},
-        { name: 'Peripherals', subCategories: []},
-    ],
-    //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-    items: [
-        { id: 1, name: 'item 1', serial: 'serial 1', model: 'model 1', brand: 'brand 1', category: 'Computers', status: 'Available', dateAcquired: '2022-01-01', description: 'item 1 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 1 image' },
-        { id: 2, name: 'item 2', serial: 'serial 2', model: 'model 2', brand: 'brand 2', category: 'Computers', status: 'In-Use', dateAcquired: '2022-02-02', description: 'item 2 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 2 image' },
-        { id: 3, name: 'item 3', serial: 'serial 3', model: 'model 3', brand: 'brand 3', category: 'Peripherals', status: 'Maintenance', dateAcquired: '2022-03-03', description: 'item 3 description', imagePath: '/images/placeholder.jpg', imageAlt: 'item 3 image' }
-    ],
-    itemHistories: [
-        {
-            id: 1,
-            histories: [
-                { assignee: 'assignee 1', duration: 'duration 1', referenceLink: 'reference link 1' }
-            ]
-        },
-        {
-            id: 2,
-            histories: [
-                { assignee: 'assignee 2', duration: 'duration 2', referenceLink: 'reference link 2' }
-            ]
-        },
-        {
-            id: 3,
-            histories: [
-                { assignee: 'assignee 3', duration: 'duration 3', referenceLink: 'reference link 3' }
-            ]
-        }
-    ]
-}
+app.use(vhost("admin." + config.DOMAIN, adminApp)); // admin subdomain first
+app.use("/api", apiApp);
+app.use(publicApp); // fallback → public app
 
-// routes
-app.get('/items', (req, res) => {
-    const { cat, q } = req.query
-
-    let context = {
-      categories: itemData.categories,
-      items: itemData.items
-    }
-
-    if(itemData.categories.find(category => category.name === cat)) {
-        context = {
-            categories: itemData.categories,
-            items: itemData.items.filter(item => item.category === cat)
-        }
-    }
-
-    let searchedItem;
-    if(q) {
-      searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
-    }
-
-    if(searchedItem) {
-      context = {
-          ...context,
-          items: [searchedItem],
-      }
-    }
-
-    res.render('items', context)
-})
-
-app.post('/items', (req, res) => {
-  try {
-    const form = new multiparty.Form();
-
-    let uploadedFilePath = null;
-
-    form.parse(req, (error, fields, files) => {
-      if (error) {
-        console.error('❌ Form parsing error:', err);
-        return res.status(400).json({
-          type: 'error',
-          message: 'Error parsing the form. Please try again.',
-        });
-      }
-
-      // extract fields
-      const name = fields.name?.[0] ?? '';
-      const description = fields.description?.[0] ?? '';
-      const brand = fields.brand?.[0] ?? '';
-      const model = fields.model?.[0] ?? '';
-      const category = fields.category?.[0] ?? '';
-      const uploadedFile = files.image ? files.image : null;
-      
-      if (!uploadedFile || uploadedFile.length === 0) {
-        console.warn('⚠️  No file was selected for upload');
-        console.debug('📊 Debug - files object:', Object.keys(files));
-        return res.status(400).json({
-          type: 'error',
-          message: 'No file was selected. Please choose an image file.',
-        });
-      }
-
-      const file = uploadedFile[0];
-      const originalFileName = file.originalFilename;
-      const tempFilePath = file.path;
-
-      const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-      const fileExtension = path.extname(originalFileName).toLowerCase();
-
-      if (!allowedExtensions.includes(fileExtension)) {
-        console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-        // Clean up the temporary file
-        fs.unlinkSync(tempFilePath);
-        return res.status(400).json({
-          type: 'error',
-          message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-        });
-      }
-
-      const timestamp = Date.now();
-      const fileName = `${timestamp}_${originalFileName}`;
-      const finalFilePath = path.join(uploadsDir, fileName);
-
-      try {
-        fs.copyFileSync(tempFilePath, finalFilePath);
-        // Delete the temporary file
-        fs.unlinkSync(tempFilePath);
-
-        // Store the relative path for the view template
-        // This will be used to display the image in the result page
-        uploadedFilePath = `/images/${fileName}`;
-
-        console.log('✓ File Upload Successful:');
-        console.log(`   Original Filename: ${originalFileName}`);
-        console.log(`   Saved As: ${fileName}`);
-        console.log(`   Path: ${finalFilePath}`);
-
-        // add new item (replace with db)
-        const newItem = {
-          name,
-          description,
-          model,
-          brand,
-          category,
-          imagePath: uploadedFilePath,
-          imageAlt: `image of ${name}`,
-          serial: randomUUID(),
-          status: 'Available',
-          dateAcquired: new Date(),
-        };
-
-        itemData.items.push(newItem);
-
-        // Render result page with file information
-        res.redirect('/items');
-      } catch (fsError) {
-        console.error('❌ File system error:', fsError);
-        // Clean up temp file if copy failed
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-        }
-        res.status(500).json({
-          type: 'error',
-          message: 'Error saving the file. Please try again.',
-        });
-      }
-    })
-  }
-  catch(error) {
-    console.error('❌ Error in /items:', error);
-    res.status(500).json({
-      type: 'error',
-      message: 'An error occurred while processing your file upload.',
-    });
-  }
-})
-
-app.get('/items/:id/history', (req, res) => {
-    const { id } = req.params
-
-    const context = {
-        item: itemData.items.find(item => String(item.id) === String(id)),
-        itemHistories: itemData.itemHistories.find(item => String(item.id) === String(id))
-    }
-
-    res.render('itemHistory', context)
-})
-
-app.get('/items/:id', (req, res) => {
-    const { id } = req.params
-
-    const context = itemData.items.find(item => String(item.id) === String(id))
-
-    if (!context) {
-        res.status(404)
-        return res.render('404')
-    }
-
-    res.render('itemDetail', context)
-})
-
-app.get("/items/:id", (req, res) => {
-  res.render("itemDetail");
-});
-
-app.get("/items/history", (req, res) => {
-  res.render("itemHistory");
-});
-
-// ++++++++++ LOGIN, REGISTER & LOGOUT
-app.get("/", (req, res) => {
-  res.render("login", { layout: "no_nav_bar.handlebars" }); // landing page: login
-});
-
-app.get("/login", (req, res) => {
-  res.render("login", { layout: "no_nav_bar.handlebars" });
-});
-
-app.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  console.log(email, password);
-
-  // TODO: validate user (rn: anything is allowed)
-  res.redirect("/home");
-});
-
-app.get("/register", (req, res) => {
-  res.render("register", { layout: "no_nav_bar.handlebars" });
-});
-
-app.post("/register", (req, res) => {
-  const { name, email, password } = req.body;
-  console.log(name, email, password);
-
-  res.redirect("/login");
-});
-
-app.get("/logout", (req, res) => {
-  res.render("login", { layout: "no_nav_bar.handlebars" });
-});
-
-// ++++++++++ List-user page
-app.get("/users", (req, res) => {
-  // MOCK DATA
-  const users = [
-    {
-      id: 1,
-      name: "Alice",
-      email: "alice@example.com",
-      role: "Admin",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Bob",
-      email: "bob@example.com",
-      role: "User",
-      status: "Active",
-    },
-    {
-      id: 3,
-      name: "Charlie",
-      email: "charlie@example.com",
-      role: "User",
-      status: "Disabled",
-    },
-    {
-      id: 4,
-      name: "Dave",
-      email: "dave@example.com",
-      role: "Admin",
-      status: "Active",
-    },
-  ];
-
-  res.render("users", { users, activePage: "users" });
-});
-
-// ++++++++++ Home (Dashboard for logged-in users)
-app.get("/home", (req, res) => {
-  // Mock data
-  const dashboardData = {
-    totalUsers: 12,
-    totalItems: 34,
-    pendingCheckouts: 5,
-    recentTransactions: [
-      {
-        id: 1,
-        user: "Alice",
-        item: "Laptop",
-        type: "Checkout",
-        date: "2026-03-22",
-      },
-      {
-        id: 2,
-        user: "Bob",
-        item: "Projector",
-        type: "Checkout",
-        date: "2026-03-21",
-      },
-      {
-        id: 3,
-        user: "Charlie",
-        item: "Camera",
-        type: "Check-in",
-        date: "2026-03-21",
-      },
-      {
-        id: 4,
-        user: "Dave",
-        item: "Tablet",
-        type: "Checkout",
-        date: "2026-03-20",
-      },
-    ],
-  };
-
-  res.render("home", { dashboardData, activePage: "home" });
-});
-
-// ++++++++++ Other routes
-app.use((req, res, next) => {
-  res.status(404);
-  res.render("404");
-});
-
+// Other routes
 app.use((error, req, res, next) => {
-  res.status(500);
-  res.render("500");
+  console.error(error);
+
+  return res.status(500).render("extra_pages/500", {
+    layout: 'no_nav_bar',
+    pageTitle: "500",
+    message: error.message || "Internal Server Error",
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Access via: http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    dbProvider = await createDatabaseProvider();
+    setDbProvider(dbProvider);
+    console.log(`Connected to ${dbProvider.providerKey} database provider`);
+
+    // for getting img on the mongo side
+    if (dbProvider.providerKey === "mongodb") {
+      app.get("/files/items/:id", (req, res) => {
+        try {
+          const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+          const stream = dbProvider.itemsBucket.openDownloadStream(fileId);
+
+          stream.on("error", () => {
+            return res.status(404).send("Image not found");
+          });
+
+          res.setHeader("Content-Type", "image/*");
+
+          stream.pipe(res);
+        } catch (err) {
+          res.status(400).send("Invalid file id");
+        }
+      });
+
+      app.get("/files/docs/:id", (req, res) => {
+        try {
+          const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+          const stream = dbProvider.getDocumentStream(fileId);
+
+          stream.on("error", () => {
+            res.status(404).send("File not found");
+          });
+
+          stream.pipe(res);
+        } catch (err) {
+          res.status(500).send("Server error");
+        }
+      });
+    }
+
+    app.listen(config.PORT, () => {
+      if (config.NODE_ENV === "development") {
+        console.log(`Using ${config.NODE_ENV} environment`);
+        console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
+        console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
+        console.log(`Database provider: ${dbProvider.providerLabel}`);
+      } else {
+        console.log(`Using ${config.NODE_ENV} environment`);
+        console.log(`  Public : http://${config.BASE_URL}`);
+        console.log(`  Admin  : http://admin.${config.BASE_URL}`);
+        console.log(`Database provider: ${dbProvider.providerLabel}`);
+      }
+    });
+  } catch (error) {
+    if (error && error.message) {
+      console.error("Failed to initialize database provider:", error.message);
+    } else {
+      console.error("Failed to initialize database provider:", error);
+    }
+    process.exit(1);
+  }
+}
+
+startServer();

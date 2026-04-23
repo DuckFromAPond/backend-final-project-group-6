@@ -1,0 +1,64 @@
+
+<aside class="w-64 bg-gray-800 text-gray-100 flex flex-col h-screen shadow-lg">
+
+  <!-- title -->
+  <div class="px-4 py-4 border-b border-gray-700">
+    <h1 class="text-lg font-semibold tracking-wide">
+      Admin Panel
+    </h1>
+    <p class="text-xs text-gray-400 mt-1">
+      Signed in as
+      <span class="font-medium text-gray-200">
+        {{#if adminUser.name}}{{adminUser.name}}{{else}}{{adminUser.username}}{{/if}}
+      </span>
+    </p>
+  </div>
+
+  <!-- nav -->
+  <nav class="flex-1 py-4 space-y-1">
+
+    <a href="/"
+      class="flex items-center px-4 py-2 text-sm hover:bg-gray-700 transition">
+      Dashboard
+    </a>
+
+    <a href="/history"
+      class="flex items-center px-4 py-2 text-sm hover:bg-gray-700 transition">
+      Logs 
+    </a>
+
+    <a href="/api"
+      class="flex items-center px-4 py-2 text-sm hover:bg-gray-700 transition">
+      API
+    </a>
+
+    <a href="/users"
+      class="flex items-center px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 transition">
+      Users
+    </a>
+
+    <div class="mt-6 px-3 text-xs text-gray-500 uppercase tracking-wider border-t border-gray-700 pt-6">
+      Quick Links
+    </div>
+
+    <a href="http://localhost:3000"
+      target="_blank"
+      class="flex items-center px-3 py-2 rounded-md text-sm text-blue-400 hover:bg-gray-700 transition">
+      ↗ View Public Site
+    </a>
+
+  </nav>
+
+  <!-- logout -->
+  <div class="p-3 border-t border-gray-800">
+
+    <form action="/logout" method="POST">
+      <button type="submit"
+        class="w-full px-3 py-2 text-sm text-white bg-red-500 cursor-pointer rounded-md hover:bg-red-600 hover:text-white transition">
+        Logout
+      </button>
+    </form>
+
+  </div>
+
+</aside>
