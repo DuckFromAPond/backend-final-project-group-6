@@ -20,7 +20,13 @@ const ItemHistorySchema = new mongoose.Schema({
 
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    immutable: true
+  },
+
+  returnedAt: {
+    type: Date,
+    default: null
   }
 });
 

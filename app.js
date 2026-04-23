@@ -120,45 +120,45 @@ publicApp.use("/", authRoutes);
 publicApp.use("/", publicRoutes);
 
 // ------ adminApp ------
-const adminApp = express();
+// const adminApp = express();
 
-adminApp.engine(
-  "handlebars",
-  engine({
-    defaultLayout: "main",
-    extname: ".handlebars",
-    layoutsDir: path.join(__dirname, "views/layouts"),
-    partialsDir: path.join(__dirname, "views/partials"),
-    helpers: hbsHelpers,
-  }),
-);
+// adminApp.engine(
+//   "handlebars",
+//   engine({
+//     defaultLayout: "main",
+//     extname: ".handlebars",
+//     layoutsDir: path.join(__dirname, "views/layouts"),
+//     partialsDir: path.join(__dirname, "views/partials"),
+//     helpers: hbsHelpers,
+//   }),
+// );
 
-adminApp.set("view engine", "handlebars");
-adminApp.set("views", path.join(__dirname, "views"));
+// adminApp.set("view engine", "handlebars");
+// adminApp.set("views", path.join(__dirname, "views"));
 
-// adminApp middleware
-adminApp.use(cors(corsOptions));
-adminApp.use(express.urlencoded({ extended: false }));
-adminApp.use(express.static(path.join(__dirname, "public")));
-adminApp.use(cookieParser());
+// // adminApp middleware
+// adminApp.use(cors(corsOptions));
+// adminApp.use(express.urlencoded({ extended: false }));
+// adminApp.use(express.static(path.join(__dirname, "public")));
+// adminApp.use(cookieParser());
 
-// temp (will change when nav is finalized)
-adminApp.use((req, res, next) => {
-  const pathName = req.path;
+// // temp (will change when nav is finalized)
+// adminApp.use((req, res, next) => {
+//   const pathName = req.path;
 
-  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
-  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
-  res.locals.navCheckin = pathName.startsWith("/owned");
-  res.locals.navReport = pathName.startsWith("/report");
-  res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
-  res.locals.navKeys = pathName.startsWith("/keys"); //
+//   res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
+//   res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
+//   res.locals.navCheckin = pathName.startsWith("/owned");
+//   res.locals.navReport = pathName.startsWith("/report");
+//   res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
+//   res.locals.navKeys = pathName.startsWith("/keys"); //
 
-  res.locals.config = config;
-  next();
-});
+//   res.locals.config = config;
+//   next();
+// });
 
-adminApp.use("/", authRoutes);
-adminApp.use("/", adminRoutes);
+// adminApp.use("/", authRoutes);
+// adminApp.use("/", adminRoutes);
 
 // ---------- API -----------------
 const apiApp = express();

@@ -64,6 +64,7 @@ function mapItemHistoryRowToModel(row) {
 		duration: row.duration,
 		referenceLink: row.referenceLink,
 		createdAt: row.createdAt,
+		returnedAt: row.returnedAt,
 		action: row.action,
   };
 }
@@ -71,25 +72,25 @@ function mapItemHistoryRowToModel(row) {
 function mapApiKeyRowToModel(row) {
   return {
     id: toIdString(row.id),
-    key: row.key,
+    hashKey: row.hashKey,
     name: row.name,
-	adminId: row.adminId,
+	userId: row.userId,
     createdAt: row.createdAt,
     revoked: row.revoked,
   };
 }
 
 
-function mapCategoryRowToModel(row) {
-  return {
-    id: toIdString(row.id),
-	hashKey: row.hashKey,
-    name: row.name,
-	adminId: row.adminId,
-    createdAt: row.createdAt,
-    revoked: row.revoked,
-  };
-}
+// function mapCategoryRowToModel(row) {
+//   return {
+//     id: toIdString(row.id),
+// 	hashKey: row.hashKey,
+//     name: row.name,
+// 	adminId: row.adminId,
+//     createdAt: row.createdAt,
+//     revoked: row.revoked,
+//   };
+// }
 
 module.exports = {
 	SUPABASE_TABLES,

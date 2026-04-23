@@ -80,6 +80,20 @@ class SupabaseProvider extends DatabaseProvider {
     return data.publicUrl;
   }
 
+  getLatestHistoryMap(histories) {
+    const map = new Map();
+
+    for (const h of histories) {
+      const key = h.itemId.toString();
+
+      if (!map.has(key)) {
+        map.set(key, h); 
+      }
+    }
+
+    return map;
+  }
+
   async initializeDatabase() {
     // USERS
     const { error: userError } = await this.supabase
@@ -263,14 +277,14 @@ class SupabaseProvider extends DatabaseProvider {
     return !!data;
   }
 
-  async findActiveCheckout(itemId) {
+  async findActiveAction(itemId, action) {
     const normalizedId = this.toSupabaseId(itemId);
 
     const { data, error } = await this.supabase
       .from(SUPABASE_TABLES.ITEM_HISTORIES)
       .select("*")
       .eq("itemId", normalizedId)
-      .eq("action", "checkout")
+      .eq("action", action)
       .order("createdAt", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -429,7 +443,7 @@ class SupabaseProvider extends DatabaseProvider {
     return mapItemHistoryRowToModel(inserted);
   }
 
-  async getUserItems(userId) {
+  async getUserHistory(userId) {
     const normalizedUserId = this.toSupabaseId(userId);
 
     const { data, error } = await this.supabase
@@ -447,7 +461,6 @@ class SupabaseProvider extends DatabaseProvider {
 			dateAcquired,
 			imageAlt,
 			imageName,
-			currentOwner,
 			item_histories (
 				id,
 				userId,
@@ -485,6 +498,42 @@ class SupabaseProvider extends DatabaseProvider {
     });
   }
 
+  async getUserHistory(userId) {
+    const histories = await ItemHistory.find({ userId })
+      .populate("itemId")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return histories.map((r) => ({
+      id: r._id.toString(),
+      userId: r.userId.toString(),
+      itemId: r.itemId._id.toString(),
+
+      action: r.action,
+      duration: r.duration,
+      createdAt: r.createdAt,
+      referenceUrl: r.referenceLink ?? null,
+
+      item: r.itemId
+        ? {
+            id: r.itemId._id.toString(),
+            name: r.itemId.name,
+            serial: r.itemId.serial,
+            model: r.itemId.model,
+            brand: r.itemId.brand,
+            category: r.itemId.category,
+            sub_category: r.itemId.subCategory,
+            status: r.itemId.status,
+            description: r.itemId.description,
+            dateAcquired: r.itemId.dateAcquired,
+            imageAlt: r.itemId.imageAlt,
+            imageUrl: this.getImageUrl(r.itemId.imageName),
+          }
+        : null,
+    }));
+  }
+
+
   async updateUserItem(itemId, newUserId, adminId, options = {}) {
     const normalizedItemId = this.toSupabaseId(itemId);
     const normalizedNewUserId = this.toSupabaseId(newUserId);
@@ -492,19 +541,17 @@ class SupabaseProvider extends DatabaseProvider {
 
     // 1. check admin
     const admin = await this.getUserById(normalizedAdminId);
-
     if (!admin || admin.role !== "Admin") {
       throw new Error("Unauthorized");
     }
 
     // 2. check item exists
     const item = await this.getItemById(normalizedItemId);
-
     if (!item) {
       throw new Error("Item not found");
     }
 
-    // 3. get current owner (latest active checkout)
+    // 3. get active checkout (SOURCE OF TRUTH)
     const { data: existing, error: fetchError } = await this.supabase
       .from(SUPABASE_TABLES.ITEM_HISTORIES)
       .select("*")
@@ -514,21 +561,17 @@ class SupabaseProvider extends DatabaseProvider {
 
     if (fetchError) throw fetchError;
 
-    // 4. RULE: already owned by same user
-    if (
-      existing &&
-      existing.userId === normalizedNewUserId &&
-      existing.action === "checkout"
-    ) {
+    // 4. already owned by same user
+    if (existing && existing.userId === normalizedNewUserId) {
       throw new Error("User already owns this item");
     }
 
-    // 5. RULE: prevent double ownership
+    // 5. owned by someone else
     if (existing && existing.userId !== normalizedNewUserId) {
       throw new Error("Item is already owned by another user");
     }
 
-    // 6. optional: close previous ownership (if you want forced transfer)
+    // 6. close previous ownership (safe transfer)
     if (existing) {
       await this.supabase
         .from(SUPABASE_TABLES.ITEM_HISTORIES)
@@ -538,7 +581,7 @@ class SupabaseProvider extends DatabaseProvider {
         .eq("id", existing.id);
     }
 
-    // 7. create new ownership record
+    // 7. create new checkout record
     const { data, error } = await this.supabase
       .from(SUPABASE_TABLES.ITEM_HISTORIES)
       .insert([
@@ -548,6 +591,7 @@ class SupabaseProvider extends DatabaseProvider {
           action: "checkout",
           reference_link: options.referenceLink ?? null,
           createdAt: new Date(),
+          returned_at: null,
         },
       ])
       .select()
@@ -572,7 +616,7 @@ class SupabaseProvider extends DatabaseProvider {
         {
           hashedKey: hashedKey,
           name: data?.name ?? null,
-          adminId: adminId,
+          userId: adminId,
           revoked: false,
           createdAt: new Date(),
         },
@@ -628,10 +672,10 @@ class SupabaseProvider extends DatabaseProvider {
     return mapApiKeyRowToModel(data);
   }
 
-  async uploadFile(path, buffer) {
+  async uploadFile(filename, buffer, mimeType) {
     const { error } = await this.supabase.storage
       .from("docs-bucket")
-      .upload(path, buffer);
+      .upload(filename, buffer);
 
     if (error) {
       throw new Error(`Upload failed: ${error.message}`);
@@ -640,10 +684,10 @@ class SupabaseProvider extends DatabaseProvider {
     return path;
   }
 
-  async uploadItem(path, buffer) {
+  async uploadItem(filename, buffer, mimeType) {
     const { error } = await this.supabase.storage
       .from("items-bucket")
-      .upload(path, buffer);
+      .upload(filename, buffer);
 
     if (error) {
       throw new Error(`Image upload failed: ${error.message}`);

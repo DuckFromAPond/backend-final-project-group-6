@@ -148,15 +148,15 @@ exports.getFile = async (req, res) => {
     }
 
     const result = await db.getFile(bucket, id);
-
+    console.log(result)
     if (!result) {
       return res.status(404).send("File not found");
     }
 
     if (result.type === "stream") {
       const stream = result.data;
-
-      res.set("Content-Type", result.contentType || "image/jpeg");
+      
+      res.setHeader("Content-Type", result.contentType);
 
       return stream.pipe(res);
     }

@@ -12,7 +12,7 @@ SHOWS CURRENTLY OWNED ITEMS
         <p class="text-gray-500 mt-1">Items currently checked out to you</p>
     </div>
 
-    <div class="w-full max-w-6xl overflow-hidden rounded-2xl shadow-lg bg-white">
+    <div class="w-full max-w-6xl overflow-x-auto rounded-2xl shadow-lg bg-white">
         <table class="w-full text-left">
 
             {{!-- table header --}}
@@ -21,6 +21,7 @@ SHOWS CURRENTLY OWNED ITEMS
                     <th class="p-4 border-r border-gray-400">ID</th>
                     <th class="p-4 border-r border-gray-400">Item</th>
                     <th class="p-4 border-r border-gray-400">Date Received</th>
+                    <th class="p-4 border-r border-gray-400">Borrow duration</th>
                     <th class="p-4 border-r border-gray-400">Return Date</th>
                     <th class="p-4 border-r border-gray-400">Status</th>
                     <th class="p-4">Action</th>
@@ -44,7 +45,7 @@ SHOWS CURRENTLY OWNED ITEMS
                             </a>
                         </td>
 
-                        <!-- RECEIVED -->
+                        {{!-- RECEIVED --}}
                         <td class="p-4 text-gray-800 border-r border-gray-400">
                             {{#if this.createdAt}}
                                 {{this.createdAt}}
@@ -52,6 +53,16 @@ SHOWS CURRENTLY OWNED ITEMS
                                 <span class="text-gray-400">No data</span>
                             {{/if}}
                         </td>
+
+                        {{!-- DURATION --}}
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.duration}}
+                                {{this.duration}}
+                            {{else}}
+                                <span class="text-gray-400">Not set</span>
+                            {{/if}}
+                        </td>
+
 
                         <!-- DUE -->
                         <td class="p-4 text-gray-800 border-r border-gray-400">
@@ -84,10 +95,17 @@ SHOWS CURRENTLY OWNED ITEMS
                             <button
                                 type="button"
                                 onclick="openForm('{{this.id}}')"
-                                class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 rounded-lg transition shadow-sm"
+                                class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm"
                             >
                                 Check In
                             </button>
+                            <a
+                                href="/api/files/docs/{{this.referenceUrl}}"
+                                target="_blank"
+                                class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
+                                >
+                                View doc ↗
+                            </a>
                         </td>
 
                     </tr>
@@ -107,7 +125,7 @@ SHOWS CURRENTLY OWNED ITEMS
     {{!-- HIDDEN FORM PAGE --}}
     <div id="modal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeForm()">
         {{!-- make closeform only work for background --}}
-        <div onclick="event.stopPropagation()">     
+        <div class=" w-full max-w-lg" onclick="event.stopPropagation()">     
             {{> form title="Check-in" action="checkin"}}
         </div>
     </div>

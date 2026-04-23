@@ -7,6 +7,8 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require("../data/data");
 const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
+const userService = require("../services/userService"); 
+const { db } = require("../data/models/mongoUserModel");
 
 // static data
 const categories = [
@@ -24,7 +26,7 @@ const categories = [
   ] },
 ];
 
-// GET: /HOME ----------------
+// GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
     const db = getDbProvider();
@@ -92,43 +94,33 @@ exports.showItems = async (req, res) => {
   let page = req.query.page;
   const pageSize = 10; // items to show per page
 
+  // manually add categories
+  // const categories = [
+  //   { name: "Peripherals", subCategories: [
+  //     { name: "Monitor" },
+  //     { name: "Keyboard" },
+  //     { name: "Mouse" },
+  //     { name: "Scanner" },
+  //     { name: "Printer" },
+  //   ] },
+  //   { name: "Computers", subCategories: [
+  //     { name: "Laptop" },
+  //     { name: "Desktop" },
+  //     { name: "Server" },
+  //   ] },
+  // ];
+
   // append query parameters to URL
   let url = "/items?";
 
   // get all items from DB
   let items = await db.getItems();
 
-  items = items.filter(item => item.status !== "Retired");
-
-  items = items.map(item => {
-  if (!item.image) return item;
-
-  // Mongo (GridFS)
-  if (db.providerKey === "mongodb") {
-    item.imageUrl = `/api/files/items/${item.image}`;
-  }
-
-  // Supabase
-  if (db.providerKey === "mongodb") {
-    item.imageUrl = dbProvider.getImageUrl(item.image);
-  }
-
-  return item;
-  });
-  
-  // derive categories dynamically
-  const categories = [
-    ...new Set(items.map(item => item.category))
-  ].map(name => ({ name }));
   // filter by subcategory
   if(subcat) {
     url += `subcat=${subcat}&`;
     items = items.filter((item) => item.subCategory === subcat);
   }
-
-  const subCategories = [
-    ...new Set(items.map(item => item.subCategories))
-  ].map(name => ({ name }));
 
   // filter by category
   if (cat) {
@@ -215,27 +207,43 @@ exports.addItem = async (req, res, next) => {
       });
     });
 
-        // extract fields
-        const name = fields.name?.[0] ?? '';
-        const description = fields.description?.[0] ?? '';
-        const brand = fields.brand?.[0] ?? '';
-        const model = fields.model?.[0] ?? '';
-        const category = fields.category?.[0] ?? '';
-        const subCategory = fields.subCategory?.[0] ?? '';
-        const serial = fields.serial?.[0] ?? '';
-        const status = fields.status?.[0] ?? '';
-        const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
+    // extract fields
+    const name = fields.name?.[0] ?? '';
+    const description = fields.description?.[0] ?? '';
+    const brand = fields.brand?.[0] ?? '';
+    const model = fields.model?.[0] ?? '';
+    const category = fields.category?.[0] ?? '';
+    const subCategory = fields.subCategory?.[0] ?? '';
+    const serial = fields.serial?.[0] ?? '';
+    const status = fields.status?.[0] ?? '';
+    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
-        const existing = await db.getItemBySerial(serial);
+    const existing = await db.getItemBySerial(serial);
 
-        if (existing) {
-          return res.redirect("/items?error=Serial+already+exists");
-        }
+    if (existing) {
+      return res.redirect("/items?error=Serial+already+exists");
+    }
 
-        // upload file 
-        let filePath = null;
-        let fileName = null;
-        let fileId = null;
+    if (
+      !name ||
+      !description ||
+      !brand ||
+      !model ||
+      !category ||
+      !serial ||
+      !status
+    ) {
+      return res.redirect("/items?error=Missing+required+fields");
+    }
+
+    // upload file 
+    let filePath = null;
+    let fileName = null;
+    let fileId = null;
+
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Image+file+required");
+    }
 
     if (files?.image?.length > 0) {
       const file = files.image[0];
@@ -249,31 +257,33 @@ exports.addItem = async (req, res, next) => {
 
       fileName = `${Date.now()}_${file.originalFilename}`;
       filePath = `${fileName}`;
+      
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
 
-          fileId = await db.uploadItem(filePath, fileBuffer);
-        }
-
-        const newItem = {
-            name,
-            description,
-            brand,
-            model,
-            category,
-            subCategory,
-            serial,
-            status,
-            dateAcquired,
-            imageName: fileId || fileName,
-            imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
-        };
-
-        await db.createItem(newItem);
-
-        return res.redirect("/items?success=Item+added+successfully");
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
-    catch (err) {
-      next(err);
-    }
+
+    const newItem = {
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
+      dateAcquired,
+      imageName: fileId || fileName,
+      imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
+    };
+
+    await db.createItem(newItem);
+
+    return res.redirect("/items?success=Item+added+successfully");
+  }
+  catch (err) {
+    next(err);
+  }
 }
 
 exports.showItemDetail = async (req, res) => {
@@ -367,11 +377,27 @@ exports.editItem = async (req, res, next) => {
     const status = fields.status?.[0] ?? "";
     const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
+    if (
+      !name ||
+      !description ||
+      !brand ||
+      !model ||
+      !category ||
+      !serial ||
+      !status
+    ) {
+      return res.redirect("/items?error=Missing+required+fields");
+    }
+
     if(!["Available", "Maintenance"].includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
+    }
+
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Image+file+required");
     }
 
     // upload file
@@ -391,7 +417,9 @@ exports.editItem = async (req, res, next) => {
       fileName = `${Date.now()}_${file.originalFilename}`;
       filePath = `${fileName}`;
 
-      await db.uploadFile(filePath, fileBuffer, true);
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
 
     const newItem = {
@@ -419,7 +447,8 @@ exports.editItem = async (req, res, next) => {
   }
 };
 
-// soft deletes only
+// ------------------------------------------------------------------------- ADMIN ONLY ROUTE PLEASE MAKE ADMIN ONLY 
+// soft deletes only 
 exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
 
@@ -494,11 +523,13 @@ exports.showItemHistory = async (req, res) => {
   res.render("items/itemHistory", context);
 };
 
-// POST: /CHECKIN
+
+
+
+// POST CHECKIN
 exports.checkIn = async (req, res, next) => {
   try {
-    const db = getDbProvider();
-
+    // get form data 
     const { fields, files } = await new Promise((resolve, reject) => {
       const form = new multiparty.Form();
 
@@ -512,95 +543,23 @@ exports.checkIn = async (req, res, next) => {
     const duration = fields.duration?.[0];
     const userId = req.user.id;
 
-    const item = await db.getItemById(itemId);
+    // validate checkout 
+    await itemService.validateCheckin(itemId);
 
-    if (!itemId) {
-      return res.redirect("/items?error=Missing+itemId");
-    }
-
-    if (!item) {
-      return res.redirect("/items?error=Item+not+found");
-    }
-
-    if (item.status !== "In-Use") {
-      return res.redirect("/items?error=Item+not+checked+out");
-    }
-
-    // 1. upload file
+    // upload file
     let filePath = null;
+    let fileName = null;
 
-    if (files?.document?.length > 0 && db.providerLabel === "Supabase") {
-      const file = files.document[0];
-      const MAX_SIZE = 50 * 1024 * 1024;
-
-      if (file.size > MAX_SIZE) {
-        return res.redirect("/items?error=File+too+large+(max+50MB)");
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-      const fileName = `${Date.now()}_${file.originalFilename}`;
-
-      filePath = await db.uploadFile(fileName, fileBuffer);
-    } else {
-      const file = files.document[0];
-
-      const fileBuffer = fs.readFileSync(file.path);
-      const fileName = `${Date.now()}_${file.originalFilename}`;
-
-      filePath = await db.uploadFile(fileName, fileBuffer);
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Reference+file+is+required");
     }
-
-    // 2. update state
-    await db.updateItem(itemId, { status: "Available" });
-
-    // 3. log history ONCE
-    await db.addItemHistory(itemId, {
-      userId,
-      action: "checkin",
-      referenceLink: filePath,
-    });
-
-    return res.redirect("/items?success=Checked+in+successfully!");
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.checkOut = async (req, res, next) => {
-  try {
-    const db = getDbProvider();
-    const { fields, files } = await new Promise((resolve, reject) => {
-      const form = new multiparty.Form();
-
-      form.parse(req, (error, fields, files) => {
-        if (error) return reject(error);
-        resolve({ fields, files });
-      });
-    });
-
-    const itemId = fields.itemId?.[0];
-    const duration = fields.duration?.[0];
-    const userId = req.user.id;
-
-    const item = await db.getItemById(itemId);
-
-    if (!item) {
-      return res.redirect("/items?error=Item+not+found");
-    }
-
-    if (
-      item.status !== "Available" ||
-      ["Maintenance", "Retired"].includes(item.status)
-    ) {
-      return res.redirect("/items?error=Item+not+available");
-    }
-
-    let filePath = null;
 
     if (files?.document?.length > 0) {
       const file = files.document[0];
+      
+      const DBlabel = itemService.getDBlabel(); 
 
-      if (db.providerLabel === "Supabase") {
+      if (DBlabel === "Supabase") {
         const MAX_SIZE = 50 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
           return res.redirect("/items?error=File+too+large+(max+50MB)");
@@ -608,55 +567,135 @@ exports.checkOut = async (req, res, next) => {
       }
 
       const fileBuffer = fs.readFileSync(file.path);
-      const fileName = `${Date.now()}_${file.originalFilename}`;
+      fileName = `${Date.now()}_${file.originalFilename}`;
 
-      filePath = await db.uploadFile(fileName, fileBuffer);
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
+    }
+
+    await itemService.checkinItem({
+      itemId,
+      userId,
+      duration,
+      referenceLink: filePath || fileName
+    });
+
+    return res.redirect("/owned");
+  } catch (err) {
+    return res.redirect(
+      `/items?error=${encodeURIComponent(err.message)}`
+    );
+  }
+};
+
+
+// POST CHECKOUT
+exports.checkOut = async (req, res, next) => {
+  try {
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
+    const userId = req.user.id;
+
+    // validate checkout 
+    await itemService.validateCheckout(itemId);
+
+    let filePath = null;
+    let fileName = null;
+
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Image+file+required");
+    }
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      
+      const DBlabel = itemService.getDBlabel(); 
+
+      if (DBlabel === "Supabase") {
+        const MAX_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+50MB)");
+        }
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      fileName = `${Date.now()}_${file.originalFilename}`;
+
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
 
     await itemService.checkoutItem({
       itemId,
       userId,
       duration,
-      referenceLink: filePath
+      referenceLink: filePath || fileName
     });
 
-    return res.redirect("/owned");
+    return res.redirect("/items?success=item+checked+out+sucessfully");
   } catch (err) {
-    next(err);
+    return res.redirect(
+      `/items?error=${encodeURIComponent(err.message)}`
+    );
   }
 };
 
+
 exports.showOwned = async (req, res, next) => {
   try {
-    const db = getDbProvider();
     const currentUserId = req.user.id;
 
-    const items = await db.getUserItems(currentUserId);
+    const items = await itemService.getUserOwnedItems(currentUserId);
 
     const allOwned = items.map((row) => {
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+
       let status = "unknown";
       let dueDate = null;
+      let hoursSince = null;
 
-      if (row.createdAt && row.duration) {
-        const created = new Date(row.createdAt);
-
+      if (created && row.duration) {
         dueDate = new Date(created);
         dueDate.setHours(dueDate.getHours() + row.duration);
 
         const now = new Date();
-
         status = now > dueDate ? "overdue" : "active";
-      }
+      } 
+      else if (created) {
+        const now = new Date();
+        hoursSince = Math.floor((now - created) / (1000 * 60 * 60));
 
-      const created = row.createdAt ? new Date(row.createdAt) : null;
-      console.log(row.referenceUrl)
+        status = "active";
+      }
       return {
-        id: row.item_id, 
+        id: row.itemId || row.item?.id,
         referenceUrl: row.referenceUrl,
-        name: row.item.name,
-        createdAt: created.toISOString().split("T")[0],
-        dueDate: dueDate ? dueDate.toISOString().split("T")[0] : null,
-        status: status,
+        name: row.item?.name,
+
+        createdAt: created
+          ? created.toISOString().split("T")[0]
+          : null,
+
+        duration: row.duration 
+          ? `${itemService.formatDuration(row.duration)}`
+          : `${itemService.formatDuration(hoursSince)} (ongoing)`,
+
+        dueDate: dueDate
+          ? dueDate.toISOString().split("T")[0]
+          : "Until returned",
+
+        status,
       };
     });
 
@@ -669,8 +708,111 @@ exports.showOwned = async (req, res, next) => {
   }
 };
 
-exports.report = (req, res) => {
-  res.render("report");
+exports.report = async (req, res, next) => {
+  try {
+    // get history for the last 7 days 
+    const AllHistories = await itemService.getDBItemsHistory();
+    const AllItems = await itemService.getDBItems();
+    const users = await userService.getAllUsers();
+
+    const totalUsers = users.length;
+    const totalItems = AllItems.length;
+
+    const deployedItems = AllItems.filter(item =>
+      item.current_owner &&
+      item.status === "In-Use"
+    ).length;
+
+
+    // 3. OLD ASSETS (3+ years)
+    const threeYearsAgo = new Date();
+    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+
+    const oldAssets = AllItems
+      .filter(i =>
+        i.dateAcquired &&
+        new Date(i.dateAcquired) <= threeYearsAgo
+      )
+      .map(i => ({
+        ...i,
+        formatted: new Date(i.dateAcquired).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric"
+        })
+      }));
+
+
+    // 4. USER AUDIT 
+    const selectedUserId = req.query.userId || null;
+
+    let selectedUserName = "";
+
+    if (selectedUserId) {
+      const user = await itemService.getUserById(selectedUserId);
+      selectedUserName = `${user.name} (${user.email})`;
+    }
+
+    const items = await itemService.getUserOwnedItems(selectedUserId);
+
+    const userAudit = items.map((row) => {
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+
+      let status = "unknown";
+      let dueDate = null;
+      let hoursSince = null;
+
+      if (created && row.duration) {
+        dueDate = new Date(created);
+        dueDate.setHours(dueDate.getHours() + row.duration);
+
+        const now = new Date();
+        status = now > dueDate ? "overdue" : "active";
+      } else if (created) {
+        const now = new Date();
+        hoursSince = Math.floor((now - created) / (1000 * 60 * 60));
+        status = "active";
+      }
+
+      return {
+        id: row.itemId || row.item?.id,
+        referenceUrl: row.referenceUrl,
+
+        name: row.item?.name,
+
+        createdAt: created
+          ? created.toISOString().split("T")[0]
+          : null,
+
+        duration: row.duration
+          ? itemService.formatDuration(row.duration)
+          : itemService.formatDuration(hoursSince) + " (ongoing)",
+
+        dueDate: dueDate
+          ? dueDate.toISOString().split("T")[0]
+          : "Until returned",
+
+        status
+      };
+    });
+
+    // console.log(oldAssets)
+    // console.log(userAudit)
+    
+    res.render("report", {
+        totalUsers,
+        totalItems,
+        deployedItems,
+        userAudit,
+        users,
+        selectedUserName,
+        selectedUserId,
+        oldAssets,
+        pageTitle: "Report"
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 // 404 handler

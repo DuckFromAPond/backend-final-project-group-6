@@ -48,7 +48,8 @@ CREATE TABLE item_histories (
     duration INTEGER DEFAULT NULL,
     referenceLink TEXT,
     action TEXT CHECK (action IN ('checkout', 'checkin')),
-    createdAt TIMESTAMP DEFAULT NOW()
+    createdAt TIMESTAMP DEFAULT NOW(),
+    returnedAt TIMESTAMP DEFAULT NULL
 );
 
 -- =========================

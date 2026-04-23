@@ -97,19 +97,6 @@ class MongoProvider extends DatabaseProvider {
     };
   }
 
-  // mapApiKey(key) {
-  //   if (!key) return null;
-
-  //   return {
-  //     id: String(key._id),
-  //     name: key.name,
-  //     adminId: String(key.adminId),
-  //     key: key.key, // remove this if showing in UI
-  //     revoked: key.revoked,
-  //     createdAt: key.createdAt,
-  //   };
-  // }
-
   // Helper to keep the data format consistent (id vs _id)
   mapApiKey(key) {
     return {
@@ -133,6 +120,7 @@ class MongoProvider extends DatabaseProvider {
       duration: history.duration || null,
       referenceLink: history.referenceLink || null,
       createdAt: history.createdAt,
+      returnedAt: history.returnedAt,
     };
   }
 
@@ -188,7 +176,11 @@ class MongoProvider extends DatabaseProvider {
     return {
       type: "stream",
       data: stream,
-      contentType: file.contentType
+      contentType:
+        file.contentType ||
+        file.metadata?.contentType ||
+        "application/octet-stream",
+      filename: file.filename,
     };
   }
 
@@ -253,7 +245,7 @@ class MongoProvider extends DatabaseProvider {
 
   async revokeOwnedApiKeys(userId) {
     // for business rule to remove all owned by a disabled acc
-    await ApiKey.updateMany({ admin_id: userId }, { revoked: true });
+    await ApiKey.updateMany({ userId: userId }, { revoked: true });
   }
 
   async getAllUsers() {
@@ -270,14 +262,12 @@ class MongoProvider extends DatabaseProvider {
     return !!admin;
   }
 
-  async findActiveCheckout(itemId) {
-    return await ItemHistory.findOne({
-      itemId: itemId,
-      action: "checkout",
-      returnedAt: null,
-    })
-      .sort({ created_at: -1 })
+  async findActiveAction(itemId, action) {
+    const latest = await ItemHistory.findOne({ itemId })
+      .sort({ createdAt: -1 })
       .lean();
+
+    return latest?.action === action && latest?.returnedAt === null;
   }
 
   // ===== ITEMS =====
@@ -324,15 +314,15 @@ class MongoProvider extends DatabaseProvider {
     return this.mapItem(item);
   }
 
-  async setItemStatus(id, status) {
-    const item = await Item.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true },
-    ).lean();
+  // async setItemStatus(id, status) {
+  //   const item = await Item.findByIdAndUpdate(
+  //     id,
+  //     { status },
+  //     { new: true },
+  //   ).lean();
 
-    return this.mapItem(item);
-  }
+  //   return this.mapItem(item);
+  // }
 
   // ===== HISTORY =====
   async getItemHistories() {
@@ -357,53 +347,47 @@ class MongoProvider extends DatabaseProvider {
       duration: data.duration ?? null,
       referenceLink: data.referenceLink ?? null,
       createdAt: new Date(),
+      returnedAt: data.returnedAt ?? null,
     });
 
     return this.mapItemHistory(history.toObject());
   }
 
-  async getUserItems(userId) {
-    const items = await Item.find({ currentOwner: userId }).lean();
-
-    const itemIds = items.map((i) => i._id);
-
-    const histories = await ItemHistory.find({
-      itemId: { $in: itemIds },
-    })
+  async getUserHistory(userId) {
+    const histories = await ItemHistory.find({ userId })
+      .populate("itemId")
       .sort({ createdAt: -1 })
       .lean();
 
-    const latest = this.getLatestCheckoutRows(histories, (r) =>
-      r.itemId?._id?.toString(),
-    );
-
-    return latest.map((r) => ({
+    return histories.map((r) => ({
       id: r._id.toString(),
       userId: r.userId.toString(),
       itemId: r.itemId._id.toString(),
       action: r.action,
       duration: r.duration,
       createdAt: r.createdAt,
-
       referenceUrl: r.referenceLink ?? null,
 
-      item: {
-        id: r.itemId._id.toString(),
-        name: r.itemId.name,
-        serial: r.itemId.serial,
-        model: r.itemId.model,
-        brand: r.itemId.brand,
-        category: r.itemId.category,
-        sub_category: r.itemId.sub_category,
-        status: r.itemId.status,
-        description: r.itemId.description,
-        dateAcquired: r.itemId.date_acquired,
-        imageAlt: r.itemId.image_alt,
-        imageUrl: this.getImageUrl(r.itemId.image_name),
-      },
+      item: r.itemId
+        ? {
+            id: r.itemId._id.toString(),
+            name: r.itemId.name,
+            serial: r.itemId.serial,
+            model: r.itemId.model,
+            brand: r.itemId.brand,
+            category: r.itemId.category,
+            subCategory: r.itemId.subCategory,
+            status: r.itemId.status,
+            description: r.itemId.description,
+            dateAcquired: r.itemId.dateAcquired,
+            imageAlt: r.itemId.imageAlt,
+            imageUrl: this.getImageUrl(r.itemId.imageName),
+          }
+        : null,
     }));
   }
 
+  // break apart later
   async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
     const item = await Item.findById(itemId);
     if (!item) throw new Error("Item not found");
@@ -417,7 +401,6 @@ class MongoProvider extends DatabaseProvider {
       throw new Error("Invalid action");
     }
 
-    // business rule check (same as normal flow)
     if (action === "checkout") {
       const existing = await ItemHistory.findOne({
         itemId,
@@ -428,7 +411,6 @@ class MongoProvider extends DatabaseProvider {
         if (existing.userId.toString() === targetUserId.toString()) {
           throw new Error("User already owns this item");
         }
-
         throw new Error("Item is already checked out");
       }
     }
@@ -439,17 +421,15 @@ class MongoProvider extends DatabaseProvider {
       action,
       duration: options.duration ?? null,
       referenceLink: options.referenceLink ?? null,
-      createdAt: new Date(),
       returnedAt: action === "checkin" ? new Date() : null,
     });
 
-    // sync item status (same logic as normal flow)
     await this.setItemStatus(
       itemId,
-      action === "checkout" ? "In-Use" : "Available",
+      action === "checkout" ? "In-Use" : "Available"
     );
 
-    return history;
+    return history.toObject();
   }
 
   // =========================
@@ -501,9 +481,14 @@ class MongoProvider extends DatabaseProvider {
   }
 
   // GRIDFS FILE UPLOAD
-  async uploadItem(filename, buffer) {
+  async uploadItem(filename, buffer, mimeType) {
     return new Promise((resolve, reject) => {
-      const uploadStream = this.itemsBucket.openUploadStream(filename);
+      const uploadStream = this.itemsBucket.openUploadStream(filename, {
+        metadata: {
+          contentType: mimeType,
+          originalName: filename,
+      },
+    });
 
       uploadStream.end(buffer);
 
@@ -515,9 +500,14 @@ class MongoProvider extends DatabaseProvider {
     });
   }
 
-  async uploadFile(filename, buffer) {
+  async uploadFile(filename, buffer, mimeType) {
     return new Promise((resolve, reject) => {
-      const uploadStream = this.docsBucket.openUploadStream(filename);
+      const uploadStream = this.docsBucket.openUploadStream(filename, {
+        metadata: {
+          contentType: mimeType,
+          originalName: filename,
+      },
+      });
 
       uploadStream.end(buffer);
 
