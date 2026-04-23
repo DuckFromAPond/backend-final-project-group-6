@@ -192,7 +192,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: false, // Set to true if using HTTPS/Production
-      maxAge: 1000 * 60 * 60, // 1 hour
+      maxAge: 1000 * 60 * 1, // 1 minute
     },
   }),
 );
