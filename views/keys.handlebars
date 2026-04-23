@@ -1,0 +1,106 @@
+{{!-- 
+    NOTE: EXCLUSIVE TO ADMIN ACCOUNTS
+--}}
+
+<div class="flex flex-col items-center p-6 space-y-6">
+  
+  <div class="w-full max-w-5xl bg-white rounded-2xl shadow-lg p-8">
+    
+    <h1 class="text-2xl font-bold mb-2 text-center text-gray-800">API Key Management</h1>
+    <p class="text-gray-500 text-center mb-8 text-sm">Generate and revoke keys for external service integrations</p>
+
+    {{#if newKey}}
+    <div class="mb-8 bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl shadow-sm">
+      <div class="flex items-center mb-3">
+        <span class="text-amber-600 mr-2">⚠️</span>
+        <h4 class="font-bold text-amber-800">Copy your API Key now!</h4>
+      </div>
+      <p class="text-amber-700 text-sm mb-4">For security reasons, this key will <strong>never</strong> be shown again. Store it in a secure password manager.</p>
+      
+      <div class="flex items-center gap-2">
+        <code id="rawKeyDisplay" class="flex-1 bg-white border border-amber-200 px-4 py-3 rounded-lg font-mono text-blue-600 break-all select-all">
+          {{newKey}}
+        </code>
+        <button 
+          onclick="copyKey('{{newKey}}')" 
+          class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 rounded-lg transition-colors font-semibold text-sm shadow-sm"
+        >
+          Copy
+        </button>
+      </div>
+    </div>
+    {{/if}}
+
+    <div class="bg-gray-50 rounded-xl p-6 mb-10 border border-gray-100">
+      <h3 class="text-sm font-bold text-gray-600 uppercase tracking-wider mb-4">Generate New Access Key</h3>
+      <form action="/keys/generate" method="POST" class="flex flex-col md:flex-row gap-4">
+        
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">Key Name / Description</label>
+          <input type="text" name="name" placeholder="e.g. Inventory Sync Bot" 
+                 class="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition" required>
+        </div>
+
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">Assign to User</label>
+          <select name="userId" class="w-full border border-gray-200 rounded-lg px-4 py-2.5 bg-white outline-none focus:ring-2 focus:ring-blue-500 transition" required>
+            <option value="" selected disabled>Select Technician...</option>
+            {{#each users}}
+              <option value="{{this.id}}">{{this.name}} ({{this.role}})</option>
+            {{/each}}
+          </select>
+        </div>
+
+        <div class="md:pt-5">
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition-all active:scale-95">
+            Generate
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full border border-gray-100 rounded-lg">
+        <thead class="bg-gray-800 text-white">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Key Name</th>
+            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Owner ID</th>
+            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Created</th>
+            <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider">Status / Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{#each keys}}
+            <tr class="hover:bg-blue-50/50 transition-colors">
+              <td class="px-6 py-4 font-semibold text-gray-700">{{this.name}}</td>
+              <td class="px-6 py-4 font-mono text-xs text-gray-400">{{this.userId}}</td>
+              <td class="px-6 py-4 text-sm text-gray-500">{{this.createdAt}}</td>
+              <td class="px-6 py-4 text-right">
+                <form action="/keys/revoke/{{this.id}}" method="POST" onsubmit="return confirm('Revoke this key? All integrations using it will fail immediately.')">
+                  <button type="submit" class="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-1.5 rounded-full text-xs font-bold transition-all border border-red-100">
+                    Revoke Key
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {{else}}
+            <tr>
+              <td colspan="4" class="px-6 py-12 text-center text-gray-400 italic">
+                No active API keys found.
+              </td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function copyKey(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('API Key copied to clipboard!');
+    });
+  }
+</script>

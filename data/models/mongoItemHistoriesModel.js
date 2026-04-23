@@ -13,7 +13,6 @@ const ItemHistorySchema = new mongoose.Schema({
   },
   duration: {type:Number,default: null},
   referenceLink: String,
-
   action: {
     type: String,
     enum: ["checkout", "checkin"]

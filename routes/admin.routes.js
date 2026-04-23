@@ -5,7 +5,7 @@ const { requireRole } = require("../middleware/roleCheck");
 const adminController = require("../controllers/admin.controller");
 
 router.use(protect);
-// router.use(requireRole("Admin")); <-- bugged for now (endless re-routing)
+router.use(requireRole("Admin"));
 
 // dashboard
 // router.get('/', protect, requireRole("Admin"), adminController.home);

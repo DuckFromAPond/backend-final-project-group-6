@@ -28,7 +28,7 @@ exports.checkAdminAvailability = async () => {
 // register
 exports.registerNewUser = async (name, email, password) => {
   const db = getDbProvider();
-  
+
   const hasAdmin = await db.hasActiveAdmin();
   const role = hasAdmin ? "Technician" : "Admin";
 
@@ -42,6 +42,11 @@ exports.getAllUsers = async () => {
 };
 
 // update role and status
+exports.updateUserRole = async (userId, newRole) => {
+  const db = getDbProvider();
+  return await db.updateUser(userId, { role: newRole });
+};
+
 exports.updateUserStatus = async (userId, newStatus) => {
   const db = getDbProvider();
 

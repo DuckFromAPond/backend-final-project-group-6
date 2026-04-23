@@ -5,21 +5,44 @@
     </div>
     
     {{!-- Title --}}
-    <h1 class="text-3xl font-bold">Items</h1>
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Items</h1>
+        <p class="text-gray-500 mt-1">All items in the system</p>
+    </div>
     
     <section class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-10 w-full">
         <nav class="bg-white p-4 rounded-lg shadow-sm">
-            <h2 class="text-lg font-semibold mb-2">Categories</h2>
+            <a class="text-lg font-semibold mb-2"
+                href="/items"
+            >Categories</a>
 
             <ul class="space-y-1">
+
                 {{#each categories}}
                 <li>
                     <a href="/items?cat={{this.name}}"
-                    class="block px-2 py-1 rounded hover:bg-gray-100 transition">
+                    class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition">
                     {{this.name}}
                     </a>
                 </li>
                 {{/each}}
+
+                <li>
+                    <button
+                    class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                    onclick="openSubcategory()"
+                    >
+                    Subcategories
+                    </button>
+                </li>
+
+                <li>
+                    <a href="/items?isRetired=true"
+                    class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                    >
+                    Show retired
+                    </a>
+                </li>
             </ul>
         </nav>
 
@@ -49,6 +72,12 @@
                 {{#each items}}
                     {{> itemCard}}
                 {{/each}}
+
+                <div
+                    class="w-full col-span-full"
+                >
+                    {{> itemPaginator}}
+                </div>
             </section>
         {{else}}
             <section class="w-full flex flex-col justify-center items-center gap-y-5">
@@ -56,10 +85,25 @@
                 <p class="text-gray-500">Try searching for something else or adding a new item.</p>
             </section>
         {{/if}}
-
     </section>
 
+    {{!-- HIDDEN FORM PAGE --}}
+    <div id="subcategoryModal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeSubcategory()">
+        {{!-- make closeform only work for background --}}
+        <div onclick="event.stopPropagation()">     
+            {{> subCategoryModal title="Subcategories"}}
+        </div>
+    </div>
+
     <script>
+        function openSubcategory() {
+            document.getElementById("subcategoryModal").classList.remove("hidden");
+        }
+
+        function closeSubcategory() {
+            document.getElementById("subcategoryModal").classList.add("hidden");
+        }
+
         function openForm(id) {
             document.getElementById("modal").classList.remove("hidden");
 

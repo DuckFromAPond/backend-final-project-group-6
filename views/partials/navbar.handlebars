@@ -9,11 +9,14 @@
                 <a href="/owned" class="{{#if navCheckin}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} rounded-lg px-3 py-1 transition">Owned</a>
                 <a href="/report" class="{{#if navReport}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} rounded-lg px-3 py-1 transition">Report</a>
                 {{!-- ADD IF CONDITION TO CHECK FOR THIS + KEY TO CHECK IF PAGE IS ALLOWED  --}}
-                <a href="/users" class="{{#if navUsers}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} p-3 py-1 rounded-lg transition">Users</a>
+                {{#if (eq user.role "Admin")}}
+                    <a href="/users" class="{{#if navUsers}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} p-3 py-1 rounded-lg transition">Users</a>
+                {{/if}}
 
                 {{#if (eq user.role "Admin")}}
-                    <a href="http://admin.{{config.DOMAIN}}:{{config.PORT}}" class="{{#if navAdmin}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} px-3 py-1 rounded-lg transition">Admin</a>
+                    <a href="/keys" class="{{#if navKeys}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} p-3 py-1 rounded-lg transition">Keys</a>
                 {{/if}}
+
             </nav>
             <div>
                 <a href="/logout" 

@@ -1,8 +1,6 @@
 const { generateToken } = require("../middleware/authMiddleware");
 const userService = require("../services/userService"); // Import the service
 
-const config = require('../config/app.config');
-
 exports.showLogin = (req, res) => {
   res.render("auth/login", {
     layout: "no_nav_bar",
@@ -15,7 +13,6 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Call the service for the "Thinking" part
     const authResult = await userService.authenticateUser(email, password);
 
     if (!authResult.success) {
@@ -30,8 +27,8 @@ exports.login = async (req, res) => {
     const token = generateToken(authResult.user);
     res.cookie("accessToken", token, {
       httpOnly: true,
-      secure: config.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60, // 1 hour
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60,
     });
 
     return res.redirect("/home");

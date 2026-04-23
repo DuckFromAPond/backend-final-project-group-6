@@ -1,28 +1,28 @@
 const mongoose = require("mongoose");
 
 const ApiKeySchema = new mongoose.Schema({
-  key: {
+  hashedKey: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   name: String,
 
-  adminId: {
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true
+    required: true,
   },
 
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
 
   revoked: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 });
 
 module.exports = mongoose.model("ApiKey", ApiKeySchema);

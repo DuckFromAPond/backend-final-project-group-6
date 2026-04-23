@@ -9,6 +9,13 @@ const apiController = require("../controllers/api.controller");
 // users
 router.post("/login", loginLimiter, apiController.apiLogin);
 
+router.get(
+  "/users",
+  apiProtect,
+  requireRoleAPI("Admin"),
+  apiController.getAllUsers,
+);
+
 router.post(
   "/users",
   apiProtect,
@@ -29,19 +36,21 @@ router.patch(
 );
 
 // router.get('/keys', apiProtect, requireRoleAPI("Admin"), apiController.getKeys)
-// router.get('/items', authOrApiKey, apiController.getItems)
-// router.get('/items/:id/history', authOrApiKey, apiController.getItemHist)
 
 // router.post('/auth/login', loginLimiter, apiController.apiLogin);
 // router.post('/keys', apiProtect, requireRoleAPI("Admin"), apiController.generateKey);
-// router.post('/items', authOrApiKey, apiController.createItem);
 // router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
 // router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
 
 // router.delete('/keys/:id', apiProtect, requireRoleAPI("Admin"), apiController.deleteKey);
-// router.delete('/items/:id', apiProtect, requireRoleAPI("Admin"), apiController.archiveItem);
 
-// router.put('/items/:id', apiProtect, apiController.updateItem)              // <--- cannot update status if in-use
+// API ROUTES FOR ITEMS
+router.get("/items", authOrApiKey, apiController.showItems);
+router.get("/items/:id", apiProtect, apiController.showItemDetail);
+router.post("/items", authOrApiKey, apiController.createItem);
+router.get('/items/:id/history', authOrApiKey, apiController.showItemHistory);
+router.delete("/items/:id", apiProtect, apiController.deleteItem);
+router.put("/items/:id", apiProtect, apiController.editItem);
 
 router.get("/files/:bucket/:id", apiProtect, apiController.getFile);
 
