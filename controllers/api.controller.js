@@ -2,6 +2,7 @@
 
 const userService = require("../services/userService");
 const { generateToken } = require("../middleware/authMiddleware");
+const { getDbProvider } = require("../utils/dbProviderShared");
 
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
@@ -89,4 +90,41 @@ exports.updateUserStatus = async (req, res) => {
 exports.generateKey = async (req, res) => {
   // Logic for generating API keys for external systems
   return res.status(501).json({ message: "Not implemented yet" });
+};
+
+exports.getFile = async (req, res) => {
+  try {
+    const db = getDbProvider();
+
+    const { bucket, id } = req.params;
+
+    const ALLOWED_BUCKETS = ["items", "docs"];
+
+    if (!ALLOWED_BUCKETS.includes(bucket)) {
+      return res.status(400).send("Invalid bucket");
+    }
+
+    const result = await db.getFile(bucket, id);
+
+    if (!result) {
+      return res.status(404).send("File not found");
+    }
+
+    if (result.type === "stream") {
+      const stream = result.data;
+
+      res.set("Content-Type", result.contentType || "image/jpeg");
+
+      return stream.pipe(res);
+    }
+
+    if (result.type === "url") {
+      return res.json({ url: result.data });
+    }
+
+    return res.status(500).send("Invalid file response");
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send("Error fetching file");
+  }
 };

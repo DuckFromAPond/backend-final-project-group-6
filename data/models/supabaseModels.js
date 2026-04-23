@@ -79,6 +79,18 @@ function mapApiKeyRowToModel(row) {
   };
 }
 
+
+function mapCategoryRowToModel(row) {
+  return {
+    id: toIdString(row.id),
+    key: row.key,
+    name: row.name,
+	adminId: row.adminId,
+    createdAt: row.createdAt,
+    revoked: row.revoked,
+  };
+}
+
 module.exports = {
 	SUPABASE_TABLES,
 	mapUserRowToModel,

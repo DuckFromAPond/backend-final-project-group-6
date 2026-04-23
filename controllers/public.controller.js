@@ -91,10 +91,30 @@ exports.showItems = async (req, res) => {
   let items = await db.getItems();
 
   items = items.filter(item => item.status !== "Retired");
+
+  items = items.map(item => {
+  if (!item.image) return item;
+
+  // Mongo (GridFS)
+  if (db.providerKey === "mongodb") {
+    item.imageUrl = `/api/files/items/${item.image}`;
+  }
+
+  // Supabase
+  if (db.providerKey === "mongodb") {
+    item.imageUrl = dbProvider.getImageUrl(item.image);
+  }
+
+  return item;
+  });
   
   // derive categories dynamically
   const categories = [
     ...new Set(items.map(item => item.category))
+  ].map(name => ({ name }));
+
+  const subCategories = [
+    ...new Set(items.map(item => item.subCategories))
   ].map(name => ({ name }));
 
   // filter by category

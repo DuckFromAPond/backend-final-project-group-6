@@ -114,6 +114,31 @@ class SupabaseProvider extends DatabaseProvider {
 		if (apiError) throw new Error("API keys table missing");
 	}
 
+	async getFile(bucket, id) {
+		if (!id) return null;
+
+		let targetBucket;
+
+		if (bucket === "items") {
+			targetBucket = "items-bucket";
+		} else if (bucket === "docs") {
+			targetBucket = "docs-bucket";
+		} else {
+			return null;
+		}
+
+		const { data } = this.supabase.storage
+			.from(targetBucket)
+			.getPublicUrl(id);
+
+		if (!data?.publicUrl) return null;
+
+		return {
+			type: "url",
+			data: data.publicUrl
+		};
+	}
+
 	// ===== USER =====
 	async registerUser(email, password, name, role) {
 		const normalizedEmail = this.normalizeEmail(email);

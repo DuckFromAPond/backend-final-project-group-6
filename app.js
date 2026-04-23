@@ -1,5 +1,5 @@
 "use strict"; // for debugging
-
+const mongoose = require("mongoose");
 const express = require("express");
 const vhost = require("vhost");
 const { engine } = require("express-handlebars");
@@ -209,43 +209,6 @@ async function startServer() {
     dbProvider = await createDatabaseProvider();
     setDbProvider(dbProvider);
     console.log(`Connected to ${dbProvider.providerKey} database provider`);
-
-    // for getting img on the mongo side
-    if (dbProvider.providerKey === "mongodb") {
-      app.get("/files/items/:id", (req, res) => {
-        try {
-          const fileId = new mongoose.Types.ObjectId(req.params.id);
-
-          const stream = dbProvider.itemsBucket.openDownloadStream(fileId);
-
-          stream.on("error", () => {
-            return res.status(404).send("Image not found");
-          });
-
-          res.setHeader("Content-Type", "image/*");
-
-          stream.pipe(res);
-        } catch (err) {
-          res.status(400).send("Invalid file id");
-        }
-      });
-
-      app.get("/files/docs/:id", (req, res) => {
-        try {
-          const fileId = new mongoose.Types.ObjectId(req.params.id);
-
-          const stream = dbProvider.getDocumentStream(fileId);
-
-          stream.on("error", () => {
-            res.status(404).send("File not found");
-          });
-
-          stream.pipe(res);
-        } catch (err) {
-          res.status(500).send("Server error");
-        }
-      });
-    }
 
     app.listen(config.PORT, () => {
       if (config.NODE_ENV === "development") {

@@ -124,30 +124,61 @@ class MongoProvider extends DatabaseProvider {
     };
   }
 
-  getImageStream(fileId) {
+  getImageStream(imageName) {
     return this.itemsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId)
+      new mongoose.Types.ObjectId(imageName)
     );
   }
 
-  getDocumentStream(fileId) {
+  getDocumentStream(imageName) {
     return this.docsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId)
+      new mongoose.Types.ObjectId(imageName)
     );
   }
 
-  getImageUrl(fileId) {
-    if (!fileId) return null;
+  getImageUrl(imageName) {
+    if (!imageName) return null;
 
-    return `${config.BASE_URL}/files/items/${fileId}`;
+    return `${config.BASE_URL}/api/files/items/${imageName}`;
   }
 
-  getDocumentUrl(fileId) {
-  if (!fileId) return null;
+  getDocumentUrl(imageName) {
+    if (!imageName) return null;
 
-  return `${config.BASE_URL}/files/docs/${fileId}`;
-}
+    return `${config.BASE_URL}/api/files/docs/${imageName}`;
+  }
   
+  
+  async getFile(bucket, id) {
+    const valid = mongoose.Types.ObjectId.isValid(id);
+    if (!valid) return null;
+
+    let gridBucket;
+
+    if (bucket === "items") {
+      gridBucket = this.itemsBucket;
+    } else if (bucket === "docs") {
+      gridBucket = this.docsBucket;
+    } else {
+      return null;
+    }
+
+    const file = await mongoose.connection.db
+      .collection(`${bucket}.files`)
+      .findOne({ _id: new mongoose.Types.ObjectId(id) });
+
+    if (!file) return null;
+
+    const stream = gridBucket.openDownloadStream(
+      new mongoose.Types.ObjectId(id)
+    );
+
+    return {
+      type: "stream",
+      data: stream,
+      contentType: file.contentType
+    };
+  }
 
 	// ===== USER =====
   async registerUser(email, password, name, role) {

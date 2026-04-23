@@ -7,6 +7,8 @@ class DatabaseProvider {
 		this.providerLabel = null;
 	}
 
+	async getFile(bucket, id) {}
+
 	// ===== USER =====
 	async registerUser(email, password, name, role) {throw new Error("missing implementation");}	// create user (I am not renaming this function)
 	async findUserByEmail(email) {throw new Error("missing implementation");}
