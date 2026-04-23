@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const express = require("express");
 
 const { engine } = require("express-handlebars");
-const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const morgan = require("morgan");
@@ -103,18 +102,6 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true })); // for forms (login/register)
 app.use(express.json());
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "SESSION_SECRET",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: false, // Set to true if using HTTPS/Production
-      maxAge: 1000 * 60 * 1, // 1 minute
-    },
-  }),
-);
 
 app.use((req, res, next) => {
   const pathName = req.path;

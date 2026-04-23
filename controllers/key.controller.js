@@ -8,18 +8,21 @@ exports.renderKeyManagement = async (req, res) => {
   try {
     const activeKeys = await keyService.getActiveKeys();
     const allUsers = await userService.getAllUsers(); // To populate the "Assign to User" dropdown
+    const newKey = req.cookies.newRawKey || null;
+
+    // clear the key from cookie after one render so it disappears on refresh
+    if (newKey) {
+      res.clearCookie("newRawKey");
+    }
 
     res.render("keys", {
       title: "API Key Management",
       keys: activeKeys,
       users: allUsers,
       user: req.user, // Current logged-in admin
-      // Check if there's a freshly generated key in the session to show once
-      newKey: req.session.newRawKey || null,
+      // check if there's a freshly generated key in the session to show once
+      newKey: newKey,
     });
-
-    // Clear the key from session after one render so it disappears on refresh
-    req.session.newRawKey = null;
   } catch (error) {
     console.error("Error rendering API management:", error);
     res.status(500).render("error", { message: "Failed to load API keys" });
@@ -34,9 +37,12 @@ exports.handleGenerateKey = async (req, res) => {
       return res.status(400).send("Name and User ID required");
 
     const result = await keyService.generateNewKey(name, userId);
-    req.session.newRawKey = result.rawKey;
 
-    // Use absolute path
+    res.cookie("newRawKey", result.rawKey, {
+      maxAge: 10000, // 10s; may need to change if too short
+      httpOnly: true,
+    });
+
     res.redirect("/keys");
   } catch (error) {
     res.status(500).send("Internal Server Error");
