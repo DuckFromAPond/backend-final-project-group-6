@@ -2,8 +2,6 @@
 const mongoose = require("mongoose");
 const express = require("express");
 
-const vhost = require("vhost");
-
 const { engine } = require("express-handlebars");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
@@ -21,7 +19,7 @@ const { setDbProvider } = require("./utils/dbProviderShared");
 const config = require("./config/app.config");
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require("./routes/public.routes");
-const adminRoutes = require("./routes/admin.routes");
+// const adminRoutes = require("./routes/admin.routes");
 const apiRoutes = require("./routes/api.routes");
 
 const createDatabaseProvider = require("./utils/createDBProvider");
@@ -55,7 +53,6 @@ const hbsHelpers = {
 // CORS configuration
 const whitelist = new Set([
   `http://localhost:${config.PORT}`,
-  `http://admin.localhost:${config.PORT}`,
   "http://127.0.0.1:3000",
   "http://localhost:5173",
   "https://websitename.com", // <--------------------------- change when host on cloudflare later btw
@@ -77,89 +74,6 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// configurations for public app ───────────────────────────────────
-const publicApp = express();
-publicApp.engine(
-  "handlebars",
-  engine({
-    defaultLayout: "main",
-    layoutsDir: path.join(__dirname, "views/layouts"),
-    partialsDir: path.join(__dirname, "views/partials"),
-    helpers: hbsHelpers,
-  }),
-);
-publicApp.set("view engine", "handlebars");
-publicApp.set("views", path.join(__dirname, "views"));
-
-// middleware ───────────────────────────────────
-publicApp.use(cors(corsOptions));
-publicApp.use(cookieParser());
-publicApp.use(express.static(path.join(__dirname, "public")));
-publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
-publicApp.use(express.json());
-
-// Morgan logging
-// publicApp.use(morgan('dev'));
-
-// temp (will change when nav is finalized)
-publicApp.use((req, res, next) => {
-  const pathName = req.path;
-
-  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
-  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
-  res.locals.navCheckin = pathName.startsWith("/owned");
-  res.locals.navReport = pathName.startsWith("/report");
-  res.locals.navUsers = pathName.startsWith("/users"); //
-  res.locals.navKeys = pathName.startsWith("/keys"); //
-
-  res.locals.config = config;
-  next();
-});
-
-publicApp.use("/", authRoutes);
-publicApp.use("/", publicRoutes);
-
-// ------ adminApp ------
-const adminApp = express();
-
-adminApp.engine(
-  "handlebars",
-  engine({
-    defaultLayout: "main",
-    extname: ".handlebars",
-    layoutsDir: path.join(__dirname, "views/layouts"),
-    partialsDir: path.join(__dirname, "views/partials"),
-    helpers: hbsHelpers,
-  }),
-);
-
-adminApp.set("view engine", "handlebars");
-adminApp.set("views", path.join(__dirname, "views"));
-
-// adminApp middleware
-adminApp.use(cors(corsOptions));
-adminApp.use(express.urlencoded({ extended: false }));
-adminApp.use(express.static(path.join(__dirname, "public")));
-adminApp.use(cookieParser());
-
-// temp (will change when nav is finalized)
-adminApp.use((req, res, next) => {
-  const pathName = req.path;
-
-  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
-  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
-  res.locals.navCheckin = pathName.startsWith("/owned");
-  res.locals.navReport = pathName.startsWith("/report");
-  res.locals.navUsers = pathName.startsWith("/users"); // <---- temp will delete when admin part is implemented
-  res.locals.navKeys = pathName.startsWith("/keys"); //
-
-  res.locals.config = config;
-  next();
-});
-
-adminApp.use("/", authRoutes);
-adminApp.use("/", adminRoutes);
-
 // ---------- API -----------------
 const apiApp = express();
 apiApp.use(cors(corsOptions));
@@ -180,6 +94,16 @@ app.engine(
   }),
 );
 
+app.set("view engine", "handlebars");
+app.set("views", path.join(__dirname, "views"));
+
+// middleware ───────────────────────────────────
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.urlencoded({ extended: true })); // for forms (login/register)
+app.use(express.json());
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "SESSION_SECRET",
@@ -191,6 +115,20 @@ app.use(
     },
   }),
 );
+
+app.use((req, res, next) => {
+  const pathName = req.path;
+
+  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
+  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
+  res.locals.navCheckin = pathName.startsWith("/owned");
+  res.locals.navReport = pathName.startsWith("/report");
+  res.locals.navUsers = pathName.startsWith("/users"); //
+  res.locals.navKeys = pathName.startsWith("/keys"); //
+
+  res.locals.config = config;
+  next();
+});
 
 app.set("view engine", "handlebars");
 app.set("views", path.join(__dirname, "views"));
@@ -205,7 +143,8 @@ if (config.NODE_ENV === "production") {
 }
 
 app.use("/api", apiApp);
-app.use(publicApp); // fallback → public app
+app.use("/", authRoutes);
+app.use("/", publicRoutes);
 
 // Other routes
 app.use((error, req, res, next) => {
@@ -227,13 +166,13 @@ async function startServer() {
     app.listen(config.PORT, () => {
       if (config.NODE_ENV === "development") {
         console.log(`Using ${config.NODE_ENV} environment`);
-        console.log(`  Public : http://${config.DOMAIN}:${config.PORT}`);
-        console.log(`  Admin  : http://admin.${config.DOMAIN}:${config.PORT}`);
+        console.log(
+          `  Both Admin & Public : http://${config.DOMAIN}:${config.PORT}`,
+        );
         console.log(`Database provider: ${dbProvider.providerLabel}`);
       } else {
         console.log(`Using ${config.NODE_ENV} environment`);
-        console.log(`  Public : http://${config.BASE_URL}`);
-        console.log(`  Admin  : http://admin.${config.BASE_URL}`);
+        console.log(`  Both Admin & Public : http://${config.BASE_URL}`);
         console.log(`Database provider: ${dbProvider.providerLabel}`);
       }
     });
