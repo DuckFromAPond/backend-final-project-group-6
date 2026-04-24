@@ -12,12 +12,18 @@
     
     <section class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-10 w-full">
         <nav class="bg-white p-4 rounded-lg shadow-sm">
-            <a class="text-lg font-semibold mb-2"
+            <div class="text-lg font-semibold mb-2"
                 href="/items"
-            >Categories</a>
+            >Categories</div>
 
             <ul class="space-y-1">
-
+                
+                <li>
+                    <a class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                        href="/items"
+                    >All</a>
+                </li>
+                
                 {{#each categories}}
                 <li>
                     <a href="/items?cat={{this.name}}"
@@ -26,7 +32,6 @@
                     </a>
                 </li>
                 {{/each}}
-
                 <li>
                     <button
                     class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
@@ -47,7 +52,7 @@
         </nav>
 
         <form method="GET" action="/items"
-            class="flex gap-2 justify-end items-center bg-white p-4 rounded-lg shadow-sm">
+            class="h-20 flex gap-2 justify-end items-center bg-white p-4 rounded-lg shadow-sm">
 
             <input
                 type="text"

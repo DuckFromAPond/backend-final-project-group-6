@@ -48,7 +48,8 @@ CREATE TABLE item_histories (
     duration INTEGER DEFAULT NULL,
     referenceLink TEXT,
     action TEXT CHECK (action IN ('checkout', 'checkin')),
-    createdAt TIMESTAMP DEFAULT NOW()
+    createdAt TIMESTAMP DEFAULT NOW(),
+    returnedAt TIMESTAMP DEFAULT NULL
 );
 
 -- =========================
@@ -56,7 +57,7 @@ CREATE TABLE item_histories (
 -- =========================
 CREATE TABLE api_keys (
     id SERIAL PRIMARY KEY,
-    key TEXT UNIQUE NOT NULL,
+    hashKey TEXT UNIQUE NOT NULL,
     name TEXT,
     adminId INTEGER NOT NULL REFERENCES users(id),
     createdAt TIMESTAMP DEFAULT NOW(),

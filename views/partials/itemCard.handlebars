@@ -2,25 +2,25 @@
     <div class="overflow-hidden w-full h-50 relative">
         
         {{#ifContains status "Available"}}
-            <span class="px-3 py-1 text-sm font-semibold rounded-lg bg-green-100 text-green-800 absolute z-10">
+            <span class="m-2 px-3 py-1 text-sm font-semibold rounded-lg bg-green-100 text-green-800 absolute z-10">
                 Available
             </span>
         {{/ifContains}}
 
         {{#ifContains status "In-Use"}}
-            <span class="px-3 py-1 text-sm font-semibold rounded-lg bg-purple-100 text-purple-800 absolute z-10">
+            <span class="m-2 px-3 py-1 text-sm font-semibold rounded-lg bg-purple-100 text-purple-800 absolute z-10">
                 In-Use
             </span>
         {{/ifContains}}
 
         {{#ifContains status "Maintenance"}}
-            <span class="px-3 py-1 text-sm font-semibold rounded-lg bg-orange-100 text-orange-800 absolute z-10">
+            <span class="m-2 px-3 py-1 text-sm font-semibold rounded-lg bg-orange-100 text-orange-800 absolute z-10">
                 Maintenance
             </span>
         {{/ifContains}}
 
         {{#ifContains status "Retired"}}
-            <span class="px-3 py-1 text-sm font-semibold rounded-lg bg-gray-100 text-gray-800 absolute z-10">
+            <span class="m-2 px-3 py-1 text-sm font-semibold rounded-lg bg-gray-100 text-gray-800 absolute z-10">
                 Retired
             </span>
         {{/ifContains}}
@@ -53,7 +53,7 @@
 {{!-- HIDDEN FORM PAGE --}}
 <div id="modal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeForm()">
     {{!-- make closeform only work for background --}}
-    <div onclick="event.stopPropagation()">     
+    <div class="w-full max-w-lg" onclick="event.stopPropagation()">     
         {{> form title="Check-out" action="checkout"}}
     </div>
 </div>

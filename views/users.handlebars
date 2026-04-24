@@ -28,11 +28,19 @@
             <td class="px-4 py-2">{{this.email}}</td>
             
             <td class="px-4 py-2">
-              <form action="/users/{{this.id}}/role" method="POST" class="flex items-center gap-2">
-                <select name="role" onchange="this.form.submit()" class="border rounded px-2 py-1 text-sm bg-white">
+              <form action="/users/{{this.id}}/role" method="POST" class="relative group max-w-[150px]">
+                <select name="role" 
+                        onchange="this.form.submit()" 
+                        class="block appearance-none w-full border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all hover:bg-gray-50">
                   <option value="Technician" {{#if (eq this.role "Technician")}}selected{{/if}}>Technician</option>
                   <option value="Admin" {{#if (eq this.role "Admin")}}selected{{/if}}>Admin</option>
                 </select>
+                
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 group-hover:text-gray-600">
+                  <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  </svg>
+                </div>
               </form>
             </td>
 

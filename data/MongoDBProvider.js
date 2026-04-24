@@ -93,20 +93,19 @@ class MongoProvider extends DatabaseProvider {
       dateAcquired: item.dateAcquired,
       currentOwner: item.currentOwner,
       imageName: item.imageName,
-      imageAlt: item.imageAlt
+      imageAlt: item.imageAlt,
     };
   }
 
+  // Helper to keep the data format consistent (id vs _id)
   mapApiKey(key) {
-    if (!key) return null;
-
     return {
-      id: String(key._id),
+      id: key._id.toString(),
+      hashedKey: key.hashedKey,
       name: key.name,
-      adminId: String(key.adminId),
-      key: key.key, // remove this if showing in UI
-      revoked: key.revoked,
+      userId: key.userId.toString(),
       createdAt: key.createdAt,
+      revoked: key.revoked,
     };
   }
 
@@ -121,49 +120,71 @@ class MongoProvider extends DatabaseProvider {
       duration: history.duration || null,
       referenceLink: history.referenceLink || null,
       createdAt: history.createdAt,
+      returnedAt: history.returnedAt,
     };
   }
 
-  getImageStream(fileId) {
+  getImageStream(imageName) {
     return this.itemsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId),
+      new mongoose.Types.ObjectId(imageName)
     );
   }
 
-  getDocumentStream(fileId) {
+  getDocumentStream(imageName) {
     return this.docsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(fileId),
+      new mongoose.Types.ObjectId(imageName)
     );
   }
 
-  getLatestCheckoutRows(rows, getItemId) {
-    const latestMap = new Map();
+  getImageUrl(imageName) {
+    if (!imageName) return null;
 
-    for (const row of rows) {
-      const itemId = getItemId(row);
-      if (!itemId) continue;
+    return `${config.BASE_URL}/api/files/items/${imageName}`;
+  }
 
-      if (!latestMap.has(itemId)) {
-        latestMap.set(itemId, row);
-      }
+  getDocumentUrl(imageName) {
+    if (!imageName) return null;
+
+    return `${config.BASE_URL}/api/files/docs/${imageName}`;
+  }
+  
+  
+  async getFile(bucket, id) {
+    const valid = mongoose.Types.ObjectId.isValid(id);
+    if (!valid) return null;
+
+    let gridBucket;
+
+    if (bucket === "items") {
+      gridBucket = this.itemsBucket;
+    } else if (bucket === "docs") {
+      gridBucket = this.docsBucket;
+    } else {
+      return null;
     }
 
-    return [...latestMap.values()].filter((r) => r.action === "checkout");
+    const file = await mongoose.connection.db
+      .collection(`${bucket}.files`)
+      .findOne({ _id: new mongoose.Types.ObjectId(id) });
+
+    if (!file) return null;
+
+    const stream = gridBucket.openDownloadStream(
+      new mongoose.Types.ObjectId(id)
+    );
+
+    return {
+      type: "stream",
+      data: stream,
+      contentType:
+        file.contentType ||
+        file.metadata?.contentType ||
+        "application/octet-stream",
+      filename: file.filename,
+    };
   }
 
-  getImageUrl(fileId) {
-    if (!fileId) return null;
-
-    return `${config.BASE_URL}/files/items/${fileId}`;
-  }
-
-  getDocumentUrl(fileId) {
-    if (!fileId) return null;
-
-    return `${config.BASE_URL}/files/docs/${fileId}`;
-  }
-
-	// ===== USER =====
+  // ===== USER =====
   async registerUser(email, password, name, role) {
     const existingAdmin = await User.findOne({
       role: "Admin",
@@ -222,8 +243,9 @@ class MongoProvider extends DatabaseProvider {
     return this.mapUser(user.toObject());
   }
 
-  async revokeOwnedApiKeys(userId) {    // for business rule to remove all owned by a disabled acc
-    await ApiKey.updateMany({ admin_id: userId }, { revoked: true });
+  async revokeOwnedApiKeys(userId) {
+    // for business rule to remove all owned by a disabled acc
+    await ApiKey.updateMany({ userId: userId }, { revoked: true });
   }
 
   async getAllUsers() {
@@ -234,28 +256,27 @@ class MongoProvider extends DatabaseProvider {
   async hasActiveAdmin() {
     const admin = await User.findOne({
       role: "Admin",
-      status: "Active"
+      status: "Active",
     }).lean();
 
     return !!admin;
   }
 
-  async findActiveCheckout(itemId) {
-    return await ItemHistory.findOne({
-      itemId:itemId,
-      action: "checkout",
-      returnedAt: null
-    })
-      .sort({ created_at: -1 })
+  async findActiveAction(itemId, action) {
+    const latest = await ItemHistory.findOne({ itemId })
+      .sort({ createdAt: -1 })
       .lean();
+
+    return latest?.action === action && latest?.returnedAt === null;
   }
 
-
-  
-	// ===== ITEMS =====
+  // ===== ITEMS =====
   async getItems() {
     const items = await Item.find().lean();
-    return items.map(i => ({...this.mapItem(i), imageUrl: this.getImageUrl(i.imageName)}));
+    return items.map((i) => ({
+      ...this.mapItem(i),
+      imageUrl: this.getImageUrl(i.imageName),
+    }));
   }
 
   async getItemById(id) {
@@ -273,15 +294,15 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getItemBySerial(serial) {
-  const item = await Item.findOne({ serial }).lean();
+    const item = await Item.findOne({ serial }).lean();
 
-  if (!item) return null;
+    if (!item) return null;
 
-  return {
-    ...this.mapItem(item),
-    imageUrl: this.getImageUrl(item.imageName),
-  };
-}
+    return {
+      ...this.mapItem(item),
+      imageUrl: this.getImageUrl(item.imageName),
+    };
+  }
 
   async createItem(data) {
     const item = await Item.create(data);
@@ -293,15 +314,15 @@ class MongoProvider extends DatabaseProvider {
     return this.mapItem(item);
   }
 
-  async setItemStatus(id, status) {
-    const item = await Item.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true },
-    ).lean();
+  // async setItemStatus(id, status) {
+  //   const item = await Item.findByIdAndUpdate(
+  //     id,
+  //     { status },
+  //     { new: true },
+  //   ).lean();
 
-    return this.mapItem(item);
-  }
+  //   return this.mapItem(item);
+  // }
 
   // ===== HISTORY =====
   async getItemHistories() {
@@ -326,53 +347,47 @@ class MongoProvider extends DatabaseProvider {
       duration: data.duration ?? null,
       referenceLink: data.referenceLink ?? null,
       createdAt: new Date(),
+      returnedAt: data.returnedAt ?? null,
     });
 
     return this.mapItemHistory(history.toObject());
   }
 
-  async getUserItems(userId) {
-    const items = await Item.find({ currentOwner: userId }).lean();
-
-    const itemIds = items.map(i => i._id);
-
-    const histories = await ItemHistory.find({
-      itemId: { $in: itemIds }
-    })
+  async getUserHistory(userId) {
+    const histories = await ItemHistory.find({ userId })
+      .populate("itemId")
       .sort({ createdAt: -1 })
       .lean();
 
-    const latest = this.getLatestCheckoutRows(histories, (r) =>
-      r.itemId?._id?.toString(),
-    );
-
-    return latest.map((r) => ({
+    return histories.map((r) => ({
       id: r._id.toString(),
       userId: r.userId.toString(),
       itemId: r.itemId._id.toString(),
       action: r.action,
       duration: r.duration,
       createdAt: r.createdAt,
-
       referenceUrl: r.referenceLink ?? null,
 
-      item: {
-        id: r.itemId._id.toString(),
-        name: r.itemId.name,
-        serial: r.itemId.serial,
-        model: r.itemId.model,
-        brand: r.itemId.brand,
-        category: r.itemId.category,
-        sub_category: r.itemId.sub_category,
-        status: r.itemId.status,
-        description: r.itemId.description,
-        dateAcquired: r.itemId.date_acquired,
-        imageAlt: r.itemId.image_alt,
-        imageUrl: this.getImageUrl(r.itemId.image_name),
-      },
+      item: r.itemId
+        ? {
+            id: r.itemId._id.toString(),
+            name: r.itemId.name,
+            serial: r.itemId.serial,
+            model: r.itemId.model,
+            brand: r.itemId.brand,
+            category: r.itemId.category,
+            subCategory: r.itemId.subCategory,
+            status: r.itemId.status,
+            description: r.itemId.description,
+            dateAcquired: r.itemId.dateAcquired,
+            imageAlt: r.itemId.imageAlt,
+            imageUrl: this.getImageUrl(r.itemId.imageName),
+          }
+        : null,
     }));
   }
 
+  // break apart later
   async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
     const item = await Item.findById(itemId);
     if (!item) throw new Error("Item not found");
@@ -386,7 +401,6 @@ class MongoProvider extends DatabaseProvider {
       throw new Error("Invalid action");
     }
 
-    // business rule check (same as normal flow)
     if (action === "checkout") {
       const existing = await ItemHistory.findOne({
         itemId,
@@ -397,7 +411,6 @@ class MongoProvider extends DatabaseProvider {
         if (existing.userId.toString() === targetUserId.toString()) {
           throw new Error("User already owns this item");
         }
-
         throw new Error("Item is already checked out");
       }
     }
@@ -408,60 +421,74 @@ class MongoProvider extends DatabaseProvider {
       action,
       duration: options.duration ?? null,
       referenceLink: options.referenceLink ?? null,
-      createdAt: new Date(),
       returnedAt: action === "checkin" ? new Date() : null,
     });
 
-    // sync item status (same logic as normal flow)
     await this.setItemStatus(
       itemId,
-      action === "checkout" ? "In-Use" : "Available",
+      action === "checkout" ? "In-Use" : "Available"
     );
 
-    return history;
+    return history.toObject();
   }
 
   // =========================
   // API KEYS
   // =========================
 
-  async createApiKey(adminId, data) {
-    const keyValue = crypto.randomBytes(32).toString("hex");
+  async createApiKey(userId, data) {
+    // generate the raw random key
+    const rawKey = crypto.randomBytes(32).toString("hex");
+
+    // hash the key for secure storage (Requirement 4.3)
+    const salt = await bcryptjs.genSalt(10);
+    const hashedKey = await bcryptjs.hash(rawKey, salt);
 
     const apiKey = await ApiKey.create({
-      key: keyValue,
-      name: data?.name ?? null,
-      adminId: adminId,
+      hashedKey: hashedKey,
+      name: data?.name || "Unnamed Key",
+      userId: userId,
       revoked: false,
       createdAt: new Date(),
     });
 
-    return apiKey;
+    // return the rawKey so the service/controller can show it once
+    const mappedKey = this.mapApiKey(apiKey.toObject());
+    return { ...mappedKey, rawKey };
   }
 
   async getApiKeys() {
-    return ApiKey.find().sort({ createdAt: -1 }).lean();
+    const keys = await ApiKey.find().sort({ createdAt: -1 }).lean();
+    return keys.map((key) => this.mapApiKey(key));
   }
 
-  async getApiKeyByKey(key) {
-    return ApiKey.findOne({ key, revoked: false }).lean();
+  // change this to find by the hashed version or just fetch all for service-side comparison
+  async getApiKeyByHash(hashedKey) {
+    const keyRecord = await ApiKey.findOne({
+      hashedKey,
+      revoked: false,
+    }).lean();
+    return keyRecord ? this.mapApiKey(keyRecord) : null;
   }
 
-  async revokeApiKey(adminId, id) {
-    const admin = await User.findById(adminId);
-
-    // ----------------------------------------------------- move this check to service later
-    if (!admin || admin.role !== "Admin") {
-      throw new Error("Only admins can revoke keys");
-    }
-
-    return ApiKey.findByIdAndUpdate(id, { revoked: true }, { new: true });
+  async updateApiKey(id, updateData) {
+    const updated = await ApiKey.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { returnDocument: "after" },
+    ).lean();
+    return updated ? this.mapApiKey(updated) : null;
   }
 
   // GRIDFS FILE UPLOAD
-  async uploadItem(filename, buffer) {
+  async uploadItem(filename, buffer, mimeType) {
     return new Promise((resolve, reject) => {
-      const uploadStream = this.itemsBucket.openUploadStream(filename);
+      const uploadStream = this.itemsBucket.openUploadStream(filename, {
+        metadata: {
+          contentType: mimeType,
+          originalName: filename,
+      },
+    });
 
       uploadStream.end(buffer);
 
@@ -473,9 +500,14 @@ class MongoProvider extends DatabaseProvider {
     });
   }
 
-  async uploadFile(filename, buffer) {
+  async uploadFile(filename, buffer, mimeType) {
     return new Promise((resolve, reject) => {
-      const uploadStream = this.docsBucket.openUploadStream(filename);
+      const uploadStream = this.docsBucket.openUploadStream(filename, {
+        metadata: {
+          contentType: mimeType,
+          originalName: filename,
+        },
+      });
 
       uploadStream.end(buffer);
 

@@ -52,50 +52,81 @@
         </div>
 
         <div class="w-1/2 flex justify-between gap-x-10">
-            {{#if isEdit}}
-                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}#editForm'"
-                >
-                    Hide Edit
-                </button>
-            {{else}}
-                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}?edit=true#editForm'"
-                >
-                    Show Edit
-                </button>
-            {{/if}}
+            <button 
+                class="hidden rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
+                onclick="toggleEdit(false)"
+                id="hideEditBtn"
+            >
+                Hide Edit
+            </button>
+
+            <button 
+                class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
+                onclick="toggleEdit(true)"
+                id="showEditBtn"
+            >
+                Show Edit
+            </button>
             
             {{#unless isRetired}}
-                {{#if isDelete}}
-                    <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                        id="deleteBtn"
-                    >
-                        Confirm Retirement
-                    </button>
-                {{else}}
-                    <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                        onclick="location.href='/items/{{id}}?del=true#deleteBtn'"
-                    >
-                        Retire
-                    </button>
-                {{/if}}
+                <button class="hidden rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                    onClick="toggleDelete(false)"
+                    id="confirmRetireBtn"
+                >
+                    Confirm Retirement
+                </button>
+
+                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                    onclick="toggleDelete(true)"
+                    id="retireBtn"
+                >
+                    Retire
+                </button>
             {{/unless}}
         </div>
     </section>
     
-    {{#if isEdit}}
-        <section id="editForm">
-            {{> itemForm}}
-        </section>
-    {{/if}}
+    <section id="editForm" class="hidden">
+        {{> itemForm}}
+    </section>
 </main>
 
 <script>
-    const deleteBtn = document.querySelector('#deleteBtn');
+    const confirmRetireBtn = document.getElementById('confirmRetireBtn');
     const itemId = "{{id}}";
 
-    deleteBtn.addEventListener('click', async (event) => {
+    function toggleEdit(show) {
+        const editForm = document.getElementById('editForm');
+        const showEditBtn = document.getElementById('showEditBtn');
+        const hideEditBtn = document.getElementById('hideEditBtn');
+
+        if(show) {
+            editForm.classList.remove('hidden');
+            hideEditBtn.classList.remove('hidden');
+            showEditBtn.classList.add('hidden');
+            editForm.scrollIntoView();
+        }
+        else {
+            editForm.classList.add('hidden');
+            hideEditBtn.classList.add('hidden');
+            showEditBtn.classList.remove('hidden');
+        }
+    }
+
+    function toggleDelete(show) {
+        const retireBtn = document.getElementById('retireBtn');
+
+        if(show) {
+            retireBtn.classList.add('hidden');
+            confirmRetireBtn.classList.remove('hidden');
+        }
+        else {
+            retireBtn.classList.remove('hidden');
+            confirmRetireBtn.classList.add('hidden');
+        }
+    }
+
+    confirmRetireBtn.addEventListener('click', async (event) => {
         const response = await fetch(`/items/${itemId}`, {
             method: 'DELETE'
         });

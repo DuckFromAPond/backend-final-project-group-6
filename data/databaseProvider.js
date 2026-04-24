@@ -7,6 +7,8 @@ class DatabaseProvider {
 		this.providerLabel = null;
 	}
 
+	async getFile(bucket, id) {}
+
 	// ===== USER =====
 	async registerUser(email, password, name, role) {throw new Error("missing implementation");}	// create user (I am not renaming this function)
 	async findUserByEmail(email) {throw new Error("missing implementation");}
@@ -16,6 +18,7 @@ class DatabaseProvider {
 	async revokeOwnedApiKeys(userId) {throw new Error("missing implementation");}		// <--- work 
 	async getAllUsers() {throw new Error("missing implementation");}
 	async hasActiveAdmin() {throw new Error("missing implementation");}
+	async findActiveAction(itemId, action) {}
 	
 	// ===== ITEMS =====
 	async getItems() {throw new Error("missing implementation");}
@@ -30,17 +33,18 @@ class DatabaseProvider {
 	async addItemHistory(itemId, data) {throw new Error("missing implementation");}
 
 	// ===== FOR USER TO ITEMS RELATIONS : UPDATE HISTORY =====
-	async getUserItems(userId) {throw new Error("missing implementation");}
+	async getUserHistory(userId) {throw new Error("missing implementation");}
+	async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {}
 
 	// ===== API KEYS ===== (need to add to auth middleware/auth controller/admin controller later)
-	async createApiKey(adminId, data) {throw new Error("missing implementation");}        			// for admin 
+	async createApiKey(userId, data) {throw new Error("missing implementation");}        			// for admin 
 	async getApiKeys() {throw new Error("missing implementation");}              						// for admin
-	async getApiKeyByKey(key) {throw new Error("missing implementation");}       						// for middleware
-	async revokeApiKey(adminId, id) {throw new Error("missing implementation");}          			// for admin
+	async getApiKeyByKey(hashedKey) {throw new Error("missing implementation");}       						// for middleware
+	async updateApiKey(id, updateData) {throw new Error("missing implementation");}          			// for admin
 
 	// add more database manip or func here if want 
-	async uploadFile(path, buffer) {throw new Error("missing implementation");}
-	async uploadItem(path, buffer) {throw new Error("missing implementation");}
+	async uploadFile(filename, buffer, mimeType) {throw new Error("missing implementation");}
+	async uploadItem(filename, buffer, mimeType) {throw new Error("missing implementation");}
 
 	
 	// ===== HELPER goes down here  (moved to conflictCheck)
