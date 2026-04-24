@@ -183,48 +183,52 @@ exports.generateKey = async (req, res) => {
 // --- API Item Management
 // COPIED FROM PUBLIC CONTROLLERS FOR NOW
 // GET /api/items
-exports.showItems = async (req, res) => {
+exports.showItems = async (req, res, next) => {
   const { cat, q, subcat, isRetired, error, success } = req.query;
 
-  let items = await itemService.getDBItems();
+  try {
+    let items = await itemService.getDBItems();
 
-  // filter by subcategory
-  if(subcat) {
-    items = items.filter((item) => item.subCategory === subcat);
+    // filter by subcategory
+    if(subcat) {
+      items = items.filter((item) => item.subCategory === subcat);
+    }
+
+    // filter by category
+    if (cat) {
+      items = items.filter((item) => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
+    }
+
+    // search by name (case-insensitive)
+    if (q) {
+      items = items.filter((item) =>
+        item.name?.toLowerCase().includes(q.toLowerCase()),
+      );
+    }
+
+    if (isRetired) {
+      items = items.filter((item) => item.status === "Retired");
+    } else {
+      items = items.filter((item) => item.status !== "Retired");
+    }
+
+    const statuses = [
+      { name: "Available" },
+      { name: "In-Use" },
+      { name: "Maintenance" },
+    ];
+
+    return res.json({
+      categories,
+      items,
+      statuses,
+      user: req.user || null,
+      error,
+      success,
+    });
+  } catch (err) {
+    next(err);
   }
-
-  // filter by category
-  if (cat) {
-    items = items.filter((item) => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
-  }
-
-  // search by name (case-insensitive)
-  if (q) {
-    items = items.filter((item) =>
-      item.name?.toLowerCase().includes(q.toLowerCase()),
-    );
-  }
-
-  if (isRetired) {
-    items = items.filter((item) => item.status === "Retired");
-  } else {
-    items = items.filter((item) => item.status !== "Retired");
-  }
-
-  const statuses = [
-    { name: "Available" },
-    { name: "In-Use" },
-    { name: "Maintenance" },
-  ];
-
-  return res.json({
-    categories,
-    items,
-    statuses,
-    user: req.user || null,
-    error,
-    success,
-  });
 };
 
 // POST /api/items
@@ -279,33 +283,38 @@ exports.createItem = async (req, res, next) => {
 exports.showItemDetail = async (req, res) => {
   const { id, success, error } = req.params;
 
-  let item = await itemService.getDBItemById(id);
+  try {
+    let item = await itemService.getDBItemById(id);
 
-  const statuses = [
-    { name: "Available" },
-    { name: "Maintenance" },
-  ];
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
 
-  let context = {
-    item,
-    statuses,
-    error,
-    success,
-    isRetired: item.status === "Retired",
-  };
+    let context = {
+      item,
+      statuses,
+      error,
+      success,
+      isRetired: item.status === "Retired",
+    };
 
-  if (!context) {
-    return res.status(404).json({
-      type: "error",
-      message: "Item not found",
-    });
+    if (!context) {
+      return res.status(404).json({
+        type: "error",
+        message: "Item not found",
+      });
+    }
+
+    return res.json(context);
   }
-
-  return res.json(context);
+  catch(err) {
+    next(err);
+  }
 };
 
 // PUT /api/items/:id
-exports.editItem = async (req, res) => {
+exports.editItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
@@ -369,7 +378,7 @@ exports.editItem = async (req, res) => {
 };
 
 // DELETE /api/items/:id
-exports.deleteItem = async (req, res) => {
+exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
@@ -383,38 +392,27 @@ exports.deleteItem = async (req, res) => {
 };
 
 // GET /api/items/:id/history
-exports.showItemHistory = async (req, res) => {
+exports.showItemHistory = async (req, res, next) => {
   const { id } = req.params;
-  const db = getDbProvider();
-  const itemHistory = await db.getItemHistoryByItemId(id);
-  const item = await db.getItemById(id);
-  const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
-  
-  const users = await Promise.all(userPromises);
 
-  let context = {
-    item,
-    itemHistories: itemHistory,
-  };
+  try {
+    const itemHistories = await itemService.getDBItemHistoriesById(id);
+        
+    let context = {
+      ...itemHistories,
+      isEmpty: false,
+      pageTitle: "Item History",
+    };
 
-  let history = context.itemHistories;
-
-  if (history) {
-      history = history.map(h => {
-        // find username using id 
-        const user = users.find(u => u.id === h.userId);
-
-        return {
-            ...h,
-            assignee: user ? user.name : "No name given"
-        };
-      });
-
+    if(itemHistories.length === 0) {
       context = {
         ...context,
-        itemHistories: history
+        isEmpty: true
       }
-  }
+    }
 
-  return res.json(context);
+    return res.json(context);
+  } catch (err) {
+    next(err);
+  }
 };

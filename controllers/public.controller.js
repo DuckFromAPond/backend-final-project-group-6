@@ -88,93 +88,98 @@ exports.home = async (req, res, next) => {
 };
 
 // GET: /items ----------------
-exports.showItems = async (req, res) => {
+exports.showItems = async (req, res, next) => {
   const { cat, q, subcat, isRetired, error, success } = req.query;
   let page = req.query.page;
   const pageSize = 10; // items to show per page
 
-  let items = await itemService.getDBItems();
+  try {
+    let items = await itemService.getDBItems();
 
-  // append query parameters to URL
-  let url = "/items?";
+    // append query parameters to URL
+    let url = "/items?";
 
-  // filter by subcategory
-  if(subcat) {
-    url += `subcat=${subcat}&`;
-    items = items.filter((item) => item.subCategory === subcat);
+    // filter by subcategory
+    if(subcat) {
+      url += `subcat=${subcat}&`;
+      items = items.filter((item) => item.subCategory === subcat);
+    }
+
+    // filter by category
+    if (cat) {
+      url += `cat=${cat}&`;
+      items = items.filter((item) => item.category === cat);
+    }
+
+    // search by name (case-insensitive)
+    if (q) {
+      url += `q=${q}&`;
+      items = items.filter((item) =>
+        item.name?.toLowerCase().includes(q.toLowerCase()),
+      );
+    }
+
+    if (isRetired) {
+      url += `isRetired=${isRetired}&`;
+      items = items.filter((item) => item.status === "Retired");
+    } else {
+      items = items.filter((item) => item.status !== "Retired");
+    }
+
+    if (error) {
+      url += `error=${error}&`;
+    }
+
+    if (success) {
+      url += `success=${success}&`;
+    }
+
+    // append page number to URL
+    if (!page) {
+      url += `page=1`;
+      return res.redirect(url);
+    }
+
+    page = parseInt(page);
+
+    // calculate total pages
+    const total = items.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    // set page range
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    items = items.slice(start, end);
+
+    // pagination
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
+
+    const statuses = [
+      { name: "Available" },
+      { name: "In-Use" },
+      { name: "Maintenance" },
+    ];
+
+    res.render("items/items", {
+      categories,
+      items,
+      statuses,
+      prevPage,
+      nextPage,
+      totalPages: pagesToRender,
+      user: req.user || null,
+      error: error || null,
+      success: success || null,
+      pageTitle: "Items",
+    });
   }
-
-  // filter by category
-  if (cat) {
-    url += `cat=${cat}&`;
-    items = items.filter((item) => item.category === cat);
+  catch(err) {
+    next(err);
   }
-
-  // search by name (case-insensitive)
-  if (q) {
-    url += `q=${q}&`;
-    items = items.filter((item) =>
-      item.name?.toLowerCase().includes(q.toLowerCase()),
-    );
-  }
-
-  if (isRetired) {
-    url += `isRetired=${isRetired}&`;
-    items = items.filter((item) => item.status === "Retired");
-  } else {
-    items = items.filter((item) => item.status !== "Retired");
-  }
-
-  if (error) {
-    url += `error=${error}&`;
-  }
-
-  if (success) {
-    url += `success=${success}&`;
-  }
-
-  // append page number to URL
-  if (!page) {
-    url += `page=1`;
-    return res.redirect(url);
-  }
-
-  page = parseInt(page);
-
-  // calculate total pages
-  const total = items.length;
-  const totalPages = Math.ceil(total / pageSize);
-  const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
-
-  // set page range
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize;
-  items = items.slice(start, end);
-
-  // pagination
-  const prevPage = page > 1 ? page - 1 : null;
-  const nextPage = page < totalPages ? page + 1 : null;
-
-  const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
-
-  const statuses = [
-    { name: "Available" },
-    { name: "In-Use" },
-    { name: "Maintenance" },
-  ];
-
-  res.render("items/items", {
-    categories,
-    items,
-    statuses,
-    prevPage,
-    nextPage,
-    totalPages: pagesToRender,
-    user: req.user || null,
-    error: error || null,
-    success: success || null,
-    pageTitle: "Items",
-  });
 };
 
 exports.addItem = async (req, res, next) => {
@@ -243,60 +248,66 @@ exports.addItem = async (req, res, next) => {
   }
 }
 
-exports.showItemDetail = async (req, res) => {
+exports.showItemDetail = async (req, res, next) => {
   const { id } = req.params;
   const { edit, del, error, success } = req.query;
-  let item = await itemService.getDBItemById(id);
 
-  const statuses = [
-    { name: "Available" },
-    { name: "Maintenance" },
-  ];
+  try {
+    let item = await itemService.getDBItemById(id);
 
-  let context = {
-    ...item,
-    categories,
-    statuses,
-    isEdit: false,
-    isDelete: false,
-    isRetired: item.status === "Retired",
-    pageTitle: "ItemDetail",
-  };
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
 
-  if (!context) {
-    res.status(404);
-    return res.render("404");
-  }
-
-  if (edit || (edit?.length !== 0 && edit === "true")) {
-    context = {
-      ...context,
-      isEdit: true,
+    let context = {
+      ...item,
+      categories,
+      statuses,
+      isEdit: false,
+      isDelete: false,
+      isRetired: item.status === "Retired",
+      pageTitle: "ItemDetail",
     };
-  }
 
-  if (del || (del?.length !== 0 && del === "true")) {
-    context = {
-      ...context,
-      isDelete: true,
-    };
-  }
+    if (!context) {
+      res.status(404);
+      return res.render("404");
+    }
 
-  if (error) {
-    context = {
-      ...context,
-      error,
-    };
-  }
+    if (edit || (edit?.length !== 0 && edit === "true")) {
+      context = {
+        ...context,
+        isEdit: true,
+      };
+    }
 
-  if (success) {
-    context = {
-      ...context,
-      success,
-    };
-  }
+    if (del || (del?.length !== 0 && del === "true")) {
+      context = {
+        ...context,
+        isDelete: true,
+      };
+    }
 
-  res.render("items/itemDetail", context);
+    if (error) {
+      context = {
+        ...context,
+        error,
+      };
+    }
+
+    if (success) {
+      context = {
+        ...context,
+        success,
+      };
+    }
+
+    res.render("items/itemDetail", context);
+  }
+  catch(err) {
+    next(err);
+  }
 };
 
 exports.editItem = async (req, res, next) => {
@@ -395,49 +406,30 @@ exports.deleteItem = async (req, res, next) => {
   }
 };
 
-exports.showItemHistory = async (req, res) => {
+exports.showItemHistory = async (req, res, next) => {
   const { id } = req.params;
-  const db = getDbProvider();
-  const itemHistory = await db.getItemHistoryByItemId(id);
-  const item = await db.getItemById(id);
-  const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
-  
-  const users = await Promise.all(userPromises);
 
-  let context = {
-    item,
-    itemHistories: itemHistory,
-    isEmpty: false,
-    pageTitle: "Item History",
-  };
+  try {
+    const itemHistories = await itemService.getDBItemHistoriesById(id);
 
-  if(itemHistory.length === 0) {
-    context = {
-      ...context,
-      isEmpty: true
-    }
-  }
+    let context = {
+      ...itemHistories,
+      isEmpty: false,
+      pageTitle: "Item History",
+    };
 
-  let history = context.itemHistories;
-
-  if (history) {
-      history = history.map(h => {
-        // find username using id 
-        const user = users.find(u => u.id === h.userId);
-
-        return {
-            ...h,
-            assignee: user ? user.name : "No name given"
-        };
-      });
-
+    if(itemHistories.length === 0) {
       context = {
         ...context,
-        itemHistories: history
+        isEmpty: true
       }
-  }
+    }
 
-  res.render("items/itemHistory", context);
+    res.render("items/itemHistory", context);
+  }
+  catch(err) {
+    next(err)
+  }
 };
 
 // POST CHECKIN

@@ -129,6 +129,40 @@ exports.getDBItemsHistory = async () => {
   return await db.getItemHistories();
 };
 
+exports.getDBItemHistoriesById = async (id) => {
+  const db = getDbProvider();
+  const itemHistory = await db.getItemHistoryByItemId(id);
+  const item = await db.getItemById(id);
+  const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
+  const users = await Promise.all(userPromises);
+
+  let itemHistories = {
+    item,
+    itemHistories: itemHistory,
+  };
+
+  let history = itemHistories.itemHistories;
+
+  if (history) {
+      history = history.map(h => {
+        // find username using id 
+        const user = users.find(u => u.id === h.userId);
+
+        return {
+            ...h,
+            assignee: user ? user.name : "No name given"
+        };
+      });
+
+      itemHistories = {
+        ...itemHistories,
+        itemHistories: history
+      }
+  }
+
+  return itemHistories;
+};
+
 exports.getUserById = async (selectedUserId) => {
   const db = getDbProvider();
   return await db.getUserById(selectedUserId);
@@ -153,8 +187,6 @@ exports.updateDBItem = async (id, data) => {
   const db = getDbProvider();
   return await db.updateItem(id, data);
 };
-
-
 
 exports.deleteDBItem = async (id) => {
   const db = getDbProvider();
