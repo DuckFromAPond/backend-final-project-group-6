@@ -1,4 +1,8 @@
 const { getDbProvider } = require("../utils/dbProviderShared");
+const multiparty = require("multiparty");
+const path = require("path");
+const fs = require("fs");
+const { base } = require("../data/models/mongoUserModel");
 
 // CHECKIN / CHECKOUT 
 exports.getDBlabel = () => { 
@@ -135,6 +139,116 @@ exports.getDBItems = async () => {
   return await db.getItems();
 };
 
+exports.getDBItemById = async (id) => {
+  const db = getDbProvider();
+  return await db.getItemById(id);
+};
+
+exports.createDBItem = async (data) => {
+  const db = getDbProvider();
+  return await db.createItem(data);
+};
+
+exports.updateDBItem = async (id, data) => {
+  const db = getDbProvider();
+  return await db.updateItem(id, data);
+};
+
+
+
+exports.deleteDBItem = async (id) => {
+  const db = getDbProvider();
+  const item = await db.getItemById(id);
+  const newItem = {
+    ...item,
+    status: "Retired",
+  };
+
+  if(item.status === "In-Use") {
+    return {
+      type: "error",
+      redirect: `/items/${id}?error=Item+in-use+cannot+be+retired`,
+    };
+  }
+
+  await db.updateItem(id, newItem);
+
+  return {
+    type: "success",
+    redirect: `/items/${id}?success=Item+retired+successfully`,
+  };
+}
+
+// PROCESS ITEM FORMS
+// description: process item form
+// precondition: request object
+// postcondition: object {type, redirect, name, description, brand, model, category, subCategory, serial, status, dateAcquired, filePath, fileBuffer, fileName, mimeType}
+exports.processItemForm = async (req) => {
+  const db = getDbProvider();
+  const id = req.params.id; // for returning to itemDetail if the form is submitted from /itemDetail
+  const form = new multiparty.Form();
+  
+  const { fields, files } = await new Promise((resolve, reject) => {
+    form.parse(req, (err, fields, files) => {
+      if (err) return reject(err);
+      resolve({ fields, files });
+    });
+  });
+
+  // extract fields
+  const name = fields.name?.[0] ?? "";
+  const description = fields.description?.[0] ?? "";
+  const brand = fields.brand?.[0] ?? "";
+  const model = fields.model?.[0] ?? "";
+  const category = fields.category?.[0] ?? "";
+  const subCategory = fields.subCategory?.[0] ?? "";
+  const serial = fields.serial?.[0] ?? "";
+  const status = fields.status?.[0] ?? "";
+  const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
+
+  // upload file
+  let filePath = null;
+  let fileName = null;
+  let fileBuffer = null;
+  let mimeType = null;
+  let type = null;
+  let redirect = null;
+
+  // check whether file is uploaded
+  if (files?.image?.length > 0 && files?.image[0]?.originalFilename.length !== 0) {
+    const file = files.image[0];
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+    if (file.size > MAX_SIZE) {
+      if(id) {
+        type = "error";
+        redirect = `/items/${id}?error=File+too+large+(max+50MB)`;
+      }
+      else {
+        type = "error";
+        redirect = `/items?error=File+too+large+(max+50MB)`;
+      }
+    }
+
+    fileBuffer = fs.readFileSync(file.path);
+    mimeType = file.headers?.["content-type"] || "application/octet-stream";
+    fileName = `${Date.now()}_${file.originalFilename}`;
+    filePath = await db.uploadItem(fileName, fileBuffer, mimeType);
+  }
+  else {
+    if(id) {
+      // for editing, no image defaults to original image instead of error or instead of replacing original with empty.
+      type = "warning";
+      redirect = `/items/${id}?warning=Image+file+missing`;
+    }
+    else {
+      type = "error";
+      redirect = `/items?error=Image+file+required`;
+    }
+  }
+
+  return {filePath, fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect};
+}
 
 // move this back to controller later 
 exports.adminCheckout = async (itemId, targetUserId, adminId, options = {}) => {

@@ -2,6 +2,7 @@
 const multiparty = require("multiparty");
 const fs = require("fs");
 const userService = require("../services/userService");
+const itemService = require("../services/itemService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
@@ -148,7 +149,7 @@ exports.getFile = async (req, res) => {
     }
 
     const result = await db.getFile(bucket, id);
-    console.log(result)
+    // console.log(result);
     if (!result) {
       return res.status(404).send("File not found");
     }
@@ -183,11 +184,9 @@ exports.generateKey = async (req, res) => {
 // COPIED FROM PUBLIC CONTROLLERS FOR NOW
 // GET /api/items
 exports.showItems = async (req, res) => {
-  const db = getDbProvider();
   const { cat, q, subcat, isRetired, error, success } = req.query;
 
-  // get all items from DB
-  let items = await db.getItems();
+  let items = await itemService.getDBItems();
 
   // filter by subcategory
   if(subcat) {
@@ -231,45 +230,27 @@ exports.showItems = async (req, res) => {
 // POST /api/items
 exports.createItem = async (req, res, next) => {
   try {
-    const db = getDbProvider();
-    const form = new multiparty.Form();
+    const {
+      filePath,
+      fileBuffer, 
+      fileName, 
+      mimeType,
+      name, 
+      description, 
+      brand, 
+      model, 
+      category, 
+      subCategory, 
+      serial, 
+      status, 
+      dateAcquired,
+      type,
+      apiRedirect,
+    } = await itemService.processItemForm(req);
 
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) return reject(err);
-        resolve({ fields, files });
-      });
-    });
-
-    // extract fields
-    const name = fields.name?.[0] ?? "";
-    const description = fields.description?.[0] ?? "";
-    const brand = fields.brand?.[0] ?? "";
-    const model = fields.model?.[0] ?? "";
-    const category = fields.category?.[0] ?? "";
-    const subCategory = fields.subCategory?.[0] ?? "";
-    const serial = fields.serial?.[0] ?? "";
-    const status = fields.status?.[0] ?? "";
-    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
-
-    // upload file
-    let filePath = null;
-    let fileName = null;
-
-    if (files?.image?.length > 0) {
-      const file = files.image[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-
-      if (file.size > MAX_SIZE) {
-        return res.redirect("/api/items?error=File+too+large+(max+50MB)");
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-
-      fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `${fileName}`;
-
-      await db.uploadItem(filePath, fileBuffer);
+    // an error in form processing must've occured
+    if (type?.toLowerCase() === "error") {
+      return res.redirect(apiRedirect);
     }
 
     const newItem = {
@@ -282,11 +263,11 @@ exports.createItem = async (req, res, next) => {
       serial,
       status,
       dateAcquired,
-      imageName: fileName,
+      imageName: filePath,
       imageAlt: `Image of ${name}`,
     };
 
-    await db.createItem(newItem);
+    await itemService.createDBItem(newItem);
 
     return res.redirect("/api/items?success=Item+added+successfully");
   } catch (err) {
@@ -297,9 +278,8 @@ exports.createItem = async (req, res, next) => {
 // GET /api/items/:id
 exports.showItemDetail = async (req, res) => {
   const { id, success, error } = req.params;
-  const db = getDbProvider();
 
-  let item = await db.getItemById(id);
+  let item = await itemService.getDBItemById(id);
 
   const statuses = [
     { name: "Available" },
@@ -329,16 +309,28 @@ exports.editItem = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const db = getDbProvider();
-    const item = await db.getItemById(id);
-    const form = new multiparty.Form();
+    const item = await itemService.getDBItemById(id);
+    const {
+      filePath,
+      fileBuffer, 
+      fileName, 
+      mimeType,
+      name, 
+      description, 
+      brand, 
+      model, 
+      category, 
+      subCategory, 
+      serial, 
+      status, 
+      dateAcquired,
+      type,
+      redirect,
+    } = await itemService.processItemForm(req);
 
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) return reject(err);
-        resolve({ fields, files });
-      });
-    });
+    if(type?.toLowerCase() === "error") {
+      return res.redirect(`/api${redirect}`);
+    }
 
     if (item.status === "In-Use") {
       return res.json({
@@ -347,17 +339,6 @@ exports.editItem = async (req, res) => {
       });
     }
 
-    // extract fields
-    const name = fields.name?.[0] ?? "";
-    const description = fields.description?.[0] ?? "";
-    const brand = fields.brand?.[0] ?? "";
-    const model = fields.model?.[0] ?? "";
-    const category = fields.category?.[0] ?? "";
-    const subCategory = fields.subCategory?.[0] ?? "";
-    const serial = fields.serial?.[0] ?? "";
-    const status = fields.status?.[0] ?? "";
-    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
-
     if(!["Available", "Maintenance"].includes(status)) {
       return res.json({
         type: "error",
@@ -365,41 +346,21 @@ exports.editItem = async (req, res) => {
       });
     }
 
-    // upload file
-    let filePath = null;
-    let fileName = null;
-
-    if (files?.image?.length > 0 && files?.image[0]?.size > 0) {
-      const file = files.image[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-
-      if (file.size > MAX_SIZE) {
-        return res.redirect(`/api/items/${id}?error=File+too+large+(max+50MB)`);
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-
-      fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `${fileName}`;
-
-      await db.uploadItem(filePath, fileBuffer);
-    }
-
     const newItem = {
       name,
       description,
       brand,
       model,
-      category,
-      subCategory,
+      category: category || item.category,
+      subCategory: subCategory || item.subCategory,
       serial,
-      status,
+      status: status || item.status,
       dateAcquired,
-      imageName: fileName ?? item.imageName,
+      imageName: filePath || item.image_name,
       imageAlt: `Image of ${name}`,
     };
 
-    await db.updateItem(id, newItem);
+    await itemService.updateDBItem(id, newItem);
 
     return res.redirect(`/api/items/${id}?success=Item+updated+successfully`);
   } catch (err) {
@@ -412,24 +373,10 @@ exports.deleteItem = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const db = getDbProvider();
-    const item = await db.getItemById(id);
-    
-    if(item.status === "In-Use") {
-      return res.json({
-        type: "error",
-        redirect: `/api/items/${id}?error=Item+in-use+cannot+be+retired`,
-      });
-    }
+    const response = await itemService.getDBItemById(id);
+    response.redirect = `/api/${response.redirect}`;
 
-    const newItem = {
-      ...item,
-      status: "Retired",
-    };
-
-    await db.updateItem(id, newItem);
-
-    return res.redirect(`/api/items/${id}?success=Item+retired+successfully`);
+    return res.json(response);
   } catch (err) {
     next(err);
   }

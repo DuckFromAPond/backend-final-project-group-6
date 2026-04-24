@@ -89,27 +89,27 @@
         <h2 class="text-xl text-center font-semibold col-span-2 w-1/2 justify-self-center self-center">Edit Item</h2>
 
         <label for="name">Item name: </label>
-        <input type="text" name="name" id="name" placeholder="Item Name..." required value="{{name}}"
+        <input type="text" name="name" id="name" placeholder="Item Name..." value="{{name}}"
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
         <label for="description">Item description: </label>
-        <input type="text" name="description" id="description" placeholder="Item Description..." required value="{{description}}"
+        <input type="text" name="description" id="description" placeholder="Item Description..." value="{{description}}"
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
         <label for="brand">Brand: </label>
-        <input type="text" name="brand" id="brand" placeholder="Item Brand..." required value="{{brand}}"
+        <input type="text" name="brand" id="brand" placeholder="Item Brand..." value="{{brand}}"
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
         <label for="model">Model: </label>
-        <input type="text" name="model" id="model" placeholder="Item Model..." required value="{{model}}"
+        <input type="text" name="model" id="model" placeholder="Item Model..." value="{{model}}"
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
         <label for="serial">Serial Number: </label>
-        <input type="text" name="serial" id="serial" placeholder="Item Serial Number..." required value="{{serial}}"
+        <input type="text" name="serial" id="serial" placeholder="Item Serial Number..." value="{{serial}}"
             class="w-full border-gray-500 border p-2 rounded-lg"
         >
 
@@ -123,7 +123,7 @@
         name="category"
         id="category"
         class="w-full border-gray-500 border p-2 rounded-lg"
-        required
+        value="{{this.category}}"
         >
             <option value="" disabled selected>Select category...</option>
             <option value="Computers">Computers</option>
@@ -135,7 +135,7 @@
         name="subCategory"
         id="subCategory"
         class="w-full border-gray-500 border p-2 rounded-lg"
-        required
+        value="{{this.subcategory}}"
         >
             <option value="" disabled selected>Select subcategory...</option>
         </select>
@@ -145,7 +145,7 @@
         name="status"
         id="status"
         class="w-full border-gray-500 border p-2 rounded-lg"
-        required
+        value="{{this.status}}"
         >
             <option value="" disabled selected>Select status...</option>
             {{#each statuses}}

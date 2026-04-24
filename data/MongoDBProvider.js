@@ -506,7 +506,7 @@ class MongoProvider extends DatabaseProvider {
         metadata: {
           contentType: mimeType,
           originalName: filename,
-      },
+        },
       });
 
       uploadStream.end(buffer);
