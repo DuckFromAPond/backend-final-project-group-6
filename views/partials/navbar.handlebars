@@ -1,22 +1,45 @@
-{{!-- ADD ACTIVE STYLE LATER BTW!!!! --}}
+<div class="bg-white shadow-md">
+  <div class="max-w mx-auto px-10">
 
-<nav class="bg-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4">
-        <div class="flex justify-between h-16 items-center">
-            <nav class="flex space-x-4">
-                <a href="/home" class="{{#if navHome}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} px-3 py-1 rounded-lg transition">Home</a>
-                <a href="/items" class="{{#if navItems}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} rounded-lg px-3 py-1 transition">Items</a>
-                <a href="/checkout" class="{{#if navCheckout}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} rounded-lg px-3 py-1 transition">Checkout</a>
-                <a href="/report" class="{{#if navReport}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} rounded-lg px-3 py-1 transition">Report</a>
-                {{!-- ADD IF CONDITION TO CHECK FOR THIS + KEY TO CHECK IF PAGE IS ALLOWED  --}}
-                <a href="/users" class="{{#if navUsers}}text-blue-500 font-bold {{else}}text-gray-700 hover:text-blue-500 {{/if}} p-3 py-1 rounded-lg transition">Users</a>
-            </nav>
-            <div>
-                <a href="/logout" 
-                class="px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold hover:bg-red-500 hover:text-white transition">
-                Logout
-                </a>
-            </div>
+    <div class="flex justify-between h-16 items-center">
+
+      {{!-- LEFT: user + nav grouped --}}
+      <div class="flex items-center space-x-8">
+
+        {{!-- USER --}}
+        <div>
+            <h1 class="text-lg font-semibold text-gray-800">
+                {{user.name}} <span class="text-xs font-normal text-gray-500">• {{#if user.role}}{{user.role}}{{else}}User{{/if}}</span>
+            </h1>
         </div>
+
+        {{!-- NAV --}}
+        <nav class="flex space-x-4">
+          <a href="/home" class="{{#if navHome}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Home</a>
+
+          <a href="/items" class="{{#if navItems}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Items</a>
+
+          <a href="/owned" class="{{#if navCheckin}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Owned</a>
+
+          <a href="/report" class="{{#if navReport}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Report</a>
+
+          {{#if (eq user.role "Admin")}}
+            <a href="/users" class="{{#if navUsers}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Users</a>
+
+            <a href="/keys" class="{{#if navKeys}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Keys</a>
+          {{/if}}
+        </nav>
+
+      </div>
+
+      {{!-- RIGHT: logout --}}
+      <div>
+        <a href="/logout"
+          class="px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold hover:bg-red-500 hover:text-white transition">
+          Logout
+        </a>
+      </div>
+
     </div>
-</nav>
+  </div>
+</div>

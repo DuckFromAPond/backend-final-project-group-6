@@ -1,417 +1,730 @@
+"use strict"; // for debugging
 
+const multiparty = require("multiparty");
+const fs = require("fs");
+const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
-const { items, itemHistories, users, dashboardData } = require('../data/data');
+const { items, itemHistories, users, dashboardData } = require("../data/data");
+const { getDbProvider } = require("../utils/dbProviderShared");
+const itemService = require("../services/itemService"); 
+const userService = require("../services/userService"); 
+const { db } = require("../data/models/mongoUserModel");
 
-// temp temp data 
-const itemData = {
-  categories: [
-    { name: "Computers", subCategories: [] },
-    { name: "Peripherals", subCategories: [] },
-  ],
-  //Fields: Item ID (Unique), Serial Number, Model, Brand, Category, Status (Available, In-Use, Maintenance, Retired), and Date Acquired.
-  items: items, // Use the imported items here
-  itemHistories: itemHistories,
-};
+// static data
+const categories = [
+  { name: "Peripherals", subCategories: [
+    { name: "Monitor" },
+    { name: "Keyboard" },
+    { name: "Mouse" },
+    { name: "Scanner" },
+    { name: "Printer" },
+  ] },
+  { name: "Computers", subCategories: [
+    { name: "Laptop" },
+    { name: "Desktop" },
+    { name: "Server" },
+  ] },
+];
 
-exports.home = (req, res) => {
-  res.render("home", { dashboardData });
-};
+// GET: /HOME ---------------------------------------------- need to fix later
+exports.home = async (req, res, next) => {
+  try {
+    const db = getDbProvider();
 
-exports.showItems = (req, res) => {
-    const { cat, q } = req.query
+    const [users, items, histories] = await Promise.all([
+      db.getAllUsers ? db.getAllUsers() : Promise.resolve([]),
+      db.getItems(),
+      db.getItemHistories(),
+    ]);
 
-    let context = {
-        categories: itemData.categories,
-        items: itemData.items,
-        statuses: itemData.statuses
+    const totalUsers = users.length;
+    const totalItems = items.length;
+
+    // latest per item
+    const latestMap = new Map();
+    const sortedHistories = [...histories].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
+
+    for (const h of sortedHistories) {
+      if (!latestMap.has(h.itemId)) {
+        latestMap.set(h.itemId, h);
+      }
     }
 
-    if (itemData.categories.find(category => category.name === cat)) {
-        context = {
-            ...context,
-            categories: itemData.categories,
-            items: itemData.items.filter(item => item.category === cat)
-        }
-    }
+    const pendingCheckouts = [...latestMap.values()].filter(
+      (h) => h.action === "checkout",
+    ).length;
 
-    let searchedItem;
-    if (q) {
-        searchedItem = itemData.items.find(i => i.name.toLowerCase().includes(q.toLowerCase()));
-    }
+    // lookup maps
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    if (searchedItem) {
-        context = {
-            ...context,
-            items: [searchedItem],
-        }
-    }
-
-    res.render('items/items', { ...context, activePage: "items" })
-}
-
-exports.addItem = (req, res) => {
-    try {
-        const form = new multiparty.Form();
-
-        let uploadedFilePath = null;
-
-        form.parse(req, (error, fields, files) => {
-            if (error) {
-                console.error('❌ Form parsing error:', err);
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'Error parsing the form. Please try again.',
-                });
-            }
-
-            // extract fields
-            const name = fields.name?.[0] ?? '';
-            const description = fields.description?.[0] ?? '';
-            const brand = fields.brand?.[0] ?? '';
-            const model = fields.model?.[0] ?? '';
-            const category = fields.category?.[0] ?? '';
-            const serial = fields.serial?.[0] ?? '';
-            const status = fields.status?.[0] ?? '';
-            const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
-
-            // extract file
-            const uploadedFile = files.image ? files.image : null;
-
-            if (!uploadedFile || uploadedFile.length === 0) {
-                console.warn('⚠️  No file was selected for upload');
-                console.debug('📊 Debug - files object:', Object.keys(files));
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'No file was selected. Please choose an image file.',
-                });
-            }
-
-            const file = uploadedFile[0];
-            const originalFileName = file.originalFilename;
-            const tempFilePath = file.path;
-
-            const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-            const fileExtension = path.extname(originalFileName).toLowerCase();
-
-            if (!allowedExtensions.includes(fileExtension)) {
-                console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-                // Clean up the temporary file
-                fs.unlinkSync(tempFilePath);
-                return res.status(400).json({
-                    type: 'error',
-                    message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-                });
-            }
-
-            const timestamp = Date.now();
-            const fileName = `${timestamp}_${originalFileName}`;
-            const finalFilePath = path.join(uploadsDir, fileName);
-
-            try {
-                fs.copyFileSync(tempFilePath, finalFilePath);
-                // Delete the temporary file
-                fs.unlinkSync(tempFilePath);
-
-                // Store the relative path for the view template
-                // This will be used to display the image in the result page
-                uploadedFilePath = `/images/${fileName}`;
-
-                console.log('✓ File Upload Successful:');
-                console.log(`   Original Filename: ${originalFileName}`);
-                console.log(`   Saved As: ${fileName}`);
-                console.log(`   Path: ${finalFilePath}`);
-
-                // add new item (replace with db)
-                const newItem = {
-                    id: itemData.items.length + 1,
-                    name,
-                    description,
-                    model,
-                    brand,
-                    category,
-                    imagePath: uploadedFilePath,
-                    imageAlt: `image of ${name}`,
-                    serial,
-                    status,
-                    dateAcquired,
-                };
-
-                itemData.items.push(newItem);
-
-                res.redirect('/items');
-            } catch (fsError) {
-                console.error('❌ File system error:', fsError);
-                // Clean up temp file if copy failed
-                if (fs.existsSync(tempFilePath)) {
-                    fs.unlinkSync(tempFilePath);
-                }
-                res.status(500).json({
-                    type: 'error',
-                    message: 'Error saving the file. Please try again.',
-                });
-            }
-        })
-    }
-    catch (error) {
-        console.error('❌ Error in /items:', error);
-        res.status(500).json({
-            type: 'error',
-            message: 'An error occurred while processing your file upload.',
-        });
-    }
-}
-
-exports.showItemDetail = (req, res) => {
-    const { id } = req.params;
-    const { edit, del } = req.query;
-
-    let context = itemData.items.find(item => String(item.id) === String(id))
-    context = {
-        ...context,
-        categories: itemData.categories,
-        statuses: itemData.statuses,
-        isEdit: false,
-        isDelete: false
-    }
-
-    if (!context) {
-        res.status(404)
-        return res.render('404')
-    }
-
-    if (edit || edit?.length !== 0 && edit === 'true') {
-        context = {
-            ...context,
-            isEdit: true
-        }
-    }
-
-    if (del || del?.length !== 0 && del === 'true') {
-        context = {
-            ...context,
-            isDelete: true
-        }
-    }
-
-    res.render('items/itemDetail', context)
-};
-
-exports.editItem = (req, res) => {
-    const { id } = req.params;
-
-    try {
-        const form = new multiparty.Form();
-
-        let uploadedFilePath = null;
-
-        form.parse(req, (error, fields, files) => {
-            if (error) {
-                console.error('❌ Form parsing error:', error);
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'Error parsing the form. Please try again.',
-                });
-            }
-
-            // extract fields
-            const name = fields.name?.[0] ?? '';
-            const description = fields.description?.[0] ?? '';
-            const brand = fields.brand?.[0] ?? '';
-            const model = fields.model?.[0] ?? '';
-            const category = fields.category?.[0] ?? '';
-            const serial = fields.serial?.[0] ?? '';
-            const status = fields.status?.[0] ?? '';
-            const dateAcquired = fields.dateAcquired?.[0] ?? '';
-
-            // extract file
-            const uploadedFile = files.image ? files.image : null;
-
-            if (!uploadedFile || uploadedFile.length === 0) {
-                console.warn('⚠️  No file was selected for upload');
-                console.debug('📊 Debug - files object:', Object.keys(files));
-                return res.status(400).json({
-                    type: 'error',
-                    message: 'No file was selected. Please choose an image file.',
-                });
-            }
-
-            const file = uploadedFile[0];
-            const originalFileName = file.originalFilename;
-            const tempFilePath = file.path;
-
-            const allowedExtensions = ['.jpg', '.jpeg', '.png'];
-            const fileExtension = path.extname(originalFileName).toLowerCase();
-
-            if (!allowedExtensions.includes(fileExtension)) {
-                console.warn(`⚠️  Invalid file type: ${fileExtension}`);
-                // Clean up the temporary file
-                fs.unlinkSync(tempFilePath);
-                return res.status(400).json({
-                    type: 'error',
-                    message: `Invalid file type. Only ${allowedExtensions.join(', ')} are allowed.`,
-                });
-            }
-
-            const timestamp = Date.now();
-            const fileName = `${timestamp}_${originalFileName}`;
-            const finalFilePath = path.join(uploadsDir, fileName);
-
-            try {
-                fs.copyFileSync(tempFilePath, finalFilePath);
-                // Delete the temporary file
-                fs.unlinkSync(tempFilePath);
-
-                // Store the relative path for the view template
-                // This will be used to display the image in the result page
-                uploadedFilePath = `/images/${fileName}`;
-
-                console.log('✓ File Upload Successful:');
-                console.log(`   Original Filename: ${originalFileName}`);
-                console.log(`   Saved As: ${fileName}`);
-                console.log(`   Path: ${finalFilePath}`);
-
-                const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
-                // replace with new item (replace with db)
-                itemData.items[indexOfOld] = {
-                    ...itemData.items[indexOfOld],
-                    name,
-                    description,
-                    model,
-                    brand,
-                    category,
-                    imagePath: uploadedFilePath,
-                    imageAlt: `image of ${name}`,
-                    serial,
-                    status,
-                    dateAcquired,
-                };
-
-                // Render result page with file information
-                return res.json({
-                    success: true,
-                    redirect: `/items/${id}`
-                });
-            } catch (fsError) {
-                console.error('❌ File system error:', fsError);
-                // Clean up temp file if copy failed
-                if (fs.existsSync(tempFilePath)) {
-                    fs.unlinkSync(tempFilePath);
-                }
-                res.status(500).json({
-                    type: 'error',
-                    message: 'Error saving the file. Please try again.',
-                });
-            }
-        })
-    }
-    catch (error) {
-        console.error('❌ Error in /items:', error);
-        res.status(500).json({
-            type: 'error',
-            message: 'An error occurred while processing your file upload.',
-        });
-    }
-}
-
-exports.deleteItem = (req, res) => {
-    const { id } = req.params;
-    const indexOfOld = itemData.items.findIndex(item => String(item.id) === String(id));
-    itemData.items.splice(indexOfOld, 1);
-    return res.json({
-        type: 'success',
-        redirect: '/items'
-    })
-}
-
-exports.showItemHistory = (req, res) => {
-  const { id } = req.params;
-
-  const context = {
-    item: itemData.items.find((item) => String(item.id) === String(id)),
-    itemHistories: itemData.itemHistories.find(
-      (item) => String(item.id) === String(id),
-    ),
-  };
-
-  const history = context.itemHistories;
-
-  if (history) {
-    history.histories = history.histories.map(h => {
-      // find username using id 
-      const user = users.find(u => u.id === h.user_id);
+    const recentTransactions = sortedHistories.slice(0, 5).map((h) => {
+      const user = userMap.get(h.userId);
+      const item = itemMap.get(h.itemId);
 
       return {
-        ...h,
-        assignee: user ? user.name : "No name given"
+        id: h.id,
+        user: user?.name || "Unknown",
+        item: item?.name || "Unknown",
+        type: h.action === "checkout" ? "Checkout" : "Checkin",
+        date: new Date(h.createdAt).toLocaleString(),
       };
     });
-  }
 
-  res.render("items/itemHistory", context);
+    res.render("home", {
+      dashboardData: {
+        totalUsers,
+        totalItems,
+        pendingCheckouts,
+        recentTransactions,
+      },
+      pageTitle: "Home",
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-exports.checkout = (req, res) => {
-  // GONNA START BY ASSUMING YOU ARE ID 1
-  const currentUserId = 1; // replace with actual logged-in user
+// GET: /items ----------------
+exports.showItems = async (req, res, next) => {
+  const { cat, q, subcat, isRetired, error, success } = req.query;
+  let page = req.query.page;
+  const pageSize = 10; // items to show per page
 
-  const currentlyOwnedItems = itemData.items
-    .map((item) => {
-      const history = itemData.itemHistories.find((h) => h.id === item.id);
-      const lastAssignment =
-        history?.histories[history.histories.length - 1] || null;
+  try {
+    let items = await itemService.getDBItems();
+
+    // append query parameters to URL
+    let url = "/items?";
+
+    // filter by subcategory
+    if(subcat) {
+      url += `subcat=${subcat}&`;
+      items = items.filter((item) => item.subCategory === subcat);
+    }
+
+    // filter by category
+    if (cat) {
+      url += `cat=${cat}&`;
+      items = items.filter((item) => item.category === cat);
+    }
+
+    // search by name (case-insensitive)
+    if (q) {
+      url += `q=${q}&`;
+      items = items.filter((item) =>
+        item.name?.toLowerCase().includes(q.toLowerCase()),
+      );
+    }
+
+    if (isRetired) {
+      url += `isRetired=${isRetired}&`;
+      items = items.filter((item) => item.status === "Retired");
+    } else {
+      items = items.filter((item) => item.status !== "Retired");
+    }
+
+    if (error) {
+      url += `error=${error}&`;
+    }
+
+    if (success) {
+      url += `success=${success}&`;
+    }
+
+    // append page number to URL
+    if (!page) {
+      url += `page=1`;
+      return res.redirect(url);
+    }
+
+    page = parseInt(page);
+
+    // calculate total pages
+    const total = items.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    // set page range
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    items = items.slice(start, end);
+
+    // pagination
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
+
+    const statuses = [
+      { name: "Available" },
+      { name: "In-Use" },
+      { name: "Maintenance" },
+    ];
+
+    res.render("items/items", {
+      categories,
+      items,
+      statuses,
+      prevPage,
+      nextPage,
+      totalPages: pagesToRender,
+      user: req.user || null,
+      error: error || null,
+      success: success || null,
+      pageTitle: "Items",
+    });
+  }
+  catch(err) {
+    next(err);
+  }
+};
+
+exports.addItem = async (req, res, next) => {
+  try {
+    const {
+      filePath,
+      fileBuffer, 
+      fileName, 
+      mimeType,
+      name, 
+      description, 
+      brand, 
+      model, 
+      category, 
+      subCategory, 
+      serial, 
+      status, 
+      dateAcquired,
+      type,
+      redirect,
+    } = await itemService.processItemForm(req);
+
+    // an error in form processing must've occured
+    if (type?.toLowerCase() === "error") {
+      return res.redirect(redirect);
+    }
+
+    const existing = await itemService.getItemBySerial(serial);
+
+    if (existing) {
+      return res.redirect("/items?error=Serial+already+exists");
+    }
+
+    if (
+      !name ||
+      !description ||
+      !brand ||
+      !model ||
+      !category ||
+      !serial ||
+      !status
+    ) {
+      return res.redirect("/items?error=Missing+required+fields");
+    }
+
+    const newItem = {
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
+      dateAcquired,
+      imageName: filePath,
+      imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
+    };
+
+    await itemService.createDBItem(newItem);
+
+    return res.redirect("/items?success=Item+added+successfully");
+  }
+  catch (err) {
+    next(err);
+  }
+}
+
+exports.showItemDetail = async (req, res, next) => {
+  const { id } = req.params;
+  const { edit, del, error, success } = req.query;
+
+  try {
+    let item = await itemService.getDBItemById(id);
+
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
+
+    let context = {
+      ...item,
+      categories,
+      statuses,
+      isEdit: false,
+      isDelete: false,
+      isRetired: item.status === "Retired",
+      pageTitle: "ItemDetail",
+    };
+
+    if (!context) {
+      res.status(404);
+      return res.render("404");
+    }
+
+    if (edit || (edit?.length !== 0 && edit === "true")) {
+      context = {
+        ...context,
+        isEdit: true,
+      };
+    }
+
+    if (del || (del?.length !== 0 && del === "true")) {
+      context = {
+        ...context,
+        isDelete: true,
+      };
+    }
+
+    if (error) {
+      context = {
+        ...context,
+        error,
+      };
+    }
+
+    if (success) {
+      context = {
+        ...context,
+        success,
+      };
+    }
+
+    res.render("items/itemDetail", context);
+  }
+  catch(err) {
+    next(err);
+  }
+};
+
+exports.editItem = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const item = await itemService.getDBItemById(id);
+    const {
+      filePath,
+      fileBuffer, 
+      fileName, 
+      mimeType,
+      name, 
+      description, 
+      brand, 
+      model, 
+      category, 
+      subCategory, 
+      serial, 
+      status, 
+      dateAcquired,
+      type,
+      redirect,
+    } = await itemService.processItemForm(req);
+
+    if (type?.toLowerCase() === "error") {
+      return res.json({
+        type,
+        redirect,
+      });
+    }
+
+    if (item.status === "In-Use") {
+      return res.json({
+        type: "error",
+        redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`,
+      });
+    }
+
+    if (
+      !name ||
+      !description ||
+      !brand ||
+      !model ||
+      !serial
+    ) {
+      return res.json({
+        type: "error",
+        redirect: `/items/${id}?error=Missing+required+fields`,
+      })
+    }
+
+    if(!["Available", "Maintenance"].includes(status)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+      });
+    }
+
+    const newItem = {
+      name,
+      description,
+      brand,
+      model,
+      category: category || item.category,
+      subCategory: subCategory || item.subCategory,
+      serial,
+      status: status || item.status,
+      dateAcquired,
+      imageName: filePath || item.imageName,
+      imageAlt: `Image of ${name}`,
+      imageUrl: filePath || item.imageUrl,
+    };
+
+    await itemService.updateDBItem(id, newItem);
+
+    return res.json({
+      type: "success",
+      redirect: `/items/${id}?success=Item+updated+successfully`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ------------------------------------------------------------------------- ADMIN ONLY ROUTE PLEASE MAKE ADMIN ONLY 
+// soft deletes only 
+exports.deleteItem = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const response = await itemService.deleteDBItem(id);
+    return res.json(response);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.showItemHistory = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const itemHistories = await itemService.getDBItemHistoriesById(id);
+
+    let context = {
+      ...itemHistories,
+      isEmpty: false,
+      pageTitle: "Item History",
+    };
+
+    if(itemHistories.length === 0) {
+      context = {
+        ...context,
+        isEmpty: true
+      }
+    }
+
+    res.render("items/itemHistory", context);
+  }
+  catch(err) {
+    next(err)
+  }
+};
+
+// POST CHECKIN
+exports.checkIn = async (req, res, next) => {
+  try {
+    // get form data 
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
+    const userId = req.user.id;
+
+    // validate checkout 
+    await itemService.validateCheckin(itemId);
+
+    // upload file
+    let filePath = null;
+    let fileName = null;
+
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Reference+file+is+required");
+    }
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      
+      const DBlabel = itemService.getDBlabel(); 
+
+      if (DBlabel === "Supabase") {
+        const MAX_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+50MB)");
+        }
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      fileName = `${Date.now()}_${file.originalFilename}`;
+
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
+    }
+
+    await itemService.checkinItem({
+      itemId,
+      userId,
+      duration,
+      referenceLink: filePath || fileName
+    });
+
+    return res.redirect("/owned");
+  } catch (err) {
+    return res.redirect(
+      `/items?error=${encodeURIComponent(err.message)}`
+    );
+  }
+};
+
+
+// POST CHECKOUT
+exports.checkOut = async (req, res, next) => {
+  try {
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
+    const userId = req.user.id;
+
+    // validate checkout 
+    await itemService.validateCheckout(itemId);
+
+    let filePath = null;
+    let fileName = null;
+
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Image+file+required");
+    }
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      
+      const DBlabel = itemService.getDBlabel(); 
+
+      if (DBlabel === "Supabase") {
+        const MAX_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+50MB)");
+        }
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      fileName = `${Date.now()}_${file.originalFilename}`;
+
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
+    }
+
+    await itemService.checkoutItem({
+      itemId,
+      userId,
+      duration,
+      referenceLink: filePath || fileName
+    });
+
+    return res.redirect("/items?success=item+checked+out+sucessfully");
+  } catch (err) {
+    return res.redirect(
+      `/items?error=${encodeURIComponent(err.message)}`
+    );
+  }
+};
+
+
+exports.showOwned = async (req, res, next) => {
+  try {
+    const currentUserId = req.user.id;
+
+    const items = await itemService.getUserOwnedItems(currentUserId);
+
+    const allOwned = items.map((row) => {
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+
+      let status = "unknown";
+      let dueDate = null;
+      let hoursSince = null;
+
+      if (created && row.duration) {
+        dueDate = new Date(created);
+        dueDate.setHours(dueDate.getHours() + row.duration);
+
+        const now = new Date();
+        status = now > dueDate ? "overdue" : "active";
+      } 
+      else if (created) {
+        const now = new Date();
+        hoursSince = Math.floor((now - created) / (1000 * 60 * 60));
+
+        status = "active";
+      }
+      return {
+        id: row.itemId || row.item?.id,
+        referenceUrl: row.referenceUrl,
+        name: row.item?.name,
+
+        createdAt: created
+          ? created.toISOString().split("T")[0]
+          : null,
+
+        duration: row.duration 
+          ? `${itemService.formatDuration(row.duration)}`
+          : `${itemService.formatDuration(hoursSince)} (ongoing)`,
+
+        dueDate: dueDate
+          ? dueDate.toISOString().split("T")[0]
+          : "Until returned",
+
+        status,
+      };
+    });
+
+    res.render("owned", {
+      items: allOwned,
+      pageTitle: "Owned",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.report = async (req, res, next) => {
+  try {
+    // get history for the last 7 days 
+    const AllHistories = await itemService.getDBItemsHistory();
+    const AllItems = await itemService.getDBItems();
+    const users = await userService.getAllUsers();
+
+    const totalUsers = users.length;
+    const totalItems = AllItems.length;
+
+    const deployedItems = AllItems.filter(item =>
+      item.current_owner &&
+      item.status === "In-Use"
+    ).length;
+
+
+    // 3. OLD ASSETS (3+ years)
+    const threeYearsAgo = new Date();
+    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+
+    const oldAssets = AllItems
+      .filter(i =>
+        i.dateAcquired &&
+        new Date(i.dateAcquired) <= threeYearsAgo
+      )
+      .map(i => ({
+        ...i,
+        formatted: new Date(i.dateAcquired).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric"
+        })
+      }));
+
+
+    // 4. USER AUDIT 
+    const selectedUserId = req.query.userId || null;
+
+    let selectedUserName = "";
+
+    if (selectedUserId) {
+      const user = await itemService.getUserById(selectedUserId);
+      selectedUserName = `${user.name} (${user.email})`;
+    }
+
+    const items = await itemService.getUserOwnedItems(selectedUserId);
+
+    const userAudit = items.map((row) => {
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+
+      let status = "unknown";
+      let dueDate = null;
+      let hoursSince = null;
+
+      if (created && row.duration) {
+        dueDate = new Date(created);
+        dueDate.setHours(dueDate.getHours() + row.duration);
+
+        const now = new Date();
+        status = now > dueDate ? "overdue" : "active";
+      } else if (created) {
+        const now = new Date();
+        hoursSince = Math.floor((now - created) / (1000 * 60 * 60));
+        status = "active";
+      }
 
       return {
-        id: item.id,
-        name: item.name,
-        // serial: item.serial,
-        // model: item.model,
-        // brand: item.brand,
-        // category: item.category,
-        status: item.status,
-        dateAcquired: item.dateAcquired,
-        // description: item.description,
-        // imagePath: item.imagePath,
-        // imageAlt: item.imageAlt,
-        currentAssignee: lastAssignment?.assignee || null,
-        currentAssigneeID: lastAssignment?.user_id || null,
-        currentDuration: lastAssignment?.duration || null,
-        currentReference: lastAssignment?.referenceLink || null,
+        id: row.itemId || row.item?.id,
+        referenceUrl: row.referenceUrl,
+
+        name: row.item?.name,
+
+        createdAt: created
+          ? created.toISOString().split("T")[0]
+          : null,
+
+        duration: row.duration
+          ? itemService.formatDuration(row.duration)
+          : itemService.formatDuration(hoursSince) + " (ongoing)",
+
+        dueDate: dueDate
+          ? dueDate.toISOString().split("T")[0]
+          : "Until returned",
+
+        status
       };
-    })
-    .filter((item) => item.currentAssigneeID === currentUserId); // only keep items assigned to current user
+    });
 
-  console.log(currentlyOwnedItems);
-  res.render("checkout", {
-    items: currentlyOwnedItems,
-  });
+    // console.log(oldAssets)
+    // console.log(userAudit)
+    
+    res.render("report", {
+        totalUsers,
+        totalItems,
+        deployedItems,
+        userAudit,
+        users,
+        selectedUserName,
+        selectedUserId,
+        oldAssets,
+        pageTitle: "Report"
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
-exports.report = (req, res) => {
-  res.render("report");
-};
-
-// ++++++++++ List-user page
-exports.users = (req, res) => {
-  // MOCK DATA
-  res.render("users", { users });
-};
-
-// 404 handler 
+// 404 handler
 exports.notFound = (req, res) => {
-  res.status(404).render('extra_pages/404', {
-    message: 'The page you are looking for does not exist.',
+  res.status(404).render("extra_pages/404", {
+    message: "The page you are looking for does not exist.",
+    pageTitle: "404",
   });
 };
-
-// LEAVING THIS MIDDLEWARE DOWN HERE UNTIL I CAN THINK OF A REPLACEMENT 
-
-// middle-ware to render 404 (bad)
-// app.use((req, res, next) => {
-//   const publicRoutes = ["/", "/login", "/register"];
-//   // If it's a known public route, let it pass to the gate or routes
-//   if (publicRoutes.includes(req.path)) {
-//     return next();
-//   }
-//   // Otherwise, it's a dead end—render 404 now!
-//   // res.status(404).render("extra_pages/404", { layout: "no_nav_bar" });
-// });

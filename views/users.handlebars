@@ -4,8 +4,7 @@
 
  --}}
 
-
-<div class="min-h-screen flex flex-col items-center bg-gray-100 p-6">
+<div class="flex flex-col items-center p-6">
   <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-6 ">
     
     <h1 class="text-2xl font-bold mb-6 text-center">Users List</h1>
@@ -24,11 +23,42 @@
       <tbody>
         {{#each users}}
           <tr class="border-b hover:bg-gray-50">
-            <td class="px-4 py-2">{{this.id}}</td>
+            <td class="px-4 py-2 font-mono text-xs">{{this.id}}</td>
             <td class="px-4 py-2">{{this.name}}</td>
             <td class="px-4 py-2">{{this.email}}</td>
-            <td class="px-4 py-2">{{this.role}}</td>
-            <td class="px-4 py-2">{{this.status}}</td>
+            
+            <td class="px-4 py-2">
+              <form action="/users/{{this.id}}/role" method="POST" class="relative group max-w-[150px]">
+                <select name="role" 
+                        onchange="this.form.submit()" 
+                        class="block appearance-none w-full border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all hover:bg-gray-50">
+                  <option value="Technician" {{#if (eq this.role "Technician")}}selected{{/if}}>Technician</option>
+                  <option value="Admin" {{#if (eq this.role "Admin")}}selected{{/if}}>Admin</option>
+                </select>
+                
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 group-hover:text-gray-600">
+                  <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  </svg>
+                </div>
+              </form>
+            </td>
+
+            <td class="px-4 py-2">
+              <form action="/users/{{this.id}}/status" method="POST">
+                {{#if (eq this.status "Active")}}
+                  <input type="hidden" name="status" value="Disabled">
+                  <button type="submit" class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-red-200 transition">
+                    Active
+                  </button>
+                {{else}}
+                  <input type="hidden" name="status" value="Active">
+                  <button type="submit" class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-200 transition">
+                    Disabled
+                  </button>
+                {{/if}}
+              </form>
+            </td>
           </tr>
         {{/each}}
       </tbody>

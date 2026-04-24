@@ -5,38 +5,61 @@
 -- USERS
 -- =========================
 CREATE TABLE users (
-    id INT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('Admin', 'User')),
-    status TEXT NOT NULL CHECK (status IN ('Active', 'Disabled'))
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('Admin', 'Technician')),
+    status TEXT NOT NULL CHECK (status IN ('Active', 'Disabled')),
+    created_at TIMESTAMP DEFAULT NOW(),
+    disabled_at TIMESTAMP NULL
 );
 
 -- =========================
 -- ITEMS
 -- =========================
 CREATE TABLE items (
-    id INT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     serial TEXT UNIQUE NOT NULL,
     model TEXT,
     brand TEXT,
     category TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('Available', 'In-Use', 'Maintenance', 'Retired')),
-    date_acquired DATE,
+    subCategory TEXT NOT NULL,
+
+    status TEXT NOT NULL CHECK (
+        status IN ('Available', 'In-Use', 'Maintenance', 'Retired')
+    ),
+    
+    dateAcquired DATE,
     description TEXT,
-    image_path TEXT,
-    image_alt TEXT
+    currentOwner INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    imageName TEXT,
+    imageAlt TEXT
 );
 
 -- =========================
--- ITEM HISTORIES (RELATIONAL)
+-- ITEM HISTORIES
 -- =========================
 CREATE TABLE item_histories (
     id SERIAL PRIMARY KEY,
-    item_id INT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    user_id INT REFERENCES users(id),
-    duration TEXT,
-    reference_link TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    itemId INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    userId INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    duration INTEGER DEFAULT NULL,
+    referenceLink TEXT,
+    action TEXT CHECK (action IN ('checkout', 'checkin')),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    returnedAt TIMESTAMP DEFAULT NULL
+);
+
+-- =========================
+-- API KEYS
+-- =========================
+CREATE TABLE api_keys (
+    id SERIAL PRIMARY KEY,
+    hashKey TEXT UNIQUE NOT NULL,
+    name TEXT,
+    adminId INTEGER NOT NULL REFERENCES users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    revoked BOOLEAN DEFAULT FALSE
 );

@@ -1,127 +1,176 @@
+"use strict"; // for debugging
+const mongoose = require("mongoose");
 const express = require("express");
-// const vhost    = require('vhost');
+
 const { engine } = require("express-handlebars");
 const cookieParser = require("cookie-parser");
-const path = require('path');
-const { items, itemHistories, users, dashboardData } = require("./data/data.js"); // import
+const path = require("path");
+const morgan = require("morgan");
+const cors = require("cors");
+const fs = require("fs");
+const multiparty = require("multiparty");
+const { randomUUID } = require("crypto");
+
 const { protect } = require("./middleware/authMiddleware");
-const { verifyToken } = require("./lib/auth");
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
-const multiparty = require('multiparty');
-const { randomUUID } = require('crypto');
-require("dotenv").config();
-const config = require('./config/app.config');
+
+const { setDbProvider } = require("./utils/dbProviderShared");
+
+const config = require("./config/app.config");
 const authRoutes = require("./routes/auth.routes");
-const publicRoutes = require('./routes/public.routes');
+const publicRoutes = require("./routes/public.routes");
+// const adminRoutes = require("./routes/admin.routes");
+const apiRoutes = require("./routes/api.routes");
+
+const createDatabaseProvider = require("./utils/createDBProvider");
+
+// fix for nodeJS v22.22 not being able to connect to mongoDB
+const dns = require("node:dns/promises");
+dns.setServers(["1.1.1.1", "1.0.0.1"]);
+
+let dbProvider;
 
 // HELPERS ───────────────────────────────────
 const hbsHelpers = {
-    // section set up (prob not needed)
-    section: function (name, options) {
-        if (!this._sections) this._sections = {};
-        this._sections[name] = options.fn(this);
-        return null;
-    },
-    // if contain string
-    ifContains: function (container, stringToFind, options) {
-        if (container && container.includes(stringToFind)) {
-            return options.fn(this);
-        }
-        return options.inverse(this);
-    },
-    // for active nav 
-    isActive: function (page, currentPage, options) {
-        return page === currentPage
-            ? "text-blue-500 font-semibold"
-            : "text-gray-700 hover:text-blue-500";
-    },
-}
+  // section set up (prob not needed)
+  section: function (name, options) {
+    if (!this._sections) this._sections = {};
+    this._sections[name] = options.fn(this);
+    return null;
+  },
+  // if contain string
+  ifContains: function (container, stringToFind, options) {
+    if (container && container.includes(stringToFind)) {
+      return options.fn(this);
+    }
+    return options.inverse(this);
+  },
+  eq: (a, b) => a === b,
+  formatDate: (date) => new Date(date).toISOString().split("T")[0], // return YYYY-MM-DD
+  json: (context) => JSON.stringify(context),
+};
 
-// configurations for public app ───────────────────────────────────
-const publicApp = express();
-publicApp.engine(
-    "handlebars",
-    engine({
-        defaultLayout: "main",
-        layoutsDir: path.join(__dirname, 'views/layouts'),
-        partialsDir: path.join(__dirname, 'views/partials'),
-        helpers: hbsHelpers,
-    }),
+// CORS configuration
+const whitelist = new Set([
+  `http://localhost:${config.PORT}`,
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "https://websitename.com", // <--------------------------- change when host on cloudflare later btw
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow Postman / server-to-server
+    if (!origin) return callback(null, true);
+
+    if (whitelist.has(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+// ---------- API -----------------
+const apiApp = express();
+apiApp.use(cors(corsOptions));
+apiApp.use(express.json());
+apiApp.use(express.urlencoded({ extended: false }));
+apiApp.use(cookieParser());
+apiApp.use(apiRoutes);
+
+// ------ Main app ------
+const app = express();
+app.engine(
+  "handlebars",
+  engine({
+    extname: ".handlebars",
+    layoutsDir: path.join(__dirname, "views/layouts"),
+    partialsDir: path.join(__dirname, "views/partials"),
+    helpers: hbsHelpers,
+  }),
 );
-publicApp.set("view engine", "handlebars");
-publicApp.set("views", path.join(__dirname, 'views'));
+
+app.set("view engine", "handlebars");
+app.set("views", path.join(__dirname, "views"));
 
 // middleware ───────────────────────────────────
-publicApp.use(cookieParser());
-publicApp.use(express.static(path.join(__dirname, 'public')));
-publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
-// Rate limiting configuration
-option = {
-    windowMs: 1 * 60 * 1000, // 1 minutes
-    max: 20, // limit each IP to 20 requests
-    standardHeaders: false, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after 1 minutes'
-}
-publicApp.use(rateLimit(option));
-// CORS configuration
-const whitelist = [
-    `http://localhost:${PORT}`,
-];
-const corsOptions = {
-    origin: (origin, callback) => {
-        // !origin allows server-to-server or tools like Postman/Curl
-        if (!origin || whitelist.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    }
-};
-publicApp.use(cors(corsOptions));
-// Morgan logging
-publicApp.use(morgan('dev'));
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.urlencoded({ extended: true })); // for forms (login/register)
+app.use(express.json());
 
-// replace this for db + bucket
-const uploadsDir = path.join(__dirname, 'public', 'images');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log(`✓ Created uploads directory at ${uploadsDir}`);
-}
+app.use((req, res, next) => {
+  const pathName = req.path;
 
-// temp (will change when nav is finalized)
-publicApp.use((req, res, next) => {
-    const pathName = req.path;
+  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
+  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
+  res.locals.navCheckin = pathName.startsWith("/owned");
+  res.locals.navReport = pathName.startsWith("/report");
+  res.locals.navUsers = pathName.startsWith("/users"); //
+  res.locals.navKeys = pathName.startsWith("/keys"); //
 
-    res.locals.navHome = pathName === '/' || pathName.startsWith('/home');
-    res.locals.navItems =
-        pathName === '/items' ||
-        pathName.startsWith('/items/');
-    res.locals.navCheckout = pathName.startsWith('/checkout');
-    res.locals.navReport = pathName.startsWith('/report');
-    res.locals.navUsers = pathName.startsWith('/users');     // <---- temp will delete when admin part is implemented
-
-    next();
+  res.locals.config = config;
+  next();
 });
 
-publicApp.use("/", authRoutes);
-publicApp.use('/', publicRoutes);
-publicApp.use(protect);
+app.set("view engine", "handlebars");
+app.set("views", path.join(__dirname, "views"));
+// safety
+app.disable("x-powered-by");
 
-// const app = express();
-// app.use(publicApp);
+// Morgan logging
+if (config.NODE_ENV === "production") {
+  app.use(morgan("combined"));
+} else {
+  app.use(morgan("dev"));
+}
+
+app.use("/api", apiApp);
+app.use("/", authRoutes);
+app.use("/", publicRoutes);
 
 // Other routes
-publicApp.use((error, req, res, next) => {
-    console.log(error)
-    res.status(500);
-    res.render("extra_pages/500");
+app.use((error, req, res, next) => {
+  console.error(error);
+
+  return res.status(500).render("extra_pages/500", {
+    layout: "no_nav_bar",
+    pageTitle: "500",
+    message: error.message || "Internal Server Error",
+  });
 });
 
-publicApp.listen(config.PORT, () => {
-    console.log(`Access via: http://localhost:${config.PORT}`);
-});
+async function startServer() {
+  try {
+    dbProvider = await createDatabaseProvider();
+    setDbProvider(dbProvider);
+    console.log(`Connected to ${dbProvider.providerKey} database provider`);
+
+    app.listen(config.PORT, () => {
+      if (config.NODE_ENV === "development") {
+        console.log(`Using ${config.NODE_ENV} environment`);
+        console.log(
+          `  Both Admin & Public : http://${config.DOMAIN}:${config.PORT}`,
+        );
+        console.log(`Database provider: ${dbProvider.providerLabel}`);
+      } else {
+        console.log(`Using ${config.NODE_ENV} environment`);
+        console.log(`  Both Admin & Public : http://${config.BASE_URL}`);
+        console.log(`Database provider: ${dbProvider.providerLabel}`);
+      }
+    });
+  } catch (error) {
+    if (error && error.message) {
+      console.error("Failed to initialize database provider:", error.message);
+    } else {
+      console.error("Failed to initialize database provider:", error);
+    }
+    process.exit(1);
+  }
+}
+
+startServer();
