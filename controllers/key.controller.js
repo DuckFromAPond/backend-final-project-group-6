@@ -36,7 +36,7 @@ exports.handleGenerateKey = async (req, res) => {
     if (!name || !userId)
       return res.status(400).send("Name and User ID required");
 
-    const result = await keyService.generateNewKey(name, userId);
+    const result = await keyService.createKey(name, userId);
 
     res.cookie("newRawKey", result.rawKey, {
       maxAge: 10000, // 10s; may need to change if too short

@@ -3,23 +3,30 @@ const multiparty = require("multiparty");
 const fs = require("fs");
 const userService = require("../services/userService");
 const itemService = require("../services/itemService");
+const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
 // static data
 const categories = [
-  { name: "Peripherals", subCategories: [
-    { name: "Monitor" },
-    { name: "Keyboard" },
-    { name: "Mouse" },
-    { name: "Scanner" },
-    { name: "Printer" },
-  ] },
-  { name: "Computers", subCategories: [
-    { name: "Laptop" },
-    { name: "Desktop" },
-    { name: "Server" },
-  ] },
+  {
+    name: "Peripherals",
+    subCategories: [
+      { name: "Monitor" },
+      { name: "Keyboard" },
+      { name: "Mouse" },
+      { name: "Scanner" },
+      { name: "Printer" },
+    ],
+  },
+  {
+    name: "Computers",
+    subCategories: [
+      { name: "Laptop" },
+      { name: "Desktop" },
+      { name: "Server" },
+    ],
+  },
 ];
 
 // --- Auth ---
@@ -136,6 +143,85 @@ exports.updateUserStatus = async (req, res) => {
   }
 };
 
+// --- API Keys Management (The Admin Only API requirements) ---
+// GET /api/keys
+exports.getKeys = async (req, res) => {
+  try {
+    const keys = await keyService.getActiveKeys();
+    const formattedKeys = keys.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      userId: entry.userId,
+      createdAt: entry.createdAt,
+      revoked: entry.revoked,
+    }));
+    console.log(formattedKeys);
+    return res.status(200).json({
+      success: true,
+      keys: formattedKeys,
+    });
+  } catch (err) {
+    console.error("Error fetching API keys:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve API keys",
+    });
+  }
+};
+
+// POST /api/keys
+exports.createKey = async (req, res) => {
+  try {
+    const { name, userId } = req.body;
+    // const userId = req.user.id;
+    if (!name || !userId)
+      return res.status(400).send("Name and User ID required");
+
+    const keyRecord = await keyService.createKey(name, userId);
+
+    return res.status(201).json({
+      success: true,
+      key: {
+        raw: keyRecord.rawKey,
+      },
+    });
+  } catch (err) {
+    console.error("Error generating API key:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate API key",
+    });
+  }
+};
+
+// DELETE /api/keys/:id
+exports.revokeKey = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await keyService.revokeKey(id);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: "API key not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "API key revoked successfully",
+    });
+  } catch (err) {
+    console.error("Error revoking API key:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to revoke API key",
+    });
+  }
+};
+
+// --- File Management...? ---
 exports.getFile = async (req, res) => {
   try {
     const db = getDbProvider();
@@ -156,7 +242,7 @@ exports.getFile = async (req, res) => {
 
     if (result.type === "stream") {
       const stream = result.data;
-      
+
       res.setHeader("Content-Type", result.contentType);
 
       return stream.pipe(res);
@@ -172,7 +258,6 @@ exports.getFile = async (req, res) => {
     return res.status(500).send("Error fetching file");
   }
 };
-
 
 // --- API Key Management ---
 exports.generateKey = async (req, res) => {
@@ -190,13 +275,16 @@ exports.showItems = async (req, res, next) => {
     let items = await itemService.getDBItems();
 
     // filter by subcategory
-    if(subcat) {
+    if (subcat) {
       items = items.filter((item) => item.subCategory === subcat);
     }
 
     // filter by category
     if (cat) {
-      items = items.filter((item) => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
+      items = items.filter(
+        (item) =>
+          item.category.toLowerCase().trim() === cat.toLowerCase().trim(),
+      );
     }
 
     // search by name (case-insensitive)
@@ -236,17 +324,17 @@ exports.createItem = async (req, res, next) => {
   try {
     const {
       filePath,
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
       dateAcquired,
       type,
       apiRedirect,
@@ -286,10 +374,7 @@ exports.showItemDetail = async (req, res) => {
   try {
     let item = await itemService.getDBItemById(id);
 
-    const statuses = [
-      { name: "Available" },
-      { name: "Maintenance" },
-    ];
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     let context = {
       item,
@@ -307,8 +392,7 @@ exports.showItemDetail = async (req, res) => {
     }
 
     return res.json(context);
-  }
-  catch(err) {
+  } catch (err) {
     next(err);
   }
 };
@@ -321,23 +405,23 @@ exports.editItem = async (req, res, next) => {
     const item = await itemService.getDBItemById(id);
     const {
       filePath,
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
       dateAcquired,
       type,
       redirect,
     } = await itemService.processItemForm(req);
 
-    if(type?.toLowerCase() === "error") {
+    if (type?.toLowerCase() === "error") {
       return res.redirect(`/api${redirect}`);
     }
 
@@ -348,7 +432,7 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    if(!["Available", "Maintenance"].includes(status)) {
+    if (!["Available", "Maintenance"].includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
@@ -397,18 +481,18 @@ exports.showItemHistory = async (req, res, next) => {
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
-        
+
     let context = {
       ...itemHistories,
       isEmpty: false,
       pageTitle: "Item History",
     };
 
-    if(itemHistories.length === 0) {
+    if (itemHistories.length === 0) {
       context = {
         ...context,
-        isEmpty: true
-      }
+        isEmpty: true,
+      };
     }
 
     return res.json(context);
