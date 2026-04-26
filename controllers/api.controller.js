@@ -302,7 +302,6 @@ exports.showItems = async (req, res, next) => {
 
     const statuses = [
       { name: "Available" },
-      { name: "In-Use" },
       { name: "Maintenance" },
     ];
 
@@ -345,9 +344,21 @@ exports.createItem = async (req, res, next) => {
       apiRedirect,
     } = await itemService.processItemForm(req);
 
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
+
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
       return res.redirect(apiRedirect);
+    }
+
+    if (!statuses.map(s => s.name).includes(status)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+      });
     }
 
     const newItem = {

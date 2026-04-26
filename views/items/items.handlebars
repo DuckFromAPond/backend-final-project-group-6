@@ -45,9 +45,9 @@
         </form>
     </div>
 
-    <section class="grid grid-cols-1 lg:grid-cols-[25%_1fr] gap-8 w-full">
-        <section class="w-full">
-            <nav class="bg-white p-4 rounded-lg shadow-sm">
+    <section class="grid grid-cols-1 lg:grid-cols-[15%_1fr] gap-8 w-full">
+        <section class="h-full w-full">
+            <nav class="bg-white p-4 rounded-lg shadow-sm h-full">
                 <div class="text-lg font-semibold mb-2"
                     href="/items"
                 >Categories</div>
@@ -95,7 +95,7 @@
         
         {{!-- item grid --}}
         {{#if items}}
-            <section class="col-start-1 lg:col-start-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full items-start min-w-0">
+            <section class="col-start-1 lg:col-start-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full items-start min-w-0">
                 {{#each items}}
                     {{> itemCard}}
                 {{/each}}

@@ -91,7 +91,7 @@ exports.home = async (req, res, next) => {
 exports.showItems = async (req, res, next) => {
   const { cat, q, subcat, isRetired, error, success } = req.query;
   let page = req.query.page;
-  const pageSize = 10; // items to show per page
+  const pageSize = 12; // items to show per page
 
   try {
     let items = await itemService.getDBItems();
@@ -156,11 +156,10 @@ exports.showItems = async (req, res, next) => {
     const prevPage = page > 1 ? page - 1 : null;
     const nextPage = page < totalPages ? page + 1 : null;
 
-    const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
+    const pagesToRender = totalPagesArray.slice(prevPage - 1, nextPage + 1);
 
     const statuses = [
       { name: "Available" },
-      { name: "In-Use" },
       { name: "Maintenance" },
     ];
 
@@ -208,12 +207,17 @@ exports.addItem = async (req, res, next) => {
       redirect,
     } = await itemService.processItemForm(req);
 
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
+
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
       return res.redirect(redirect);
     }
 
-    const existing = await itemService.getItemBySerial(serial);
+    const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing) {
       return res.redirect("/items?error=Serial+already+exists");
@@ -229,6 +233,10 @@ exports.addItem = async (req, res, next) => {
       !status
     ) {
       return res.redirect("/items?error=Missing+required+fields");
+    }
+
+    if(!statuses.map(s => s.name).includes(status)) {
+      return res.redirect(`/api/items?error=Status+must+be+available+or+maintenance`);
     }
 
     const newItem = {
@@ -421,7 +429,7 @@ exports.showItemHistory = async (req, res, next) => {
       pageTitle: "Item History",
     };
 
-    if(itemHistories.length === 0) {
+    if(itemHistories.itemHistories.length === 0) {
       context = {
         ...context,
         isEmpty: true

@@ -4,34 +4,34 @@
         <p class="text-gray-500 mt-1">All history for this item</p>
     </div>
 
-    <div class="w-full max-w-6xl max-h-screen overflow-scroll md:overflow-hidden rounded-2xl shadow-lg bg-white">
-        <table class="min-w-full border border-gray-200 rounded-lg overflow-scroll md:overflow-hidden">
-            <thead class="bg-blue-500/50 text-black text-xs uppercase tracking-wider border-b border-gray-400">
+    <div class="w-full max-w-6xl max-h-screen overflow-scroll md:overflow-hidden shadow-lg bg-white p-6">
+        <table class="w-full border border-gray-200">
+            <thead class="bg-blue-500 text-white">
                 <tr>
-                    <th class="p-4 border-r border-gray-400">ID</th>
-                    <th class="p-4 border-r border-gray-400">Assignee</th>
-                    <th class="p-4 border-r border-gray-400">Duration</th>
-                    <th class="p-4 border-r border-gray-400">Action</th>
-                    <th class="p-4 border-r border-gray-400">Date</th>
-                    <th class="p-4 border-r border-gray-400">Reference Link</th>
+                    <th class="px-4 py-2 text-left">ID</th>
+                    <th class="px-4 py-2 text-left">Assignee</th>
+                    <th class="px-4 py-2 text-left">Duration</th>
+                    <th class="px-4 py-2 text-left">Action</th>
+                    <th class="px-4 py-2 text-left">Date</th>
+                    <th class="px-4 py-2 text-left">Reference Link</th>
                 </tr>
             </thead>
                 <tbody>
                     {{#if isEmpty}}
-                        <tr>
-                            <td colspan="6" class="p-6 text-center text-gray-400">
+                        <tr class="border-b">
+                            <td colspan="100%" class="font-mono text-center text-gray-400 p-6">
                                 No history for this items
                             </td>
                         </tr>
                     {{else}}
                         {{#each itemHistories}}
-                            <tr class="border-t border-gray-400 hover:bg-gray-100 transition">
-                                <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">{{this.id}}</td>
-                                <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">{{this.assignee}}</td>
-                                <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">{{this.duration}}hr</td>
-                                <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">{{this.action}}</td>
-                                <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">{{formatDate this.createdAt}}</td>
-                                <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">{{this.referenceLink}}</td>
+                            <tr class="border-b">
+                                <td class="px-4 py-2 font-mono text-xs">{{this.id}}</td>
+                                <td class="px-4 py-2">{{this.assignee}}</td>
+                                <td class="px-4 py-2">{{this.duration}}hr</td>
+                                <td class="px-4 py-2">{{this.action}}</td>
+                                <td class="px-4 py-2">{{formatDate this.createdAt}}</td>
+                                <td class="px-4 py-2">{{this.referenceLink}}</td>
                             </tr>
                         {{/each}}
                     {{/if}}

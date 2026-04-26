@@ -180,7 +180,7 @@ exports.getDBItemById = async (id) => {
 
 exports.getDBItemBySerial = async (id) => {
   const db = getDbProvider();
-  return await db.getDBItemBySerial(id);
+  return await db.getItemBySerial(id);
 }
 
 exports.createDBItem = async (data) => {
