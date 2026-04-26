@@ -12,20 +12,7 @@ const adminService = require("../services/adminService");
 const { db } = require("../data/models/mongoUserModel");
 
 // static data
-const categories = [
-  { name: "Peripherals", subCategories: [
-    { name: "Monitor" },
-    { name: "Keyboard" },
-    { name: "Mouse" },
-    { name: "Scanner" },
-    { name: "Printer" },
-  ] },
-  { name: "Computers", subCategories: [
-    { name: "Laptop" },
-    { name: "Desktop" },
-    { name: "Server" },
-  ] },
-];
+const categories = await itemService.getCategoryFromDB();
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
@@ -598,7 +585,7 @@ exports.checkIn = async (req, res, next) => {
     let fileName = null;
 
     if (!files?.document?.length) {
-      return res.redirect("/items?error=Reference+file+is+required");
+      return res.redirect("/owned?error=Reference+file+is+required");
     }
 
     if (files?.document?.length > 0) {
@@ -609,7 +596,7 @@ exports.checkIn = async (req, res, next) => {
       if (DBlabel === "Supabase") {
         const MAX_SIZE = 50 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
+          return res.redirect("/owned?error=File+too+large+(max+50MB)");
         }
       }
 
@@ -628,10 +615,10 @@ exports.checkIn = async (req, res, next) => {
       referenceLink: filePath || fileName
     });
 
-    return res.redirect("/owned");
+    return res.redirect("/owned?success=item+checked+in+sucessfully");
   } catch (err) {
     return res.redirect(
-      `/items?error=${encodeURIComponent(err.message)}`
+      `/owned?error=${encodeURIComponent(err.message)}`
     );
   }
 };
@@ -814,7 +801,7 @@ exports.showOwned = async (req, res, next) => {
 
     res.render("owned", {
       items: allOwned,
-      pageTitle: "Owned",
+      pageTitle: "Owned"
     });
   } catch (err) {
     next(err);

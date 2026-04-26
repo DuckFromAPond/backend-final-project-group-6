@@ -16,13 +16,3 @@ exports.adminValidateForCheckout = async (userEmail,adminId) =>{
 
   return user.id;
 }
-// exports.adminCheckout = async (itemId, targetUserId, duration, referenceLink) => {
-//   const db = getDbProvider();
-
-//   return checkoutItem({
-//     itemId,
-//     userId: targetUserId,
-//     duration: duration,
-//     referenceLink: referenceLink
-//   });
-// };
