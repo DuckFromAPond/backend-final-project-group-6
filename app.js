@@ -112,6 +112,7 @@ app.use((req, res, next) => {
   res.locals.navReport = pathName.startsWith("/report");
   res.locals.navUsers = pathName.startsWith("/users"); //
   res.locals.navKeys = pathName.startsWith("/keys"); //
+  res.locals.currentYear = (new Date()).getFullYear();
 
   res.locals.config = config;
   next();
