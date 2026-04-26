@@ -32,7 +32,7 @@ exports.home = async (req, res, next) => {
     const db = getDbProvider();
 
     const [users, items, histories] = await Promise.all([
-      db.getAllUsers ? db.getAllUsers() : Promise.resolve([]),
+      db.getAllUsers() ? db.getAllUsers() : Promise.resolve([]),
       db.getItems(),
       db.getItemHistories(),
     ]);
@@ -164,6 +164,12 @@ exports.showItems = async (req, res, next) => {
       { name: "Maintenance" },
     ];
 
+    // for security's sake, please don't return the entire user object. The password hash is there
+    const exclude = ['email', 'passwordHash'];
+    const keyFilteredUser = Object.fromEntries(
+      Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+    );
+
     res.render("items/items", {
       categories,
       items,
@@ -171,7 +177,7 @@ exports.showItems = async (req, res, next) => {
       prevPage,
       nextPage,
       totalPages: pagesToRender,
-      user: req.user || null,
+      user: keyFilteredUser || null,
       error: error || null,
       success: success || null,
       pageTitle: "Items",
@@ -250,10 +256,15 @@ exports.addItem = async (req, res, next) => {
 
 exports.showItemDetail = async (req, res, next) => {
   const { id } = req.params;
-  const { edit, del, error, success } = req.query;
+  const { error, success } = req.query;
 
   try {
     let item = await itemService.getDBItemById(id);
+
+    if (!item) {
+      res.status(404);
+      return res.render("extra_pages/404");
+    }
 
     const statuses = [
       { name: "Available" },
@@ -264,30 +275,11 @@ exports.showItemDetail = async (req, res, next) => {
       ...item,
       categories,
       statuses,
-      isEdit: false,
-      isDelete: false,
+      isEdit: true,
+      isDelete: true,
       isRetired: item.status === "Retired",
       pageTitle: "ItemDetail",
     };
-
-    if (!context) {
-      res.status(404);
-      return res.render("404");
-    }
-
-    if (edit || (edit?.length !== 0 && edit === "true")) {
-      context = {
-        ...context,
-        isEdit: true,
-      };
-    }
-
-    if (del || (del?.length !== 0 && del === "true")) {
-      context = {
-        ...context,
-        isDelete: true,
-      };
-    }
 
     if (error) {
       context = {
@@ -333,6 +325,17 @@ exports.editItem = async (req, res, next) => {
       redirect,
     } = await itemService.processItemForm(req);
 
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
+
+    const existing = await itemService.getDBItemBySerial(serial);
+
+    if (existing) {
+      return res.redirect("/items?error=Serial+already+exists");
+    }
+
     if (type?.toLowerCase() === "error") {
       return res.json({
         type,
@@ -360,7 +363,7 @@ exports.editItem = async (req, res, next) => {
       })
     }
 
-    if(!["Available", "Maintenance"].includes(status)) {
+    if(!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
@@ -368,17 +371,17 @@ exports.editItem = async (req, res, next) => {
     }
 
     const newItem = {
-      name,
-      description,
-      brand,
-      model,
+      name: name || item.name,
+      description: description || item.description,
+      brand: brand || item.brand,
+      model: model || item.model,
       category: category || item.category,
       subCategory: subCategory || item.subCategory,
-      serial,
+      serial: serial || item.serial,
       status: status || item.status,
-      dateAcquired,
-      imageName: filePath || item.imageName,
-      imageAlt: `Image of ${name}`,
+      dateAcquired: dateAcquired || item.dateAcquired,
+      imageName: filePath || item.image_name,
+      imageAlt: `Image of ${name || item.name}`,
       imageUrl: filePath || item.imageUrl,
     };
 

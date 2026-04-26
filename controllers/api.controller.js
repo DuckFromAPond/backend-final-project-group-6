@@ -306,11 +306,16 @@ exports.showItems = async (req, res, next) => {
       { name: "Maintenance" },
     ];
 
+    const exclude = ['email', 'passwordHash'];
+    const keyFilteredUser = Object.fromEntries(
+      Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+    );
+
     return res.json({
       categories,
       items,
       statuses,
-      user: req.user || null,
+      user: keyFilteredUser || null,
       error,
       success,
     });
@@ -361,7 +366,11 @@ exports.createItem = async (req, res, next) => {
 
     await itemService.createDBItem(newItem);
 
-    return res.redirect("/api/items?success=Item+added+successfully");
+    return res.json({
+      ...newItem,
+      type: "success",
+      redirect: "/api/items?success=Item+added+successfully"
+    });
   } catch (err) {
     next(err);
   }
@@ -369,27 +378,28 @@ exports.createItem = async (req, res, next) => {
 
 // GET /api/items/:id
 exports.showItemDetail = async (req, res) => {
-  const { id, success, error } = req.params;
+  const { id } = req.params;
+  const {error, success} = req.query;
 
   try {
     let item = await itemService.getDBItemById(id);
 
+    if (!item) {
+      return res.status(404).json({
+        type: "error",
+        redirect: `/items/${id}?error=Item+not+found`
+      });
+    }
+
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     let context = {
-      item,
+      ...item,
       statuses,
       error,
       success,
       isRetired: item.status === "Retired",
     };
-
-    if (!context) {
-      return res.status(404).json({
-        type: "error",
-        message: "Item not found",
-      });
-    }
 
     return res.json(context);
   } catch (err) {
@@ -421,8 +431,22 @@ exports.editItem = async (req, res, next) => {
       redirect,
     } = await itemService.processItemForm(req);
 
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
+
+    const existing = await itemService.getDBItemBySerial(serial);
+    
+    if (existing) {
+      return res.json({
+        type: "error",
+        redirect: "/items?error=Serial+already+exists"
+      });
+    }
+
     if (type?.toLowerCase() === "error") {
-      return res.redirect(`/api${redirect}`);
+      return res.json({
+        type: error,
+        redirect: `/api${redirect}`,
+      });
     }
 
     if (item.status === "In-Use") {
@@ -432,7 +456,7 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    if (!["Available", "Maintenance"].includes(status)) {
+    if (!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
@@ -440,22 +464,26 @@ exports.editItem = async (req, res, next) => {
     }
 
     const newItem = {
-      name,
-      description,
-      brand,
-      model,
+      name: name || item.name,
+      description: description || item.description,
+      brand: brand || item.brand,
+      model: model || item.model,
       category: category || item.category,
       subCategory: subCategory || item.subCategory,
-      serial,
+      serial: serial || item.serial,
       status: status || item.status,
-      dateAcquired,
+      dateAcquired: dateAcquired || item.dateAcquired,
       imageName: filePath || item.image_name,
-      imageAlt: `Image of ${name}`,
+      imageAlt: `Image of ${name || item.name}`,
     };
 
     await itemService.updateDBItem(id, newItem);
 
-    return res.redirect(`/api/items/${id}?success=Item+updated+successfully`);
+    return res.json({
+      ...newItem,
+      type: "success",
+      redirect: `/items/${id}?success=Item+updated+successfully`,
+    });
   } catch (err) {
     next(err);
   }
@@ -466,7 +494,7 @@ exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const response = await itemService.getDBItemById(id);
+    const response = await itemService.deleteDBItem(id);
     response.redirect = `/api/${response.redirect}`;
 
     return res.json(response);

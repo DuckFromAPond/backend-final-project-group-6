@@ -178,6 +178,11 @@ exports.getDBItemById = async (id) => {
   return await db.getItemById(id);
 };
 
+exports.getDBItemBySerial = async (id) => {
+  const db = getDbProvider();
+  return await db.getDBItemBySerial(id);
+}
+
 exports.createDBItem = async (data) => {
   const db = getDbProvider();
   return await db.createItem(data);
@@ -206,6 +211,7 @@ exports.deleteDBItem = async (id) => {
   await db.updateItem(id, newItem);
 
   return {
+    ...newItem,
     type: "success",
     redirect: `/items/${id}?success=Item+retired+successfully`,
   };

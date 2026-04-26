@@ -162,8 +162,8 @@
 {{/if}}
 
 <script>
-    const form = document.querySelector('#updateForm');
-    const category = document.querySelector('#category');
+    const form = document.getElementById('updateForm');
+    const category = document.getElementById('category');
 
     // grab the right subcategories based on user selected category
     if (category) {
@@ -171,7 +171,7 @@
 
         category.addEventListener('change', (event) => {
             const selectedCategory = event.target.value;
-            const subCategory = document.querySelector('#subCategory');
+            const subCategory = document.getElementById('subCategory');
             subCategory.innerHTML = '<option value="" disabled selected>Select subcategory...</option>';
             const selected = selectedCategory;
 
