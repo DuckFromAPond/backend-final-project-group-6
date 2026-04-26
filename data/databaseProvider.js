@@ -34,7 +34,7 @@ class DatabaseProvider {
 
 	// ===== FOR USER TO ITEMS RELATIONS : UPDATE HISTORY =====
 	async getUserHistory(userId) {throw new Error("missing implementation");}
-	async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {}
+	// async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {}
 
 	// ===== API KEYS ===== (need to add to auth middleware/auth controller/admin controller later)
 	async createApiKey(userId, data) {throw new Error("missing implementation");}        			// for admin 

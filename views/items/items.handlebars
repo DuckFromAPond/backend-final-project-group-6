@@ -72,10 +72,10 @@
         {{> itemForm}}
         
         {{!-- item grid --}}
-        {{#if items}}
+        {{#if items.length}}
             <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full items-start min-w-0">
                 {{#each items}}
-                    {{> itemCard}}
+                    {{> itemCard user=user}}
                 {{/each}}
 
                 <div
@@ -118,10 +118,39 @@
         function closeForm() {
             document.getElementById("modal").classList.add("hidden");
         }
+
+        function openadminForm(id) {
+            document.getElementById("adminmodal").classList.remove("hidden");
+
+            document.getElementById("file_item_admin").value = id;
+        }
+
+        function closeadminForm() {
+            document.getElementById("adminmodal").classList.add("hidden");
+        }
         
         function setDuration(hours) {
             document.getElementById("duration").value = hours;
         }
+
+        function setadminDuration(hours) {
+            document.getElementById("adminduration").value = hours;
+        }
     </script>
 </div>
 
+
+{{!-- HIDDEN FORM PAGE --}}
+<div id="modal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeForm()">
+    {{!-- make closeform only work for background --}}
+    <div class="w-full max-w-lg" onclick="event.stopPropagation()">     
+        {{> form title="Check-out" action="checkout"}}
+    </div>
+</div>
+
+<div id="adminmodal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeadminForm()">
+    {{!-- make closeform only work for background --}}
+    <div class="w-full max-w-lg" onclick="event.stopPropagation()">     
+        {{> adminForm title="Check-out" action="adminCheckout"}}
+    </div>
+</div>

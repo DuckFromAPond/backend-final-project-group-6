@@ -39,6 +39,7 @@ router.patch(
 
 // router.post('/auth/login', loginLimiter, apiController.apiLogin);
 // router.post('/keys', apiProtect, requireRoleAPI("Admin"), apiController.generateKey);
+
 // router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
 // router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
 

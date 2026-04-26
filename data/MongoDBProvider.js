@@ -366,7 +366,7 @@ class MongoProvider extends DatabaseProvider {
       action: r.action,
       duration: r.duration,
       createdAt: r.createdAt,
-      referenceUrl: r.referenceLink ?? null,
+      referenceLink: r.referenceLink ?? null,
 
       item: r.itemId
         ? {
@@ -388,49 +388,49 @@ class MongoProvider extends DatabaseProvider {
   }
 
   // break apart later
-  async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
-    const item = await Item.findById(itemId);
-    if (!item) throw new Error("Item not found");
+  // async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
+  //   const item = await Item.findById(itemId);
+  //   if (!item) throw new Error("Item not found");
 
-    const admin = await User.findById(adminId);
-    if (!admin || admin.role !== "Admin") {
-      throw new Error("Unauthorized");
-    }
+  //   const admin = await User.findById(adminId);
+  //   if (!admin || admin.role !== "Admin") {
+  //     throw new Error("Unauthorized");
+  //   }
 
-    if (!["checkout", "checkin"].includes(action)) {
-      throw new Error("Invalid action");
-    }
+  //   if (!["checkout", "checkin"].includes(action)) {
+  //     throw new Error("Invalid action");
+  //   }
 
-    if (action === "checkout") {
-      const existing = await ItemHistory.findOne({
-        itemId,
-        returnedAt: null,
-      });
+  //   if (action === "checkout") {
+  //     const existing = await ItemHistory.findOne({
+  //       itemId,
+  //       returnedAt: null,
+  //     });
 
-      if (existing) {
-        if (existing.userId.toString() === targetUserId.toString()) {
-          throw new Error("User already owns this item");
-        }
-        throw new Error("Item is already checked out");
-      }
-    }
+  //     if (existing) {
+  //       if (existing.userId.toString() === targetUserId.toString()) {
+  //         throw new Error("User already owns this item");
+  //       }
+  //       throw new Error("Item is already checked out");
+  //     }
+  //   }
 
-    const history = await ItemHistory.create({
-      itemId,
-      userId: targetUserId,
-      action,
-      duration: options.duration ?? null,
-      referenceLink: options.referenceLink ?? null,
-      returnedAt: action === "checkin" ? new Date() : null,
-    });
+  //   const history = await ItemHistory.create({
+  //     itemId,
+  //     userId: targetUserId,
+  //     action,
+  //     duration: options.duration ?? null,
+  //     referenceLink: options.referenceLink ?? null,
+  //     returnedAt: action === "checkin" ? new Date() : null,
+  //   });
 
-    await this.setItemStatus(
-      itemId,
-      action === "checkout" ? "In-Use" : "Available"
-    );
+  //   await this.setItemStatus(
+  //     itemId,
+  //     action === "checkout" ? "In-Use" : "Available"
+  //   );
 
-    return history.toObject();
-  }
+  //   return history.toObject();
+  // }
 
   // =========================
   // API KEYS

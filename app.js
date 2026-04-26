@@ -109,6 +109,7 @@ publicApp.use((req, res, next) => {
   res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
   res.locals.navCheckin = pathName.startsWith("/owned");
   res.locals.navReport = pathName.startsWith("/report");
+  res.locals.navLogs = pathName.startsWith("/logs"); //
   res.locals.navUsers = pathName.startsWith("/users"); //
   res.locals.navKeys = pathName.startsWith("/keys"); //
 

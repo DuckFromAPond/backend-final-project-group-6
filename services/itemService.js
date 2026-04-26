@@ -120,6 +120,16 @@ exports.getUserOwnedItems = async (currentUserId) => {
   );
 };
 
+
+exports.getUserHistory = async (currentUserId) => {
+  const db = getDbProvider();
+
+  const userHistories = await db.getUserHistory(currentUserId);
+
+  return userHistories
+};
+
+
 exports.getDBItemsHistory = async () => {
   const db = getDbProvider();
   return await db.getItemHistories();
@@ -136,35 +146,3 @@ exports.getDBItems = async () => {
 };
 
 
-// move this back to controller later 
-exports.adminCheckout = async (itemId, targetUserId, adminId, options = {}) => {
-  const db = getDbProvider();
-
-  const admin = await db.getUserById(adminId);
-  if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
-  }
-
-  return checkoutItem({
-    itemId,
-    userId: targetUserId,
-    duration: options.duration,
-    referenceLink: options.referenceLink
-  });
-};
-
-exports.adminCheckout = async (itemId, targetUserId, adminId, options = {}) => {
-  const db = getDbProvider();
-
-  const admin = await db.getUserById(adminId);
-  if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
-  }
-
-  return checkoutItem({
-    itemId,
-    userId: targetUserId,
-    duration: options.duration,
-    referenceLink: options.referenceLink
-  });
-};
