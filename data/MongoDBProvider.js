@@ -126,13 +126,13 @@ class MongoProvider extends DatabaseProvider {
 
   getImageStream(imageName) {
     return this.itemsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(imageName)
+      new mongoose.Types.ObjectId(imageName),
     );
   }
 
   getDocumentStream(imageName) {
     return this.docsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(imageName)
+      new mongoose.Types.ObjectId(imageName),
     );
   }
 
@@ -147,8 +147,7 @@ class MongoProvider extends DatabaseProvider {
 
     return `${config.BASE_URL}/api/files/docs/${imageName}`;
   }
-  
-  
+
   async getFile(bucket, id) {
     const valid = mongoose.Types.ObjectId.isValid(id);
     if (!valid) return null;
@@ -170,7 +169,7 @@ class MongoProvider extends DatabaseProvider {
     if (!file) return null;
 
     const stream = gridBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(id)
+      new mongoose.Types.ObjectId(id),
     );
 
     return {
@@ -245,7 +244,8 @@ class MongoProvider extends DatabaseProvider {
 
   async revokeOwnedApiKeys(userId) {
     // for business rule to remove all owned by a disabled acc
-    await ApiKey.updateMany({ userId: userId }, { revoked: true });
+    // await ApiKey.updateMany({ userId: userId }, { revoked: true });
+    await ApiKey.deleteMany({ userId: userId }); // hard-delete
   }
 
   async getAllUsers() {
@@ -426,7 +426,7 @@ class MongoProvider extends DatabaseProvider {
 
     await this.setItemStatus(
       itemId,
-      action === "checkout" ? "In-Use" : "Available"
+      action === "checkout" ? "In-Use" : "Available",
     );
 
     return history.toObject();
@@ -487,8 +487,8 @@ class MongoProvider extends DatabaseProvider {
         metadata: {
           contentType: mimeType,
           originalName: filename,
-      },
-    });
+        },
+      });
 
       uploadStream.end(buffer);
 

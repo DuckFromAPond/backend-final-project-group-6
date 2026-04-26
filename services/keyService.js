@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
-exports.generateNewKey = async (name, userId) => {
+exports.createKey = async (name, userId) => {
   const db = getDbProvider();
   // pass the name and userId.
   const keyRecord = await db.createApiKey(userId, { name });
