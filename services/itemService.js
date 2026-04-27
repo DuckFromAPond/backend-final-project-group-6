@@ -196,6 +196,11 @@ exports.getDBItemById = async (id) => {
   return await db.getItemById(id);
 };
 
+exports.getDBItemBySerial = async (id) => {
+  const db = getDbProvider();
+  return await db.getItemBySerial(id);
+}
+
 // CREATE ITEM
 // Description: creates item in database
 // Precondition: payload of new item
@@ -236,6 +241,7 @@ exports.deleteDBItem = async (id) => {
   await db.updateItem(id, newItem);
 
   return {
+    ...newItem,
     type: "success",
     redirect: `/items/${id}?success=Item+retired+successfully`,
   };

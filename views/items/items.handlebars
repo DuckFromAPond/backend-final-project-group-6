@@ -5,52 +5,11 @@
     </div>
     
     {{!-- Title --}}
-    <div>
-        <h1 class="text-3xl font-bold text-gray-800">Items</h1>
-        <p class="text-gray-500 mt-1">All items in the system</p>
-    </div>
-    
-    <section class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-10 w-full">
-        <nav class="bg-white p-4 rounded-lg shadow-sm">
-            <div class="text-lg font-semibold mb-2"
-                href="/items"
-            >Categories</div>
-
-            <ul class="space-y-1">
-                
-                <li>
-                    <a class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
-                        href="/items"
-                    >All</a>
-                </li>
-                
-                {{#each categories}}
-                <li>
-                    <a href="/items?cat={{this.name}}"
-                    class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition">
-                    {{this.name}}
-                    </a>
-                </li>
-                {{/each}}
-                <li>
-                    <button
-                    class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
-                    onclick="openSubcategory()"
-                    >
-                    Subcategories
-                    </button>
-                </li>
-
-                <li>
-                    <a href="/items?isRetired=true"
-                    class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
-                    >
-                    Show retired
-                    </a>
-                </li>
-            </ul>
-        </nav>
-
+    <div class="grid grid-cols-1 sm:grid-cols-2">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Items</h1>
+            <p class="text-gray-500 mt-1">All items in the system</p>
+        </div>
         <form method="GET" action="/items"
             class="h-20 flex gap-2 justify-end items-center bg-white p-4 rounded-lg shadow-sm">
 
@@ -62,18 +21,81 @@
                 class="w-full border border-gray-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
             >
             <button
-                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition">
+                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition"
+                type="submit"
+            >
                 Search
             </button>
-        </form>
-    </section>
 
-    <section class="grid grid-cols-1 md:grid-cols-[45%_1fr] lg:grid-cols-[30%_1fr] gap-8 w-full">
-        {{> itemForm}}
+            <button onClick="showAddItem()"
+            class="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all"
+            id="addItemBtn"
+            type="button"
+            >
+            Create
+            </button>
+
+            <button onClick="hideAddItem()"
+            class="hidden cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all"
+            id="hideAddItemBtn"
+            type="button"
+            >
+            Hide
+            </button>
+        </form>
+    </div>
+
+    <section class="grid grid-cols-1 lg:grid-cols-[15%_1fr] gap-8 w-full">
+        <section class="h-full w-full">
+            <nav class="bg-white p-4 rounded-lg shadow-sm h-full">
+                <div class="text-lg font-semibold mb-2"
+                    href="/items"
+                >Categories</div>
+
+                <ul class="space-y-1">
+                    
+                    <li>
+                        <a class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                            href="/items"
+                        >All</a>
+                    </li>
+                    
+                    {{#each categories}}
+                    <li>
+                        <a href="/items?cat={{this.name}}"
+                        class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition">
+                        {{this.name}}
+                        </a>
+                    </li>
+                    {{/each}}
+                    <li>
+                        <button
+                        class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                        onclick="openSubcategory()"
+                        >
+                        Subcategories
+                        </button>
+                    </li>
+
+                    
+                    <li>
+                        <a href="/items?isRetired=true"
+                        class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                        >
+                        Retired
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </section>
+        
+        <section id="addItem" class="hidden">
+            {{> itemForm}}
+        </section>
         
         {{!-- item grid --}}
         {{#if items}}
-            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full items-start min-w-0">
+            <section class="col-start-1 lg:col-start-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full items-start min-w-0">
                 {{#each items}}
                     {{> itemCard}}
                 {{/each}}
@@ -101,6 +123,18 @@
     </div>
 
     <script>
+        function showAddItem() {
+            document.getElementById("addItem").classList.remove("hidden");
+            document.getElementById("hideAddItemBtn").classList.remove("hidden");
+            document.getElementById("addItemBtn").classList.add("hidden");
+        }
+
+        function hideAddItem() {
+            document.getElementById("addItem").classList.add("hidden");
+            document.getElementById("hideAddItemBtn").classList.add("hidden");
+            document.getElementById("addItemBtn").classList.remove("hidden");
+        }
+
         function openSubcategory() {
             document.getElementById("subcategoryModal").classList.remove("hidden");
         }

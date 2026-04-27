@@ -3,23 +3,30 @@ const multiparty = require("multiparty");
 const fs = require("fs");
 const userService = require("../services/userService");
 const itemService = require("../services/itemService");
+const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
 // static data
 const categories = [
-  { name: "Peripherals", subCategories: [
-    { name: "Monitor" },
-    { name: "Keyboard" },
-    { name: "Mouse" },
-    { name: "Scanner" },
-    { name: "Printer" },
-  ] },
-  { name: "Computers", subCategories: [
-    { name: "Laptop" },
-    { name: "Desktop" },
-    { name: "Server" },
-  ] },
+  {
+    name: "Peripherals",
+    subCategories: [
+      { name: "Monitor" },
+      { name: "Keyboard" },
+      { name: "Mouse" },
+      { name: "Scanner" },
+      { name: "Printer" },
+    ],
+  },
+  {
+    name: "Computers",
+    subCategories: [
+      { name: "Laptop" },
+      { name: "Desktop" },
+      { name: "Server" },
+    ],
+  },
 ];
 
 // --- Auth ---
@@ -136,6 +143,85 @@ exports.updateUserStatus = async (req, res) => {
   }
 };
 
+// --- API Keys Management (The Admin Only API requirements) ---
+// GET /api/keys
+exports.getKeys = async (req, res) => {
+  try {
+    const keys = await keyService.getActiveKeys();
+    const formattedKeys = keys.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      userId: entry.userId,
+      createdAt: entry.createdAt,
+      revoked: entry.revoked,
+    }));
+    console.log(formattedKeys);
+    return res.status(200).json({
+      success: true,
+      keys: formattedKeys,
+    });
+  } catch (err) {
+    console.error("Error fetching API keys:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve API keys",
+    });
+  }
+};
+
+// POST /api/keys
+exports.createKey = async (req, res) => {
+  try {
+    const { name, userId } = req.body;
+    // const userId = req.user.id;
+    if (!name || !userId)
+      return res.status(400).send("Name and User ID required");
+
+    const keyRecord = await keyService.createKey(name, userId);
+
+    return res.status(201).json({
+      success: true,
+      key: {
+        raw: keyRecord.rawKey,
+      },
+    });
+  } catch (err) {
+    console.error("Error generating API key:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate API key",
+    });
+  }
+};
+
+// DELETE /api/keys/:id
+exports.revokeKey = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await keyService.revokeKey(id);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: "API key not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "API key revoked successfully",
+    });
+  } catch (err) {
+    console.error("Error revoking API key:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to revoke API key",
+    });
+  }
+};
+
+// --- File Management...? ---
 exports.getFile = async (req, res) => {
   try {
     const db = getDbProvider();
@@ -156,7 +242,7 @@ exports.getFile = async (req, res) => {
 
     if (result.type === "stream") {
       const stream = result.data;
-      
+
       res.setHeader("Content-Type", result.contentType);
 
       return stream.pipe(res);
@@ -172,7 +258,6 @@ exports.getFile = async (req, res) => {
     return res.status(500).send("Error fetching file");
   }
 };
-
 
 // --- API Key Management ---
 exports.generateKey = async (req, res) => {
@@ -190,13 +275,16 @@ exports.showItems = async (req, res, next) => {
     let items = await itemService.getDBItems();
 
     // filter by subcategory
-    if(subcat) {
+    if (subcat) {
       items = items.filter((item) => item.subCategory === subcat);
     }
 
     // filter by category
     if (cat) {
-      items = items.filter((item) => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
+      items = items.filter(
+        (item) =>
+          item.category.toLowerCase().trim() === cat.toLowerCase().trim(),
+      );
     }
 
     // search by name (case-insensitive)
@@ -214,15 +302,19 @@ exports.showItems = async (req, res, next) => {
 
     const statuses = [
       { name: "Available" },
-      { name: "In-Use" },
       { name: "Maintenance" },
     ];
+
+    const exclude = ['email', 'passwordHash'];
+    const keyFilteredUser = Object.fromEntries(
+      Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+    );
 
     return res.json({
       categories,
       items,
       statuses,
-      user: req.user || null,
+      user: keyFilteredUser || null,
       error,
       success,
     });
@@ -236,25 +328,37 @@ exports.createItem = async (req, res, next) => {
   try {
     const {
       filePath,
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
       dateAcquired,
       type,
       apiRedirect,
     } = await itemService.processItemForm(req);
 
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
+
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
       return res.redirect(apiRedirect);
+    }
+
+    if (!statuses.map(s => s.name).includes(status)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+      });
     }
 
     const newItem = {
@@ -273,7 +377,11 @@ exports.createItem = async (req, res, next) => {
 
     await itemService.createDBItem(newItem);
 
-    return res.redirect("/api/items?success=Item+added+successfully");
+    return res.json({
+      ...newItem,
+      type: "success",
+      redirect: "/api/items?success=Item+added+successfully"
+    });
   } catch (err) {
     next(err);
   }
@@ -281,34 +389,31 @@ exports.createItem = async (req, res, next) => {
 
 // GET /api/items/:id
 exports.showItemDetail = async (req, res) => {
-  const { id, success, error } = req.params;
+  const { id } = req.params;
+  const {error, success} = req.query;
 
   try {
     let item = await itemService.getDBItemById(id);
 
-    const statuses = [
-      { name: "Available" },
-      { name: "Maintenance" },
-    ];
+    if (!item) {
+      return res.status(404).json({
+        type: "error",
+        redirect: `/items/${id}?error=Item+not+found`
+      });
+    }
+
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     let context = {
-      item,
+      ...item,
       statuses,
       error,
       success,
       isRetired: item.status === "Retired",
     };
 
-    if (!context) {
-      return res.status(404).json({
-        type: "error",
-        message: "Item not found",
-      });
-    }
-
     return res.json(context);
-  }
-  catch(err) {
+  } catch (err) {
     next(err);
   }
 };
@@ -321,24 +426,38 @@ exports.editItem = async (req, res, next) => {
     const item = await itemService.getDBItemById(id);
     const {
       filePath,
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
       dateAcquired,
       type,
       redirect,
     } = await itemService.processItemForm(req);
 
-    if(type?.toLowerCase() === "error") {
-      return res.redirect(`/api${redirect}`);
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
+
+    const existing = await itemService.getDBItemBySerial(serial);
+    
+    if (existing) {
+      return res.json({
+        type: "error",
+        redirect: "/items?error=Serial+already+exists"
+      });
+    }
+
+    if (type?.toLowerCase() === "error") {
+      return res.json({
+        type: error,
+        redirect: `/api${redirect}`,
+      });
     }
 
     if (item.status === "In-Use") {
@@ -348,7 +467,7 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    if(!["Available", "Maintenance"].includes(status)) {
+    if (!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
@@ -356,22 +475,26 @@ exports.editItem = async (req, res, next) => {
     }
 
     const newItem = {
-      name,
-      description,
-      brand,
-      model,
+      name: name || item.name,
+      description: description || item.description,
+      brand: brand || item.brand,
+      model: model || item.model,
       category: category || item.category,
       subCategory: subCategory || item.subCategory,
-      serial,
+      serial: serial || item.serial,
       status: status || item.status,
-      dateAcquired,
+      dateAcquired: dateAcquired || item.dateAcquired,
       imageName: filePath || item.image_name,
-      imageAlt: `Image of ${name}`,
+      imageAlt: `Image of ${name || item.name}`,
     };
 
     await itemService.updateDBItem(id, newItem);
 
-    return res.redirect(`/api/items/${id}?success=Item+updated+successfully`);
+    return res.json({
+      ...newItem,
+      type: "success",
+      redirect: `/items/${id}?success=Item+updated+successfully`,
+    });
   } catch (err) {
     next(err);
   }
@@ -382,7 +505,7 @@ exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const response = await itemService.getDBItemById(id);
+    const response = await itemService.deleteDBItem(id);
     response.redirect = `/api/${response.redirect}`;
 
     return res.json(response);
@@ -397,18 +520,18 @@ exports.showItemHistory = async (req, res, next) => {
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
-        
+
     let context = {
       ...itemHistories,
       isEmpty: false,
       pageTitle: "Item History",
     };
 
-    if(itemHistories.length === 0) {
+    if (itemHistories.length === 0) {
       context = {
         ...context,
-        isEmpty: true
-      }
+        isEmpty: true,
+      };
     }
 
     return res.json(context);
