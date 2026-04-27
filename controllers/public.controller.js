@@ -121,7 +121,7 @@ exports.showItems = async (req, res, next) => {
     // append query parameters to URL
     let url = "/items?";
 
-    if(subcat) url += `subcat=${subcat}&`;
+    if (subcat) url += `subcat=${subcat}&`;
     if (cat) url += `cat=${cat}&`;
     if (q) url += `q=${q}&`;
     if (isRetired) url += `isRetired=${isRetired}&`;
@@ -321,8 +321,6 @@ exports.showItemDetail = async (req, res, next) => {
   }
 };
 
-
-// -------------------------------------------------------------- to change: only admin can change status while in-use -> also have update for user history too 
 exports.editItem = async (req, res, next) => {
   const { id } = req.params;
 
@@ -414,7 +412,6 @@ exports.editItem = async (req, res, next) => {
   }
 };
 
-// ------------------------------------------------------------------------- ADMIN ONLY ROUTE PLEASE MAKE ADMIN ONLY 
 // soft deletes only 
 exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
