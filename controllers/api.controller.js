@@ -485,9 +485,16 @@ exports.apiCheckin = async (req, res) => {
     await itemService.validateCheckin(itemId);
 
     let filePath = null;
+    const file = req.files?.document?.[0];
+
+    if (!file || file.size === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "File is required"
+      });
+    }
 
     if (req.files?.document) {
-      const file = req.files.document;
 
       const DBlabel = itemService.getDBlabel();
 
@@ -539,9 +546,16 @@ exports.apiCheckout = async (req, res) => {
 
     let filePath = null;
 
-    // optional file upload (if using multipart/form-data)
+    const file = req.files?.document?.[0];
+
+    if (!file || file.size === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "File is required"
+      });
+    }
+
     if (req.files?.document) {
-      const file = req.files.document;
 
       const DBlabel = itemService.getDBlabel();
 
