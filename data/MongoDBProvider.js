@@ -464,6 +464,19 @@ class MongoProvider extends DatabaseProvider {
     return keys.map((key) => this.mapApiKey(key));
   }
 
+  async verifyApiKey(key) {
+    const apiKeys = await ApiKey.find({ revoked: false }).lean();
+
+    for (const apiKey of apiKeys) {
+        const match = await bcryptjs.compare(key, apiKey.hashedKey)
+        if (match) {
+            return this.mapApiKey(apiKey)
+        }
+    }
+
+    return null;
+  }
+
   // change this to find by the hashed version or just fetch all for service-side comparison
   async getApiKeyByHash(hashedKey) {
     const keyRecord = await ApiKey.findOne({
@@ -523,7 +536,6 @@ class MongoProvider extends DatabaseProvider {
 
   async getAllCategories() {
     const categories = await Category.find().lean();
-
     return categories.map((c) => this.mapCategory(c));
   }
 

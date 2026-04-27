@@ -207,6 +207,79 @@ exports.getDBItems = async () => {
   return await db.getItems();
 };
 
+// GET CATEGORIES
+// Description: gets all categories from database
+// Precondition: none
+// Postcondition: array of categories
+exports.getCategoryFromDB = async () => {
+  const db = getDbProvider();
+  const categories = await db.getAllCategories(); 
+
+  const map = new Map();
+  const result = [];
+
+  // 1. build lookup map
+  categories.forEach(cat => {
+    map.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      subCategories: []
+    });
+  });
+
+  // 2. build tree
+  categories.forEach(cat => {
+    if (cat.parentId) {
+      const parent = map.get(cat.parentId);
+
+      if (parent) {
+        parent.subCategories.push(map.get(cat.id));
+      }
+    } else {
+      result.push(map.get(cat.id));
+    }
+  });
+
+  return result;
+};
+
+// GET FILTERED ITEMS
+// Description: gets filtered items from database
+// Precondition: none
+// Postcondition: array of items
+exports.getDBFilteredItems = async ({cat, subcat, q, isRetired}) => {
+  let items = await exports.getDBItems();
+  let categories = await exports.getCategoryFromDB();
+
+  if(!categories || categories.length === 0) {
+    // use static data
+    categories = [
+      { name: "Peripherals", subCategories: [
+        { name: "Monitor" },
+        { name: "Keyboard" },
+        { name: "Mouse" },
+        { name: "Scanner" },
+        { name: "Printer" },
+      ] },
+      { name: "Computers", subCategories: [
+        { name: "Laptop" },
+        { name: "Desktop" },
+        { name: "Server" },
+      ] },
+    ];
+  }
+
+  if (subcat) items = items.filter(item => item.subCategory === subcat);
+  if (cat) items = items.filter(item => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
+  if (q) items = items.filter(item => item.name?.toLowerCase().includes(q.toLowerCase()));
+
+  items = isRetired
+      ? items.filter(item => item.status === 'Retired')
+      : items.filter(item => item.status !== 'Retired');
+
+  return { items, categories }
+}
+
 // GET ITEM BY ITEM ID
 // Description: gets item by id from database
 // Precondition: id of item
@@ -284,14 +357,14 @@ exports.processItemForm = async (req) => {
   });
 
   // extract fields
-  const name = fields.name?.[0] ?? "";
-  const description = fields.description?.[0] ?? "";
-  const brand = fields.brand?.[0] ?? "";
-  const model = fields.model?.[0] ?? "";
-  const category = fields.category?.[0] ?? "";
-  const subCategory = fields.subCategory?.[0] ?? "";
-  const serial = fields.serial?.[0] ?? "";
-  const status = fields.status?.[0] ?? "";
+  const name = fields.name?.[0] ?? null;
+  const description = fields.description?.[0] ?? null;
+  const brand = fields.brand?.[0] ?? null;
+  const model = fields.model?.[0] ?? null;
+  const category = fields.category?.[0] ?? null;
+  const subCategory = fields.subCategory?.[0] ?? null;
+  const serial = fields.serial?.[0] ?? null;
+  const status = fields.status?.[0] ?? null;
   const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
   // upload file
@@ -337,34 +410,3 @@ exports.processItemForm = async (req) => {
 
   return {filePath, fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect};
 }
-
-exports.getCategoryFromDB = async () => {
-  const categories = await db.getAllCategories(); 
-
-  const map = new Map();
-  const result = [];
-
-  // 1. build lookup map
-  categories.forEach(cat => {
-    map.set(cat.id, {
-      id: cat.id,
-      name: cat.name,
-      subCategories: []
-    });
-  });
-
-  // 2. build tree
-  categories.forEach(cat => {
-    if (cat.parentId) {
-      const parent = map.get(cat.parentId);
-
-      if (parent) {
-        parent.subCategories.push(map.get(cat.id));
-      }
-    } else {
-      result.push(map.get(cat.id));
-    }
-  });
-
-  return result;
-};

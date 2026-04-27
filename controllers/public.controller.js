@@ -11,9 +11,6 @@ const userService = require("../services/userService");
 const adminService = require("../services/adminService");  
 const { db } = require("../data/models/mongoUserModel");
 
-// static data
-const categories = await itemService.getCategoryFromDB();
-
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
@@ -114,80 +111,23 @@ exports.showItems = async (req, res, next) => {
   const pageSize = 12; // items to show per page
 
   try {
-    let items = await itemService.getDBItems();
+    let { items, categories } = await itemService.getDBFilteredItems({
+      cat, 
+      subcat, 
+      q, 
+      isRetired
+    });
 
     // append query parameters to URL
     let url = "/items?";
 
-    // filter by subcategory
-    if(subcat) {
-      url += `subcat=${subcat}&`;
-      items = items.filter((item) => item.subCategory === subcat);
-    }
-    // filter by subcategory
-    if(subcat) {
-      url += `subcat=${subcat}&`;
-      items = items.filter((item) => item.subCategory === subcat);
-    }
+    if(subcat) url += `subcat=${subcat}&`;
+    if (cat) url += `cat=${cat}&`;
+    if (q) url += `q=${q}&`;
+    if (isRetired) url += `isRetired=${isRetired}&`;
+    if (error) url += `error=${error}&`;
+    if (success) url += `success=${success}&`;
 
-    // filter by category
-    if (cat) {
-      url += `cat=${cat}&`;
-      items = items.filter((item) => item.category === cat);
-    }
-    // filter by category
-    if (cat) {
-      url += `cat=${cat}&`;
-      items = items.filter((item) => item.category === cat);
-    }
-
-    // search by name (case-insensitive)
-    if (q) {
-      url += `q=${q}&`;
-      items = items.filter((item) =>
-        item.name?.toLowerCase().includes(q.toLowerCase()),
-      );
-    }
-    // search by name (case-insensitive)
-    if (q) {
-      url += `q=${q}&`;
-      items = items.filter((item) =>
-        item.name?.toLowerCase().includes(q.toLowerCase()),
-      );
-    }
-
-    if (isRetired) {
-      url += `isRetired=${isRetired}&`;
-      items = items.filter((item) => item.status === "Retired");
-    } else {
-      items = items.filter((item) => item.status !== "Retired");
-    }
-    if (isRetired) {
-      url += `isRetired=${isRetired}&`;
-      items = items.filter((item) => item.status === "Retired");
-    } else {
-      items = items.filter((item) => item.status !== "Retired");
-    }
-
-    if (error) {
-      url += `error=${error}&`;
-    }
-    if (error) {
-      url += `error=${error}&`;
-    }
-
-    if (success) {
-      url += `success=${success}&`;
-    }
-    if (success) {
-      url += `success=${success}&`;
-    }
-
-    // append page number to URL
-    if (!page) {
-      url += `page=1`;
-      return res.redirect(url);
-    }
     // append page number to URL
     if (!page) {
       url += `page=1`;
@@ -195,12 +135,7 @@ exports.showItems = async (req, res, next) => {
     }
 
     page = parseInt(page);
-    page = parseInt(page);
 
-    // calculate total pages
-    const total = items.length;
-    const totalPages = Math.ceil(total / pageSize);
-    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
     // calculate total pages
     const total = items.length;
     const totalPages = Math.ceil(total / pageSize);
@@ -210,14 +145,7 @@ exports.showItems = async (req, res, next) => {
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     items = items.slice(start, end);
-    // set page range
-    const start = (page - 1) * pageSize;
-    const end = start + pageSize;
-    items = items.slice(start, end);
 
-    // pagination
-    const prevPage = page > 1 ? page - 1 : null;
-    const nextPage = page < totalPages ? page + 1 : null;
     // pagination
     const prevPage = page > 1 ? page - 1 : null;
     const nextPage = page < totalPages ? page + 1 : null;
@@ -334,6 +262,7 @@ exports.showItemDetail = async (req, res, next) => {
 
   try {
     let item = await itemService.getDBItemById(id);
+    const categories = await itemService.getCategoryFromDB();
 
     if (!item) {
       res.status(404);
@@ -413,10 +342,7 @@ exports.editItem = async (req, res, next) => {
       redirect,
     } = await itemService.processItemForm(req);
 
-    const statuses = [
-      { name: "Available" },
-      { name: "Maintenance" },
-    ];
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     const existing = await itemService.getDBItemBySerial(serial);
 

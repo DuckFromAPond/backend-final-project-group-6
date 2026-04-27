@@ -95,7 +95,9 @@
         
         {{!-- item grid --}}
         {{#if items}}
-            <section class="col-start-1 lg:col-start-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full items-start min-w-0">
+            <section class="col-start-1 lg:col-start-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full items-start min-w-0"
+                id="items"
+            >
                 {{#each items}}
                     {{> itemCard user=user}}
                 {{/each}}
@@ -127,12 +129,16 @@
             document.getElementById("addItem").classList.remove("hidden");
             document.getElementById("hideAddItemBtn").classList.remove("hidden");
             document.getElementById("addItemBtn").classList.add("hidden");
+            document.getElementById("items").classList.add("lg:col-span-2");
+            document.getElementById("items").classList.remove("lg:col-start-2");
         }
 
         function hideAddItem() {
             document.getElementById("addItem").classList.add("hidden");
             document.getElementById("hideAddItemBtn").classList.add("hidden");
             document.getElementById("addItemBtn").classList.remove("hidden");
+            document.getElementById("items").classList.remove("lg:col-span-2");
+            document.getElementById("items").classList.add("lg:col-start-2");
         }
 
         function openSubcategory() {

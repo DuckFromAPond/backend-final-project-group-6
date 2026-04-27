@@ -7,28 +7,6 @@ const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
 
-// static data
-const categories = [
-  {
-    name: "Peripherals",
-    subCategories: [
-      { name: "Monitor" },
-      { name: "Keyboard" },
-      { name: "Mouse" },
-      { name: "Scanner" },
-      { name: "Printer" },
-    ],
-  },
-  {
-    name: "Computers",
-    subCategories: [
-      { name: "Laptop" },
-      { name: "Desktop" },
-      { name: "Server" },
-    ],
-  },
-];
-
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
   try {
@@ -272,33 +250,12 @@ exports.showItems = async (req, res, next) => {
   const { cat, q, subcat, isRetired, error, success } = req.query;
 
   try {
-    let items = await itemService.getDBItems();
-
-    // filter by subcategory
-    if (subcat) {
-      items = items.filter((item) => item.subCategory === subcat);
-    }
-
-    // filter by category
-    if (cat) {
-      items = items.filter(
-        (item) =>
-          item.category.toLowerCase().trim() === cat.toLowerCase().trim(),
-      );
-    }
-
-    // search by name (case-insensitive)
-    if (q) {
-      items = items.filter((item) =>
-        item.name?.toLowerCase().includes(q.toLowerCase()),
-      );
-    }
-
-    if (isRetired) {
-      items = items.filter((item) => item.status === "Retired");
-    } else {
-      items = items.filter((item) => item.status !== "Retired");
-    }
+    let { items, categories } = await itemService.getDBFilteredItems({
+      cat,
+      subcat,
+      q,
+      isRetired,
+    });
 
     const statuses = [
       { name: "Available" },
@@ -306,9 +263,12 @@ exports.showItems = async (req, res, next) => {
     ];
 
     const exclude = ['email', 'passwordHash'];
-    const keyFilteredUser = Object.fromEntries(
-      Object.entries(req.user).filter(([key]) => !exclude.includes(key))
-    );
+    let keyFilteredUser = null;
+    if(req.user) {
+      keyFilteredUser = Object.fromEntries(
+        Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+      );
+    }
 
     return res.json({
       categories,
@@ -394,6 +354,7 @@ exports.showItemDetail = async (req, res) => {
 
   try {
     let item = await itemService.getDBItemById(id);
+    const categories = await itemService.getCategoryFromDB();
 
     if (!item) {
       return res.status(404).json({
@@ -457,6 +418,13 @@ exports.editItem = async (req, res, next) => {
       return res.json({
         type: error,
         redirect: `/api${redirect}`,
+      });
+    }
+
+    if (!item) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Item+not+found`,
       });
     }
 
