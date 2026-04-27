@@ -150,7 +150,10 @@ exports.showItems = async (req, res, next) => {
     const prevPage = page > 1 ? page - 1 : null;
     const nextPage = page < totalPages ? page + 1 : null;
 
-    const pagesToRender = totalPagesArray.slice(prevPage - 1, nextPage + 1);
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
 
     const statuses = [
       { name: "Available" },
@@ -170,6 +173,7 @@ exports.showItems = async (req, res, next) => {
       prevPage,
       nextPage,
       totalPages: pagesToRender,
+      currentPage: page,
       user: keyFilteredUser || null,
       error: error || null,
       success: success || null,
