@@ -124,11 +124,21 @@ exports.getUserOwnedItems = async (currentUserId) => {
   );
 };
 
+
+
+// GET ALL HISTORY
+// Description: gets all history from database
+// Precondition: none
+// Postcondition: object (all history)
 exports.getDBItemsHistory = async () => {
   const db = getDbProvider();
   return await db.getItemHistories();
 };
 
+// GET ALL HISTORY OF AN ITEM
+// Description: gets all history of an item by item id from database
+// Precondition: id of item
+// Postcondition: object (all history of an item + searched item)
 exports.getDBItemHistoriesById = async (id) => {
   const db = getDbProvider();
   const itemHistory = await db.getItemHistoryByItemId(id);
@@ -168,26 +178,46 @@ exports.getUserById = async (selectedUserId) => {
   return await db.getUserById(selectedUserId);
 };
 
+// GET ITEMS
+// Description: gets all items from database
+// Precondition: none
+// Postcondition: array of items
 exports.getDBItems = async () => {
   const db = getDbProvider();
   return await db.getItems();
 };
 
+// GET ITEM BY ITEM ID
+// Description: gets item by id from database
+// Precondition: id of item
+// Postcondition: object (item)
 exports.getDBItemById = async (id) => {
   const db = getDbProvider();
   return await db.getItemById(id);
 };
 
+// CREATE ITEM
+// Description: creates item in database
+// Precondition: payload of new item
+// Postcondition: object (item)
 exports.createDBItem = async (data) => {
   const db = getDbProvider();
   return await db.createItem(data);
 };
 
+// UPDATE ITEM
+// Description: updates item in database
+// Precondition: id of item to update, payload of new item that will replace old item
+// Postcondition: object (item)
 exports.updateDBItem = async (id, data) => {
   const db = getDbProvider();
   return await db.updateItem(id, data);
 };
 
+// DELETE ITEM
+// Description: deletes item from database
+// Precondition: id of item to delete
+// Postcondition: object {type, redirect}
 exports.deleteDBItem = async (id) => {
   const db = getDbProvider();
   const item = await db.getItemById(id);
@@ -213,7 +243,7 @@ exports.deleteDBItem = async (id) => {
 
 // PROCESS ITEM FORMS
 // description: process item form
-// precondition: request object
+// precondition: request object, fs, multiparty, path
 // postcondition: object {type, redirect, name, description, brand, model, category, subCategory, serial, status, dateAcquired, filePath, fileBuffer, fileName, mimeType}
 exports.processItemForm = async (req) => {
   const db = getDbProvider();
