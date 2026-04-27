@@ -426,22 +426,46 @@ exports.deleteItem = async (req, res, next) => {
 
 exports.showItemHistory = async (req, res, next) => {
   const { id } = req.params;
+  const pageSize = 10;
+  let page = req.query.page;
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
 
+    if (!page) {
+      return res.redirect(`/items/${id}/history?page=1`);
+    }
+
+    page = parseInt(page);
+
+    const histories = itemHistories.itemHistories || [];
+    const total = histories.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedHistories = histories.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
     let context = {
       ...itemHistories,
-      isEmpty: false,
+      itemHistories: paginatedHistories,
+      isEmpty: paginatedHistories.length === 0 && total === 0,
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: `items/${id}/history`,
       pageTitle: "Item History",
     };
-
-    if(itemHistories.itemHistories.length === 0) {
-      context = {
-        ...context,
-        isEmpty: true
-      }
-    }
 
     res.render("items/itemHistory", context);
   }
@@ -910,8 +934,7 @@ exports.logs = async (req, res, next) => {
       Math.max(0, page - 2),
       Math.min(totalPages, page + 1)
     );
-
-    console.log(paginatedHistories)
+    
     res.render("logs", {
       allHistories: paginatedHistories,
       users,

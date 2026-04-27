@@ -6,7 +6,6 @@ const itemService = require("../services/itemService");
 const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
-const itemService = require("../services/itemService")
 
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
