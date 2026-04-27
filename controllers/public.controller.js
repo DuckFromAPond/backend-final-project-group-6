@@ -382,7 +382,7 @@ exports.editItem = async (req, res, next) => {
     if(!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
-        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+        redirect: `/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
 
@@ -474,12 +474,13 @@ exports.checkIn = async (req, res, next) => {
     let filePath = null;
     let fileName = null;
 
-    if (!files?.document?.length) {
-      return res.redirect("/owned?error=Reference+file+is+required");
+    const file = files?.document?.[0];
+
+    if (!file || file.size === 0 || !file.originalFilename) {
+      return res.redirect("/items?error=File+is+required");
     }
 
     if (files?.document?.length > 0) {
-      const file = files.document[0];
       
       const DBlabel = itemService.getDBlabel(); 
 
@@ -536,13 +537,13 @@ exports.checkOut = async (req, res, next) => {
     let filePath = null;
     let fileName = null;
 
-    if (!files?.document?.length) {
-      return res.redirect("/items?error=Image+file+required");
+    const file = files?.document?.[0];
+
+    if (!file || file.size === 0 || !file.originalFilename) {
+      return res.redirect("/items?error=File+is+required");
     }
 
     if (files?.document?.length > 0) {
-      const file = files.document[0];
-      
       const DBlabel = itemService.getDBlabel(); 
 
       if (DBlabel === "Supabase") {
@@ -600,12 +601,13 @@ exports.adminCheckout = async (req, res, next) => {
     let filePath = null;
     let fileName = null;
 
-    if (!files?.document?.length) {
-      return res.redirect("/items?error=Image+file+required");
+    const file = files?.document?.[0];
+
+    if (!file || file.size === 0 || !file.originalFilename) {
+      return res.redirect("/items?error=File+is+required");
     }
 
     if (files?.document?.length > 0) {
-      const file = files.document[0];
       
       const DBlabel = itemService.getDBlabel(); 
 
@@ -930,7 +932,12 @@ exports.logs = async (req, res, next) => {
 
 // 404 handler
 exports.notFound = (req, res) => {
+  const isAuthRoute =
+    req.path.startsWith("/login") ||
+    req.path.startsWith("/register");
+
   res.status(404).render("extra_pages/404", {
+    layout: isAuthRoute ? "no_nav_bar" : "main",
     message: "The page you are looking for does not exist.",
     pageTitle: "404",
   });

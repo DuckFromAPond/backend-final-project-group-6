@@ -9,7 +9,7 @@ const User = require("./models/mongoUserModel");
 const Item = require("./models/mongoItemsModel");
 const ItemHistory = require("./models/mongoItemHistoriesModel");
 const ApiKey = require("./models/mongoAPIkeysModel");
-const Category = require("./models/mongoCategoryModel");
+// const Category = require("./models/mongoCategoryModel");
 
 class MongoProvider extends DatabaseProvider {
   constructor() {
@@ -54,7 +54,7 @@ class MongoProvider extends DatabaseProvider {
       Item.init(),
       ItemHistory.init(),
       ApiKey.init(),
-      Category.init()
+      // Category.init()
     ]);
 
     console.log("MongoDB initialized");
@@ -126,15 +126,15 @@ class MongoProvider extends DatabaseProvider {
     };
   }
 
-  mapCategory(category) {
-    if (!category) return null;
+  // mapCategory(category) {
+  //   if (!category) return null;
 
-    return {
-      id: String(category._id),
-      name: category.name,
-      parentId: String(category.parentId) || null,
-    };
-  }
+  //   return {
+  //     id: String(category._id),
+  //     name: category.name,
+  //     parentId: String(category.parentId) || null,
+  //   };
+  // }
 
   getImageStream(imageName) {
     return this.itemsBucket.openDownloadStream(
@@ -534,79 +534,80 @@ class MongoProvider extends DatabaseProvider {
     });
   }
 
-  async getAllCategories() {
-    const categories = await Category.find().lean();
-    return categories.map((c) => this.mapCategory(c));
-  }
+//   async getAllCategories() {
+//     const categories = await Category.find().lean();
 
-  async addCategory(name) {
-    return await Category.create({
-      name,
-      parentId: null
-    });
-  }
+//     return categories.map((c) => this.mapCategory(c));
+//   }
 
-  async addSubCategory(categoryId, name) {
-    const parent = await Category.findById(categoryId);
-    if (!parent) {
-      throw new Error("Parent category not found");
-    }
+//   async addCategory(name) {
+//     return await Category.create({
+//       name,
+//       parentId: null
+//     });
+//   }
 
-    return await Category.create({
-      name,
-      parentId: categoryId
-    });
-  }
+//   async addSubCategory(categoryId, name) {
+//     const parent = await Category.findById(categoryId);
+//     if (!parent) {
+//       throw new Error("Parent category not found");
+//     }
 
-  async deleteCategory(categoryId) {
-    const category = await Category.findById(categoryId);
+//     return await Category.create({
+//       name,
+//       parentId: categoryId
+//     });
+//   }
 
-    if (!category) {
-      throw new Error("Category not found");
-    }
+//   async deleteCategory(categoryId) {
+//     const category = await Category.findById(categoryId);
 
-    const itemCount = await Item.countDocuments({
-      category: category.name
-    });
+//     if (!category) {
+//       throw new Error("Category not found");
+//     }
 
-    if (itemCount > 0) {
-      throw new Error("Cannot delete category with items");
-    }
+//     const itemCount = await Item.countDocuments({
+//       category: category.name
+//     });
 
-    await Category.deleteMany({ parentId: categoryId });
+//     if (itemCount > 0) {
+//       throw new Error("Cannot delete category with items");
+//     }
 
-    return await Category.findByIdAndDelete(categoryId);
-  }
+//     await Category.deleteMany({ parentId: categoryId });
 
-  async updateSubCategory(subCategoryId, data) {
-    const subCategory = await Category.findById(subCategoryId);
-    if (!subCategory) {
-      throw new Error("Subcategory not found");
-    }
+//     return await Category.findByIdAndDelete(categoryId);
+//   }
 
-    const update = {};
+//   async updateSubCategory(subCategoryId, data) {
+//     const subCategory = await Category.findById(subCategoryId);
+//     if (!subCategory) {
+//       throw new Error("Subcategory not found");
+//     }
 
-    if (data.name) {
-      update.name = data.name;
-    }
+//     const update = {};
 
-    if (data.parentId) {
-      const parent = await Category.findById(data.parentId);
-      if (!parent) {
-        throw new Error("New parent category not found");
-      }
+//     if (data.name) {
+//       update.name = data.name;
+//     }
 
-      update.parentId = data.parentId;
-    }
+//     if (data.parentId) {
+//       const parent = await Category.findById(data.parentId);
+//       if (!parent) {
+//         throw new Error("New parent category not found");
+//       }
 
-    const updated = await Category.findByIdAndUpdate(
-      subCategoryId,
-      update,
-      { new: true }
-    ).lean();
+//       update.parentId = data.parentId;
+//     }
 
-    return this.mapCategory(updated);
-  }
+//     const updated = await Category.findByIdAndUpdate(
+//       subCategoryId,
+//       update,
+//       { new: true }
+//     ).lean();
+
+//     return this.mapCategory(updated);
+//   }
 }
 
 module.exports = MongoProvider;

@@ -6,6 +6,7 @@ const itemService = require("../services/itemService");
 const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
+const itemService = require("../services/itemService")
 
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
@@ -31,7 +32,7 @@ exports.apiLogin = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 
@@ -506,4 +507,136 @@ exports.showItemHistory = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+exports.apiCheckin = async (req, res) => {
+  try {
+    const { itemId, duration } = req.body;
+    const userId = req.user.id;
+
+    if (!itemId) {
+      return res.status(400).json({ error: "itemId is required" });
+    }
+
+    await itemService.validateCheckin(itemId);
+
+    let filePath = null;
+    const file = req.files?.document?.[0];
+
+    if (!file || file.size === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "File is required"
+      });
+    }
+
+    if (req.files?.document) {
+
+      const DBlabel = itemService.getDBlabel();
+
+      if (DBlabel === "Supabase" && file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({ error: "File too large (max 50MB)" });
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+
+      const mimeType = file.mimetype || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(
+        fileName,
+        fileBuffer,
+        mimeType
+      );
+    }
+
+    const result = await itemService.checkinItem({
+      itemId,
+      userId,
+      duration,
+      referenceLink: filePath
+    });
+
+    return res.status(200).json({
+      message: "Item checked in successfully",
+      data: result
+    });
+
+  } catch (err) {
+    return res.status(400).json({
+      error: err.message
+    });
+  }
+};
+
+exports.apiCheckout = async (req, res) => {
+  try {
+    const { itemId, duration } = req.body;
+    const userId = req.user.id;
+
+    if (!itemId) {
+      return res.status(400).json({ error: "itemId is required" });
+    }
+
+    await itemService.validateCheckout(itemId);
+
+    let filePath = null;
+
+    const file = req.files?.document?.[0];
+
+    if (!file || file.size === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "File is required"
+      });
+    }
+
+    if (req.files?.document) {
+
+      const DBlabel = itemService.getDBlabel();
+
+      if (DBlabel === "Supabase" && file.size > 50 * 1024 * 1024) {
+        return res.status(400).json({ error: "File too large (max 50MB)" });
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      const fileName = `${Date.now()}_${file.originalFilename}`;
+
+      const mimeType = file.mimetype || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(
+        fileName,
+        fileBuffer,
+        mimeType
+      );
+    }
+
+    const result = await itemService.checkoutItem({
+      itemId,
+      userId,
+      duration,
+      referenceLink: filePath
+    });
+
+    return res.status(200).json({
+      message: "Item checked out successfully",
+      data: result
+    });
+
+  } catch (err) {
+    return res.status(400).json({
+      error: err.message
+    });
+  }
+};
+
+exports.notFound = (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "Not Found",
+    message: `Cannot ${req.method} ${req.originalUrl}`,
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
 };

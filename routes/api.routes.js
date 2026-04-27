@@ -52,8 +52,11 @@ router.delete(
 
 // router.post('/auth/login', loginLimiter, apiController.apiLogin);
 // router.post('/keys', apiProtect, requireRoleAPI("Admin"), apiController.generateKey);
-// router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
-// router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
+
+router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
+router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
+
+// router.delete('/keys/:id', apiProtect, requireRoleAPI("Admin"), apiController.deleteKey);
 
 // API ROUTES FOR ITEMS
 router.get("/items", authOrApiKey, apiController.showItems);
@@ -66,6 +69,6 @@ router.put("/items/:id", authOrApiKey, apiController.editItem);
 router.get("/files/:bucket/:id", apiProtect, apiController.getFile);
 
 // error 404
-// router.use(apiController.notFound);
+router.use(apiController.notFound);
 
 module.exports = router;
