@@ -54,7 +54,7 @@ const whitelist = new Set([
   `http://localhost:${config.PORT}`,
   "http://127.0.0.1:3000",
   "http://localhost:5173",
-  config.PRODUCTION_URL || "https://websitename.com", // <--------------------------- change when host on cloudflare later btw
+  config.PRODUCTION_URL, // <--------------------------- change when host on cloudflare later btw
 ]);
 
 const corsOptions = {
