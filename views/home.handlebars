@@ -15,19 +15,20 @@
     </div>
 
     <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
-      <h2 class="text-gray-500 font-semibold mb-2">Total Check-ins</h2>
-      <p class="text-2xl font-bold">{{dashboardData.totalCheckins}}</p>
+      <h2 class="text-gray-500 font-semibold mb-2">Active items</h2>
+      <p class="text-2xl font-bold">{{dashboardData.activeCount}}</p>
     </div>
 
     <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
-      <h2 class="text-gray-500 font-semibold mb-2">Total Check-outs</h2>
-      <p class="text-2xl font-bold">{{dashboardData.totalCheckouts}}</p>
+      <h2 class="text-gray-500 font-semibold mb-2">Overdued items</h2>
+      <p class="text-2xl font-bold">{{dashboardData.overdueCount}}</p>
     </div>
   </div>
 
   <!-- RECENT TRANSACTIONS TABLE -->
   <div class="bg-white rounded-2xl shadow p-6 overflow-x-auto hover:shadow-lg transition">
-    <h2 class="text-xl font-bold mb-4">Recent Transactions</h2>
+    <h2 class="text-xl font-bold mb-4">Your Recent Transactions</h2>
+    {{#if dashboardData.recentTransactions.length}}
     <table class="min-w-full border border-gray-200 rounded-lg">
       <thead class="bg-blue-500 text-white">
         <tr>
@@ -50,7 +51,11 @@
           </tr>
         {{/each}}
       </tbody>
+      
     </table>
+    {{else}}
+      <p class="text-gray-500">No transaction data found for this account.</p>
+    {{/if}}
   </div>
 
 </div>

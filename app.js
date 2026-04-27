@@ -73,6 +73,49 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
+// configurations for public app ───────────────────────────────────
+const publicApp = express();
+publicApp.engine(
+  "handlebars",
+  engine({
+    defaultLayout: "main",
+    layoutsDir: path.join(__dirname, "views/layouts"),
+    partialsDir: path.join(__dirname, "views/partials"),
+    helpers: hbsHelpers,
+  }),
+);
+publicApp.set("view engine", "handlebars");
+publicApp.set("views", path.join(__dirname, "views"));
+
+// middleware ───────────────────────────────────
+publicApp.use(cors(corsOptions));
+publicApp.use(cookieParser());
+publicApp.use(express.static(path.join(__dirname, "public")));
+publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
+publicApp.use(express.json());
+
+// Morgan logging
+// publicApp.use(morgan('dev'));
+
+// temp (will change when nav is finalized)
+publicApp.use((req, res, next) => {
+  const pathName = req.path;
+
+  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
+  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
+  res.locals.navCheckin = pathName.startsWith("/owned");
+  res.locals.navReport = pathName.startsWith("/report");
+  res.locals.navLogs = pathName.startsWith("/logs"); //
+  res.locals.navUsers = pathName.startsWith("/users"); //
+  res.locals.navKeys = pathName.startsWith("/keys"); //
+
+  res.locals.config = config;
+  next();
+});
+
+publicApp.use("/", authRoutes);
+publicApp.use("/", publicRoutes);
+
 // ---------- API -----------------
 const apiApp = express();
 apiApp.use(cors(corsOptions));

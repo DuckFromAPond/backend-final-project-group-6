@@ -235,7 +235,7 @@ exports.getFile = async (req, res) => {
     }
 
     const result = await db.getFile(bucket, id);
-    // console.log(result);
+
     if (!result) {
       return res.status(404).send("File not found");
     }

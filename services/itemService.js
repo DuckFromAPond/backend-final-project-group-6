@@ -125,6 +125,26 @@ exports.getUserOwnedItems = async (currentUserId) => {
 };
 
 
+exports.getUserHistory = async (currentUserId) => {
+  const db = getDbProvider();
+
+  const userHistories = await db.getUserHistory(currentUserId);
+
+  return userHistories
+};
+
+
+
+exports.getUserHistory = async (currentUserId) => {
+  const db = getDbProvider();
+
+  const userHistories = await db.getUserHistory(currentUserId);
+
+  return userHistories
+};
+
+
+
 
 // GET ALL HISTORY
 // Description: gets all history from database
@@ -318,35 +338,33 @@ exports.processItemForm = async (req) => {
   return {filePath, fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect};
 }
 
-// move this back to controller later 
-exports.adminCheckout = async (itemId, targetUserId, adminId, options = {}) => {
-  const db = getDbProvider();
+exports.getCategoryFromDB = async () => {
+  const categories = await db.getAllCategories(); 
 
-  const admin = await db.getUserById(adminId);
-  if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
-  }
+  const map = new Map();
+  const result = [];
 
-  return checkoutItem({
-    itemId,
-    userId: targetUserId,
-    duration: options.duration,
-    referenceLink: options.referenceLink
+  // 1. build lookup map
+  categories.forEach(cat => {
+    map.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      subCategories: []
+    });
   });
-};
 
-exports.adminCheckout = async (itemId, targetUserId, adminId, options = {}) => {
-  const db = getDbProvider();
+  // 2. build tree
+  categories.forEach(cat => {
+    if (cat.parentId) {
+      const parent = map.get(cat.parentId);
 
-  const admin = await db.getUserById(adminId);
-  if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
-  }
-
-  return checkoutItem({
-    itemId,
-    userId: targetUserId,
-    duration: options.duration,
-    referenceLink: options.referenceLink
+      if (parent) {
+        parent.subCategories.push(map.get(cat.id));
+      }
+    } else {
+      result.push(map.get(cat.id));
+    }
   });
+
+  return result;
 };

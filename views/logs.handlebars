@@ -1,0 +1,145 @@
+<div class="flex flex-col items-center p-6 gap-10">
+    {{!-- GLOBAL LOG SECTION --}}
+    <div class="w-full max-w-6xl">
+        <div class="mb-4">
+            <h1 class="text-3xl font-bold text-gray-800">System Log</h1>
+            <p class="text-gray-500 mt-1">All item activity across users</p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow mb-4">
+           <form method="GET" action="/logs" class="relative w-full">
+
+                <button type="button" id="dropdownBtnLogs"
+                    class="w-full border border-gray-300 p-2 rounded-lg text-left bg-white">
+                    {{#if selectedUserName}}
+                        {{selectedUserName}}
+                    {{else}}
+                        All Users
+                    {{/if}}
+                </button>
+
+                <div id="dropdownListLogs"
+                    class="hidden absolute z-20 w-full max-h-60 overflow-y-auto bg-white border rounded-lg shadow">
+
+                    <!-- ALL USERS OPTION -->
+                    <div
+                        class="p-2 hover:bg-gray-100 cursor-pointer font-semibold"
+                        onclick="selectUser('', 'All Users')"
+                    >
+                        All Users
+                    </div>
+
+                    <hr class="my-1">
+
+                    <!-- INDIVIDUAL USERS -->
+                    {{#each users}}
+                    <div
+                        class="p-2 hover:bg-gray-100 cursor-pointer"
+                        onclick="selectUser('{{this.id}}', '{{this.name}} ({{this.email}})')"
+                    >
+                        {{this.name}} ({{this.email}})
+                    </div>
+                    {{/each}}
+
+                </div>
+
+                <input type="hidden" name="userId" id="userIdInputLogs">
+
+            </form>
+        </div>
+        <div class="rounded-2xl shadow-lg bg-white">
+            <div class="overflow-x-auto rounded-t-2xl">
+            <table class="w-full text-left">
+
+                <thead class="bg-blue-500/40 text-xs uppercase border-b tracking-wider">
+                    <tr>
+                        <th class="p-4">ID</th>
+                        <th class="p-4">Item</th>
+                        <th class="p-4">User</th>
+                        <th class="p-4">Action</th>
+                        <th class="p-4">Date</th>
+                        <th class="p-4">Status</th>
+                        <th class="p-4">Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {{#if allHistories.length}}
+                        {{#each allHistories}}
+                        <tr class="border-t hover:bg-gray-50 transition">
+
+                            <td class="p-4 font-medium text-gray-700">#{{this.id}}</td>
+
+                            <td class="p-4">
+                                <a href="/items/{{this.itemId}}" class="text-blue-600 hover:underline">
+                                    {{this.item}}
+                                </a>
+                            </td>
+
+                            <td class="p-4 text-gray-700">
+                                {{this.user}}
+                            </td>
+
+                            <td class="p-4">
+                                {{#if (eq this.action "checkout")}}
+                                    <span class="text-red-600 font-medium">Checked Out</span>
+                                {{else if (eq this.action "checkin")}}
+                                    <span class="text-blue-600 font-medium">Checked In</span>
+                                {{/if}}
+                            </td>
+
+                            <td class="p-4 text-gray-700">
+                                {{this.date}}
+                            </td>
+
+                            <td class="p-4">
+                                {{#if (eq this.status "overdue")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800">
+                                        Overdue
+                                    </span>
+                                {{else if (eq this.status "active")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                        Active
+                                    </span>
+                                {{else if (eq this.status "old")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Returned
+                                    </span>
+                                {{else}}
+                                    <span class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-800">
+                                        Unknown
+                                    </span>
+                                {{/if}}
+                            </td>
+
+                            <td class="p-4">
+                                <a
+                                    href="/api/files/docs/{{this.referenceLink}}"
+                                    target="_blank"
+                                    class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
+                                    >
+                                    View doc ↗
+                                </a>
+                            </td>
+
+                        </tr>
+                        {{/each}}
+                    {{else}}
+                        <tr>
+                            <td colspan="7" class="p-6 text-center text-gray-400">
+                                No logs available
+                            </td>
+                        </tr>
+                    {{/if}}
+                </tbody>
+
+            </table>
+            </div>
+            {{#if allHistories.length}} 
+                {{>historyPaginator}}
+            {{/if}}
+        </div>
+    </div>
+</div>
+
+
+<script src="/js/logs.js"></script>

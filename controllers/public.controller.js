@@ -7,81 +7,101 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require("../data/data");
 const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
-const userService = require("../services/userService"); 
+const userService = require("../services/userService");
+const adminService = require("../services/adminService");  
 const { db } = require("../data/models/mongoUserModel");
 
 // static data
-const categories = [
-  { name: "Peripherals", subCategories: [
-    { name: "Monitor" },
-    { name: "Keyboard" },
-    { name: "Mouse" },
-    { name: "Scanner" },
-    { name: "Printer" },
-  ] },
-  { name: "Computers", subCategories: [
-    { name: "Laptop" },
-    { name: "Desktop" },
-    { name: "Server" },
-  ] },
-];
+const categories = await itemService.getCategoryFromDB();
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
+    const currentUserId = req.user.id;
     const db = getDbProvider();
 
     const [users, items, histories] = await Promise.all([
-      db.getAllUsers() ? db.getAllUsers() : Promise.resolve([]),
-      db.getItems(),
-      db.getItemHistories(),
+      userService.getAllUsers(),
+      itemService.getDBItems(),
+      itemService.getDBItemsHistory(),
     ]);
-
-    const totalUsers = users.length;
-    const totalItems = items.length;
-
-    // latest per item
-    const latestMap = new Map();
-    const sortedHistories = [...histories].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-    );
-
-    for (const h of sortedHistories) {
-      if (!latestMap.has(h.itemId)) {
-        latestMap.set(h.itemId, h);
-      }
-    }
-
-    const pendingCheckouts = [...latestMap.values()].filter(
-      (h) => h.action === "checkout",
-    ).length;
 
     // lookup maps
     const userMap = new Map(users.map((u) => [u.id, u]));
     const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    const recentTransactions = sortedHistories.slice(0, 5).map((h) => {
-      const user = userMap.get(h.userId);
-      const item = itemMap.get(h.itemId);
+    const sortedHistories = [...histories].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    const userHistories = sortedHistories.filter(
+      (h) => h.userId?.toString() === currentUserId.toString()
+    );
+
+    const ownedItems = await itemService.getUserOwnedItems(currentUserId);
+
+    // counts
+    let overdueCount = 0;
+    let activeCount = 0;
+
+    for (const row of ownedItems) {
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+      if (!created) continue;
+
+      if (row.duration) {
+        const due = new Date(created);
+        due.setHours(due.getHours() + row.duration);
+
+        if (new Date() > due) overdueCount++;
+        else activeCount++;
+      } else {
+        activeCount++;
+      }
+    }
+
+    const totalOwned = ownedItems.length;
+
+    // recent transactions
+    const recentTransactions = userHistories.map((h) => {
+      const created = h.createdAt ? new Date(h.createdAt) : null;
+
+      let status = "unknown";
+
+      if (h.action === "checkin" || h.returnedAt) {
+        status = "returned";
+      } else if (h.duration && h.createdAt) {
+        const due = new Date(h.createdAt);
+        due.setHours(due.getHours() + h.duration);
+        status = new Date() > due ? "overdue" : "active";
+      } else {
+        status = "active";
+      }
 
       return {
         id: h.id,
-        user: user?.name || "Unknown",
-        item: item?.name || "Unknown",
+        user: req.user.name,
+        item: itemMap.get(h.itemId?.toString())?.name || "Unknown",
+
+        date: created
+          ? created.toISOString().split("T")[0]
+          : null,
+
         type: h.action === "checkout" ? "Checkout" : "Checkin",
-        date: new Date(h.createdAt).toLocaleString(),
+        status,
       };
     });
 
+    // RENDER
     res.render("home", {
       dashboardData: {
-        totalUsers,
-        totalItems,
-        pendingCheckouts,
+        totalOwned,
+        activeCount,
+        overdueCount,
         recentTransactions,
       },
       pageTitle: "Home",
     });
+
   } catch (err) {
     next(err);
   }
@@ -104,13 +124,30 @@ exports.showItems = async (req, res, next) => {
       url += `subcat=${subcat}&`;
       items = items.filter((item) => item.subCategory === subcat);
     }
+    // filter by subcategory
+    if(subcat) {
+      url += `subcat=${subcat}&`;
+      items = items.filter((item) => item.subCategory === subcat);
+    }
 
     // filter by category
     if (cat) {
       url += `cat=${cat}&`;
       items = items.filter((item) => item.category === cat);
     }
+    // filter by category
+    if (cat) {
+      url += `cat=${cat}&`;
+      items = items.filter((item) => item.category === cat);
+    }
 
+    // search by name (case-insensitive)
+    if (q) {
+      url += `q=${q}&`;
+      items = items.filter((item) =>
+        item.name?.toLowerCase().includes(q.toLowerCase()),
+      );
+    }
     // search by name (case-insensitive)
     if (q) {
       url += `q=${q}&`;
@@ -125,11 +162,23 @@ exports.showItems = async (req, res, next) => {
     } else {
       items = items.filter((item) => item.status !== "Retired");
     }
+    if (isRetired) {
+      url += `isRetired=${isRetired}&`;
+      items = items.filter((item) => item.status === "Retired");
+    } else {
+      items = items.filter((item) => item.status !== "Retired");
+    }
 
     if (error) {
       url += `error=${error}&`;
     }
+    if (error) {
+      url += `error=${error}&`;
+    }
 
+    if (success) {
+      url += `success=${success}&`;
+    }
     if (success) {
       url += `success=${success}&`;
     }
@@ -139,9 +188,19 @@ exports.showItems = async (req, res, next) => {
       url += `page=1`;
       return res.redirect(url);
     }
+    // append page number to URL
+    if (!page) {
+      url += `page=1`;
+      return res.redirect(url);
+    }
 
     page = parseInt(page);
+    page = parseInt(page);
 
+    // calculate total pages
+    const total = items.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
     // calculate total pages
     const total = items.length;
     const totalPages = Math.ceil(total / pageSize);
@@ -151,7 +210,14 @@ exports.showItems = async (req, res, next) => {
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     items = items.slice(start, end);
+    // set page range
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    items = items.slice(start, end);
 
+    // pagination
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
     // pagination
     const prevPage = page > 1 ? page - 1 : null;
     const nextPage = page < totalPages ? page + 1 : null;
@@ -295,7 +361,19 @@ exports.showItemDetail = async (req, res, next) => {
         error,
       };
     }
+    if (error) {
+      context = {
+        ...context,
+        error,
+      };
+    }
 
+    if (success) {
+      context = {
+        ...context,
+        success,
+      };
+    }
     if (success) {
       context = {
         ...context,
@@ -310,6 +388,8 @@ exports.showItemDetail = async (req, res, next) => {
   }
 };
 
+
+// -------------------------------------------------------------- to change: only admin can change status while in-use -> also have update for user history too 
 exports.editItem = async (req, res, next) => {
   const { id } = req.params;
 
@@ -468,7 +548,7 @@ exports.checkIn = async (req, res, next) => {
     let fileName = null;
 
     if (!files?.document?.length) {
-      return res.redirect("/items?error=Reference+file+is+required");
+      return res.redirect("/owned?error=Reference+file+is+required");
     }
 
     if (files?.document?.length > 0) {
@@ -479,7 +559,7 @@ exports.checkIn = async (req, res, next) => {
       if (DBlabel === "Supabase") {
         const MAX_SIZE = 50 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
+          return res.redirect("/owned?error=File+too+large+(max+50MB)");
         }
       }
 
@@ -498,10 +578,10 @@ exports.checkIn = async (req, res, next) => {
       referenceLink: filePath || fileName
     });
 
-    return res.redirect("/owned");
+    return res.redirect("/owned?success=item+checked+in+sucessfully");
   } catch (err) {
     return res.redirect(
-      `/items?error=${encodeURIComponent(err.message)}`
+      `/owned?error=${encodeURIComponent(err.message)}`
     );
   }
 };
@@ -525,6 +605,70 @@ exports.checkOut = async (req, res, next) => {
 
     // validate checkout 
     await itemService.validateCheckout(itemId);
+
+    let filePath = null;
+    let fileName = null;
+
+    if (!files?.document?.length) {
+      return res.redirect("/items?error=Image+file+required");
+    }
+
+    if (files?.document?.length > 0) {
+      const file = files.document[0];
+      
+      const DBlabel = itemService.getDBlabel(); 
+
+      if (DBlabel === "Supabase") {
+        const MAX_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          return res.redirect("/items?error=File+too+large+(max+50MB)");
+        }
+      }
+
+      const fileBuffer = fs.readFileSync(file.path);
+      fileName = `${Date.now()}_${file.originalFilename}`;
+
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
+    }
+
+    await itemService.checkoutItem({
+      itemId,
+      userId,
+      duration,
+      referenceLink: filePath || fileName
+    });
+
+    return res.redirect("/items?success=item+checked+out+sucessfully");
+  } catch (err) {
+    return res.redirect(
+      `/items?error=${encodeURIComponent(err.message)}`
+    );
+  }
+};
+
+
+// POST CHECKOUT
+exports.adminCheckout = async (req, res, next) => {
+  try {
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
+    const userEmail = fields.userEmail?.[0];
+    const adminId = req.user.id;
+
+    // validate checkout 
+    await itemService.validateCheckout(itemId);
+    const userId = await adminService.adminValidateForCheckout(userEmail, adminId);
 
     let filePath = null;
     let fileName = null;
@@ -595,9 +739,11 @@ exports.showOwned = async (req, res, next) => {
 
         status = "active";
       }
+
+      
       return {
         id: row.itemId || row.item?.id,
-        referenceUrl: row.referenceUrl,
+        referenceUrl: row.referenceLink,
         name: row.item?.name,
 
         createdAt: created
@@ -618,7 +764,7 @@ exports.showOwned = async (req, res, next) => {
 
     res.render("owned", {
       items: allOwned,
-      pageTitle: "Owned",
+      pageTitle: "Owned"
     });
   } catch (err) {
     next(err);
@@ -636,7 +782,7 @@ exports.report = async (req, res, next) => {
     const totalItems = AllItems.length;
 
     const deployedItems = AllItems.filter(item =>
-      item.current_owner &&
+      item.currentOwner &&
       item.status === "In-Use"
     ).length;
 
@@ -693,7 +839,7 @@ exports.report = async (req, res, next) => {
 
       return {
         id: row.itemId || row.item?.id,
-        referenceUrl: row.referenceUrl,
+        referenceUrl: row.referenceLink,
 
         name: row.item?.name,
 
@@ -712,9 +858,6 @@ exports.report = async (req, res, next) => {
         status
       };
     });
-
-    // console.log(oldAssets)
-    // console.log(userAudit)
     
     res.render("report", {
         totalUsers,
@@ -727,6 +870,132 @@ exports.report = async (req, res, next) => {
         oldAssets,
         pageTitle: "Report"
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.logs = async (req, res, next) => {
+  try {
+    const selectedUserId = req.query.userId || null;
+    const userId = req.user?.id;
+
+    const pageSize = 8;
+    const page = parseInt(req.query.page) || 1;
+
+    // DATA FETCH FIRST
+    const [allHistories, items, users] = await Promise.all([
+      itemService.getDBItemsHistory(),
+      itemService.getDBItems(),
+      userService.getAllUsers(),
+    ]);
+    
+    // SORT FIRST
+    const sorted = [...allHistories].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    // Build latest record per itemId
+    const latestByItem = new Map();
+
+    for (const h of sorted) {
+      const key = h.itemId?.toString();
+      if (!latestByItem.has(key)) {
+        latestByItem.set(key, h); // first seen = latest because sorted DESC
+      }
+    }
+
+    // FILTER
+    let logs = sorted;
+
+    let selectedUserName = "";
+
+    if (selectedUserId) { 
+      logs = logs.filter(h => h.userId?.toString() === selectedUserId.toString() ); 
+    } 
+    
+    if (selectedUserId) { 
+      const user = await itemService.getUserById(selectedUserId); 
+      
+      if (user) { 
+        selectedUserName = `${user.name} (${user.email})`; 
+      } 
+    }
+
+    // MAPS
+    const itemMap = new Map(items.map(i => [i.id?.toString(), i]));
+    const userMap = new Map(users.map(u => [u.id?.toString(), u]));
+
+    // TRANSFORM
+    const newLogs = logs.map((h) => {
+      const itemId = h.itemId?.toString();
+      const latest = latestByItem.get(itemId);
+
+      const created = h.createdAt ? new Date(h.createdAt) : null;
+
+      let status = "unknown";
+
+      if (latest?.id?.toString() !== h.id?.toString()) {
+        // older history rows should NOT be "active/returned logic"
+        status = "old";
+      } else {
+        // ONLY latest record determines real status
+        if (latest.action === "checkin") {
+          status = "returned";
+        } else if (latest.action === "checkout") {
+          if (created && h.duration) {
+            const dueDate = new Date(created);
+            dueDate.setHours(dueDate.getHours() + h.duration);
+
+            status = new Date() > dueDate ? "overdue" : "active";
+          } else {
+            status = "active";
+          }
+        }
+      }
+
+      return {
+        ...h,
+        item: itemMap.get(h.itemId?.toString())?.name || "Unknown",
+        user: userMap.get(h.userId?.toString())?.name || "Unknown",
+        date: created ? created.toISOString().split("T")[0] : "No date",
+        status,
+      };
+    });
+
+    // PAGINATION
+    const total = newLogs.length;
+    const totalPages = Math.ceil(total / pageSize);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+
+    const paginatedHistories = newLogs.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
+    console.log(paginatedHistories)
+    res.render("logs", {
+      allHistories: paginatedHistories,
+      users,
+      selectedUserName,
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: "logs",
+      query: selectedUserId ? `&userId=${selectedUserId}` : "",
+      pageTitle: "Logs",
+    });
+
   } catch (err) {
     next(err);
   }
