@@ -12,7 +12,24 @@ const adminService = require("../services/adminService");
 const { db } = require("../data/models/mongoUserModel");
 
 // static data
-const categories = await itemService.getCategoryFromDB();
+// const categories = await itemService.getCategoryFromDB();
+
+// manually add categories
+const categories = [
+  { name: "Peripherals", subCategories: [
+    { name: "Monitor" },
+    { name: "Keyboard" },
+    { name: "Mouse" },
+    { name: "Scanner" },
+    { name: "Printer" },
+  ] },
+  { name: "Computers", subCategories: [
+    { name: "Laptop" },
+    { name: "Desktop" },
+    { name: "Server" },
+  ] },
+];
+
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
@@ -114,22 +131,6 @@ exports.showItems = async (req, res, next) => {
     const { cat, q, subcat, isRetired, error, success } = req.query;
     let page = req.query.page;
     const pageSize = 10; // items to show per page
-
-    // manually add categories
-    // const categories = [
-    //   { name: "Peripherals", subCategories: [
-    //     { name: "Monitor" },
-    //     { name: "Keyboard" },
-    //     { name: "Mouse" },
-    //     { name: "Scanner" },
-    //     { name: "Printer" },
-    //   ] },
-    //   { name: "Computers", subCategories: [
-    //     { name: "Laptop" },
-    //     { name: "Desktop" },
-    //     { name: "Server" },
-    //   ] },
-    // ];
 
     // append query parameters to URL
     let url = "/items?";
@@ -1040,7 +1041,12 @@ exports.logs = async (req, res, next) => {
 
 // 404 handler
 exports.notFound = (req, res) => {
+  const isAuthRoute =
+    req.path.startsWith("/login") ||
+    req.path.startsWith("/register");
+
   res.status(404).render("extra_pages/404", {
+    layout: isAuthRoute ? "no_nav_bar" : "main",
     message: "The page you are looking for does not exist.",
     pageTitle: "404",
   });

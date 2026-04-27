@@ -14,7 +14,7 @@ const fs = require("fs");
 const multiparty = require("multiparty");
 const { randomUUID } = require("crypto");
 
-const { protect } = require("./middleware/authMiddleware");
+const { protect,attachUser } = require("./middleware/authMiddleware");
 
 const { setDbProvider } = require("./utils/dbProviderShared");
 
@@ -97,6 +97,8 @@ publicApp.use(cookieParser());
 publicApp.use(express.static(path.join(__dirname, "public")));
 publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
 publicApp.use(express.json());
+
+publicApp.use(attachUser);
 
 // Morgan logging
 // publicApp.use(morgan('dev'));

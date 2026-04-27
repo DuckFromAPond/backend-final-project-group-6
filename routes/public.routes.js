@@ -7,6 +7,7 @@ const adminController = require("../controllers/admin.controller"); // it's weir
 const keyController = require("../controllers/key.controller");
 const { requireRole } = require("../middleware/roleCheck");
 
+
 // Home (need design with frontend)
 router.get("/", protect, publicController.home);
 router.get("/home", protect, publicController.home);

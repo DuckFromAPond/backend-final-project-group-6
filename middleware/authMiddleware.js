@@ -56,6 +56,33 @@ async function protect(req, res, next) {
   next();
 }
 
+async function attachUser(req, res, next) {     // for passing user around 
+  const token = req.cookies?.accessToken;
+
+  if (!token) {
+    res.locals.user = null;
+    return next();
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    res.locals.user = null;
+    return next();
+  }
+
+  const dbProvider = getDbProvider();
+  const user = await dbProvider.getUserById(decoded.id);
+
+  if (!user || user.status === "Disabled") {
+    res.locals.user = null;
+    return next();
+  }
+
+  req.user = user;
+  res.locals.user = user;
+  next();
+}
+
 function redirectIfAuth(req, res, next) {
   const token = req.cookies?.accessToken;
   const user = token ? verifyToken(token) : null;
@@ -97,5 +124,6 @@ module.exports = {
   verifyToken,
   protect,
   redirectIfAuth,
+  attachUser
   // apiProtect,
 };
