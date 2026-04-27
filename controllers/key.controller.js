@@ -16,7 +16,7 @@ exports.renderKeyManagement = async (req, res) => {
     }
 
     res.render("keys", {
-      title: "API Key Management",
+      pageTitle: "API Keys", // changed from Manage API Key Management -> API Keys for consistency 
       keys: activeKeys,
       users: allUsers,
       user: req.user, // Current logged-in admin

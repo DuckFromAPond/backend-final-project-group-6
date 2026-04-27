@@ -279,6 +279,7 @@ class MongoProvider extends DatabaseProvider {
       .sort({ createdAt: -1 })
       .lean();
 
+    console.log(latest)
     return latest?.action === action && latest?.returnedAt === null;
   }
 

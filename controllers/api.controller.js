@@ -6,7 +6,6 @@ const itemService = require("../services/itemService");
 const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
 const { getDbProvider } = require("../utils/dbProviderShared");
-const itemService = require("../services/itemService")
 
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
@@ -489,14 +488,67 @@ exports.showItemHistory = async (req, res, next) => {
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
+    const sessionsByItem = await itemService.buildSessions(itemHistories.itemHistories);
+  
+    const newItemHist = [...itemHistories.itemHistories].map((log) => {
+      const itemId = log.itemId?.toString();
+      const sessions = sessionsByItem.get(itemId) || [];
+      const created = new Date(log.createdAt);
 
+      const session = sessions.find(
+        s => s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id)
+      );
+
+      let status = "unknown";
+      let duration = "———";
+
+      if (!session) {
+        status = "old";
+        return { ...log, status, duration };
+      }
+
+      const checkoutTime = new Date(session.checkout.createdAt);
+      const checkinTime = session.checkin
+        ? new Date(session.checkin.createdAt)
+        : null;
+
+      if (session.checkin) {
+        status = "returned";
+
+        const hours = (checkinTime - checkoutTime) / (1000 * 60 * 60);
+        duration = itemService.formatDuration(hours);
+
+      } else {
+        status = "active";
+
+        const hours = (Date.now() - checkoutTime) / (1000 * 60 * 60);
+        if (session.checkout?.duration != null) {
+          const dueDate = new Date(checkoutTime);
+          dueDate.setHours(dueDate.getHours() + session.checkout.duration);
+
+          status = new Date() > dueDate ? "overdue" : "active";
+        }
+        duration =
+          hours < 1
+            ? "<1 min"
+            : `${itemService.formatDuration(hours)} (ongoing)`;
+      }
+
+      return {
+        ...log,
+        status,
+        duration,
+      };
+    });
+    
     let context = {
       ...itemHistories,
+      itemHistories: newItemHist,
       isEmpty: false,
       pageTitle: "Item History",
     };
 
-    if (itemHistories.length === 0) {
+    if (itemHistories.itemHistories.length === 0) {
       context = {
         ...context,
         isEmpty: true,

@@ -5,26 +5,27 @@ SHOWS CURRENTLY OWNED ITEMS
 --}}
 
 {{!-- style later --}}
-<div class="flex flex-col items-center p-6 ">
+<div class="flex flex-col items-center px-8 py-6 ">
     <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
         {{> toast}}
     </div>
     {{!-- header --}}
-    <div class="w-full max-w-6xl mb-6">
+    <div class="w-full mb-6">
         <h1 class="text-3xl font-bold text-gray-800">Owned Items</h1>
         <p class="text-gray-500 mt-1">Items currently checked out to you</p>
     </div>
 
-    <div class="w-full max-w-6xl overflow-x-auto rounded-2xl shadow-lg bg-white">
+    <div class="w-full overflow-x-auto rounded-2xl shadow-lg bg-white">
         <table class="w-full text-left">
 
             {{!-- table header --}}
             <thead class="bg-blue-500/50 text-black text-xs uppercase tracking-wider border-b border-gray-400">
                 <tr>
-                    <th class="p-4 border-r border-gray-400">ID</th>
+                    <th class="p-4 border-r border-gray-400">Item ID</th>
                     <th class="p-4 border-r border-gray-400">Item</th>
                     <th class="p-4 border-r border-gray-400">Date Received</th>
                     <th class="p-4 border-r border-gray-400">Borrow duration</th>
+                    <th class="p-4 border-r border-gray-400">Given duration</th>
                     <th class="p-4 border-r border-gray-400">Return Date</th>
                     <th class="p-4 border-r border-gray-400">Status</th>
                     <th class="p-4">Action</th>
@@ -66,6 +67,13 @@ SHOWS CURRENTLY OWNED ITEMS
                             {{/if}}
                         </td>
 
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.givenDuration}}
+                                {{this.givenDuration}}
+                            {{else}}
+                                <span class="text-gray-400">Not set</span>
+                            {{/if}}
+                        </td>
 
                         <!-- DUE -->
                         <td class="p-4 text-gray-800 border-r border-gray-400">
@@ -100,7 +108,7 @@ SHOWS CURRENTLY OWNED ITEMS
                                 onclick="openForm('{{this.id}}')"
                                 class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm"
                             >
-                                Check In
+                                Check-In
                             </button>
                             <a
                                 href="/api/files/docs/{{this.referenceUrl}}"
@@ -142,10 +150,6 @@ SHOWS CURRENTLY OWNED ITEMS
 
         function closeForm() {
             document.getElementById("modal").classList.add("hidden");
-        }
-        
-        function setDuration(hours) {
-            document.getElementById("duration").value = hours;
         }
     </script>
 </div>

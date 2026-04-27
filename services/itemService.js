@@ -50,7 +50,7 @@ exports.checkoutItem = async ({ itemId, userId, duration, referenceLink }) => {
   });
 };
 
-exports.validateCheckin = async (itemId) => {
+exports.validateCheckin = async (itemId, userId) => {
   const db = getDbProvider();
 
   const item = await db.getItemById(itemId);
@@ -63,6 +63,10 @@ exports.validateCheckin = async (itemId) => {
     throw new Error("Item is not in-use.");
   }
 
+  if (String(item.currentOwner) !== String(userId)) {
+    throw new Error("You don't own this item.");
+  }
+
   const active = await db.findActiveAction(itemId, "checkin");
 
   if (active) {
@@ -70,7 +74,7 @@ exports.validateCheckin = async (itemId) => {
   }
 };
 
-exports.checkinItem = async ({ itemId, userId, duration, referenceLink }) => { 
+exports.checkinItem = async ({ itemId, userId, referenceLink }) => { 
   const db = getDbProvider();
   await db.updateItem(itemId, {
     currentOwner: null,
@@ -80,6 +84,7 @@ exports.checkinItem = async ({ itemId, userId, duration, referenceLink }) => {
   return await db.addItemHistory(itemId, {
     userId,
     action: "checkin",
+    duration: null,
     referenceLink: referenceLink ?? null,
     returnedAt:  Date.now(),
   });
@@ -89,18 +94,36 @@ exports.checkinItem = async ({ itemId, userId, duration, referenceLink }) => {
 exports.formatDuration = (hours) => {
   if (hours == null) return null;
 
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
+  const totalMinutes = Math.floor(hours * 60);
 
-  if (days > 0) {
-    if (remainingHours === 0) {
-      return `${days} day${days > 1 ? "s" : ""}`;
-    }
-    return `${days} day${days > 1 ? "s" : ""} ${remainingHours} hour${remainingHours > 1 ? "s" : ""}`;
+  if (totalMinutes === 0) return "<1 min";
+
+  // less than 1 hour → show minutes
+  if (totalMinutes < 60) {
+    return `${totalMinutes} min${totalMinutes !== 1 ? "s" : ""}`;
   }
 
-  return `${hours} hour${hours > 1 ? "s" : ""}`;
-}
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const remainingMinutesAfterDays = totalMinutes % (60 * 24);
+
+  const h = Math.floor(remainingMinutesAfterDays / 60);
+  const m = remainingMinutesAfterDays % 60;
+
+  // days
+  if (days > 0) {
+    if (h === 0) {
+      return `${days} day${days > 1 ? "s" : ""}`;
+    }
+    return `${days} day${days > 1 ? "s" : ""} ${h} hour${h > 1 ? "s" : ""}`;
+  }
+
+  // hours + minutes (optional nice UX)
+  if (m > 0) {
+    return `${h} hour${h > 1 ? "s" : ""} ${m} min${m > 1 ? "s" : ""}`;
+  }
+
+  return `${h} hour${h > 1 ? "s" : ""}`;
+};
 
 exports.getUserOwnedItems = async (currentUserId) => {
   const db = getDbProvider();
@@ -193,11 +216,6 @@ exports.getDBItemHistoriesById = async (id) => {
   return itemHistories;
 };
 
-exports.getUserById = async (selectedUserId) => {
-  const db = getDbProvider();
-  return await db.getUserById(selectedUserId);
-};
-
 // GET ITEMS
 // Description: gets all items from database
 // Precondition: none
@@ -215,30 +233,30 @@ exports.getCategoryFromDB = async () => {
   const db = getDbProvider();
   const categories = await db.getAllCategories(); 
 
-//   const map = new Map();
-//   const result = [];
+  const map = new Map();
+  const result = [];
 
-//   // 1. build lookup map
-//   categories.forEach(cat => {
-//     map.set(cat.id, {
-//       id: cat.id,
-//       name: cat.name,
-//       subCategories: []
-//     });
-//   });
+  // 1. build lookup map
+  categories.forEach(cat => {
+    map.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      subCategories: []
+    });
+  });
 
-//   // 2. build tree
-//   categories.forEach(cat => {
-//     if (cat.parentId) {
-//       const parent = map.get(cat.parentId);
+  // 2. build tree
+  categories.forEach(cat => {
+    if (cat.parentId) {
+      const parent = map.get(cat.parentId);
 
-//       if (parent) {
-//         parent.subCategories.push(map.get(cat.id));
-//       }
-//     } else {
-//       result.push(map.get(cat.id));
-//     }
-//   });
+      if (parent) {
+        parent.subCategories.push(map.get(cat.id));
+      }
+    } else {
+      result.push(map.get(cat.id));
+    }
+  });
 
   return result;
 };
@@ -393,6 +411,28 @@ exports.processItemForm = async (req) => {
 
     fileBuffer = fs.readFileSync(file.path);
     mimeType = file.headers?.["content-type"] || "application/octet-stream";
+    const ext = path.extname(file.originalFilename).toLowerCase();
+
+    const allowedImageExtensions = new Set([
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".gif"
+    ]);
+
+    const isImage = mimeType.startsWith("image/");
+
+    if (!allowedImageExtensions.has(ext) || !isImage) {
+      if(id) {
+        type = "error";
+        redirect = `/items/${id}?error=Only+image+files+are+allowed`;
+      }
+      else {
+        type = "error";
+        redirect = `/items?error=Only+image+files+are+allowed`;
+      }
+    }
     fileName = `${Date.now()}_${file.originalFilename}`;
     filePath = await db.uploadItem(fileName, fileBuffer, mimeType);
   }
@@ -409,4 +449,43 @@ exports.processItemForm = async (req) => {
   }
 
   return {filePath, fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect};
+}
+
+
+exports.buildSessions= async(logs) => {
+  // sort oldest → newest (important for pairing)
+  const sorted = [...logs].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+  );
+
+  const sessionsByItem = new Map();
+
+  for (const log of sorted) {
+    const itemId = log.itemId?.toString();
+
+    if (!sessionsByItem.has(itemId)) {
+      sessionsByItem.set(itemId, []);
+    }
+
+    const sessions = sessionsByItem.get(itemId);
+
+    if (log.action === "checkout") {
+      // start new session
+      sessions.push({
+        checkout: log,
+        checkin: null
+      });
+    }
+
+    if (log.action === "checkin") {
+      // attach to latest open session
+      const openSession = [...sessions].reverse().find(s => !s.checkin);
+
+      if (openSession) {
+        openSession.checkin = log;
+      }
+    }
+  }
+
+  return sessionsByItem;
 }

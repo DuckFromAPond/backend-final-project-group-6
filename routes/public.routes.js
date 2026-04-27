@@ -19,7 +19,7 @@ router.get("/items/:id/history", protect, publicController.showItemHistory);
 
 router.post("/items", protect, publicController.addItem);
 router.put("/items/:id", protect, publicController.editItem);
-router.delete("/items/:id", protect,requireRole("Admin"), publicController.deleteItem);
+router.delete("/items/:id", protect, requireRole("Admin"), publicController.deleteItem);
 
 // Owned (should done but a little empty)
 router.get("/owned", protect, publicController.showOwned);
@@ -32,7 +32,7 @@ router.post("/transactions/checkin", protect, publicController.checkIn);
 router.post("/transactions/checkout", protect, publicController.checkOut);
 
 router.post("/transactions/adminCheckout", protect,requireRole("Admin"), publicController.adminCheckout);
-// router.post("/transactions/adminCheckin", protect,requireRole("Admin"), publicController.adminCheckin);
+router.post("/transactions/adminCheckin", protect,requireRole("Admin"), publicController.adminCheckin);
 
 router.get('/logs', protect, publicController.logs);
 
