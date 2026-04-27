@@ -11,26 +11,6 @@ const userService = require("../services/userService");
 const adminService = require("../services/adminService");  
 const { db } = require("../data/models/mongoUserModel");
 
-// static data
-// const categories = await itemService.getCategoryFromDB();
-
-// manually add categories
-const categories = [
-  { name: "Peripherals", subCategories: [
-    { name: "Monitor" },
-    { name: "Keyboard" },
-    { name: "Mouse" },
-    { name: "Scanner" },
-    { name: "Printer" },
-  ] },
-  { name: "Computers", subCategories: [
-    { name: "Laptop" },
-    { name: "Desktop" },
-    { name: "Server" },
-  ] },
-];
-
-
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
@@ -126,52 +106,27 @@ exports.home = async (req, res, next) => {
 
 // GET: /items ----------------
 exports.showItems = async (req, res, next) => {
+  const { cat, q, subcat, isRetired, error, success } = req.query;
+  let page = req.query.page;
+  const pageSize = 12; // items to show per page
+
   try {
-    const db = getDbProvider();
-    const { cat, q, subcat, isRetired, error, success } = req.query;
-    let page = req.query.page;
-    const pageSize = 10; // items to show per page
+    let { items, categories } = await itemService.getDBFilteredItems({
+      cat, 
+      subcat, 
+      q, 
+      isRetired
+    });
 
     // append query parameters to URL
     let url = "/items?";
 
-    // get all items from DB
-    let items = await db.getItems();
-
-    // filter by subcategory
-    if(subcat) {
-      url += `subcat=${subcat}&`;
-      items = items.filter((item) => item.subCategory === subcat);
-    }
-
-    // filter by category
-    if (cat) {
-      url += `cat=${cat}&`;
-      items = items.filter((item) => item.category === cat);
-    }
-
-    // search by name (case-insensitive)
-    if (q) {
-      url += `q=${q}&`;
-      items = items.filter((item) =>
-        item.name?.toLowerCase().includes(q.toLowerCase()),
-      );
-    }
-
-    if (isRetired) {
-      url += `isRetired=${isRetired}&`;
-      items = items.filter((item) => item.status === "Retired");
-    } else {
-      items = items.filter((item) => item.status !== "Retired");
-    }
-
-    if (error) {
-      url += `error=${error}&`;
-    }
-
-    if (success) {
-      url += `success=${success}&`;
-    }
+    if(subcat) url += `subcat=${subcat}&`;
+    if (cat) url += `cat=${cat}&`;
+    if (q) url += `q=${q}&`;
+    if (isRetired) url += `isRetired=${isRetired}&`;
+    if (error) url += `error=${error}&`;
+    if (success) url += `success=${success}&`;
 
     // append page number to URL
     if (!page) {
@@ -195,13 +150,21 @@ exports.showItems = async (req, res, next) => {
     const prevPage = page > 1 ? page - 1 : null;
     const nextPage = page < totalPages ? page + 1 : null;
 
-    const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
 
     const statuses = [
       { name: "Available" },
-      { name: "In-Use" },
       { name: "Maintenance" },
     ];
+
+    // for security's sake, please don't return the entire user object. The password hash is there
+    const exclude = ['email', 'passwordHash'];
+    const keyFilteredUser = Object.fromEntries(
+      Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+    );
 
     res.render("items/items", {
       categories,
@@ -210,40 +173,49 @@ exports.showItems = async (req, res, next) => {
       prevPage,
       nextPage,
       totalPages: pagesToRender,
-      user: req.user || null,
+      currentPage: page,
+      user: keyFilteredUser || null,
       error: error || null,
       success: success || null,
       pageTitle: "Items",
     });
-  } catch (err) { 
-    next(err)
+  }
+  catch(err) {
+    next(err);
   }
 };
 
 exports.addItem = async (req, res, next) => {
   try {
-    const db = getDbProvider();
-    const form = new multiparty.Form();
+    const {
+      filePath,
+      fileBuffer, 
+      fileName, 
+      mimeType,
+      name, 
+      description, 
+      brand, 
+      model, 
+      category, 
+      subCategory, 
+      serial, 
+      status, 
+      dateAcquired,
+      type,
+      redirect,
+    } = await itemService.processItemForm(req);
 
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) return reject(err);
-        resolve({ fields, files });
-      });
-    });
+    const statuses = [
+      { name: "Available" },
+      { name: "Maintenance" },
+    ];
 
-    // extract fields
-    const name = fields.name?.[0] ?? '';
-    const description = fields.description?.[0] ?? '';
-    const brand = fields.brand?.[0] ?? '';
-    const model = fields.model?.[0] ?? '';
-    const category = fields.category?.[0] ?? '';
-    const subCategory = fields.subCategory?.[0] ?? '';
-    const serial = fields.serial?.[0] ?? '';
-    const status = fields.status?.[0] ?? '';
-    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
+    // an error in form processing must've occured
+    if (type?.toLowerCase() === "error") {
+      return res.redirect(redirect);
+    }
 
-    const existing = await db.getItemBySerial(serial);
+    const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing) {
       return res.redirect("/items?error=Serial+already+exists");
@@ -261,31 +233,8 @@ exports.addItem = async (req, res, next) => {
       return res.redirect("/items?error=Missing+required+fields");
     }
 
-    // upload file 
-    let filePath = null;
-    let fileName = null;
-    let fileId = null;
-
-    if (!files?.document?.length) {
-      return res.redirect("/items?error=Image+file+required");
-    }
-
-    if (files?.image?.length > 0) {
-      const file = files.image[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-
-      if (file.size > MAX_SIZE) {
-        return res.redirect("/items?error=File+too+large+(max+50MB)");
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-
-      fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `${fileName}`;
-      
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
-
-      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
+    if(!statuses.map(s => s.name).includes(status)) {
+      return res.redirect(`/api/items?error=Status+must+be+available+or+maintenance`);
     }
 
     const newItem = {
@@ -298,11 +247,11 @@ exports.addItem = async (req, res, next) => {
       serial,
       status,
       dateAcquired,
-      imageName: fileId || fileName,
+      imageName: filePath,
       imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
     };
 
-    await db.createItem(newItem);
+    await itemService.createDBItem(newItem);
 
     return res.redirect("/items?success=Item+added+successfully");
   }
@@ -312,12 +261,17 @@ exports.addItem = async (req, res, next) => {
 }
 
 exports.showItemDetail = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { edit, del, error, success } = req.query;
-    const db = getDbProvider();
+  const { id } = req.params;
+  const { error, success } = req.query;
 
-    let item = await db.getItemById(id);
+  try {
+    let item = await itemService.getDBItemById(id);
+    const categories = await itemService.getCategoryFromDB();
+
+    if (!item) {
+      res.status(404);
+      return res.render("extra_pages/404");
+    }
 
     const statuses = [
       { name: "Available" },
@@ -328,31 +282,18 @@ exports.showItemDetail = async (req, res, next) => {
       ...item,
       categories,
       statuses,
-      isEdit: false,
-      isDelete: false,
+      isEdit: true,
+      isDelete: true,
       isRetired: item.status === "Retired",
       pageTitle: "ItemDetail",
     };
 
-    if (!context) {
-      res.status(404);
-      return res.render("404");
-    }
-
-    if (edit || (edit?.length !== 0 && edit === "true")) {
+    if (error) {
       context = {
         ...context,
-        isEdit: true,
+        error,
       };
     }
-
-    if (del || (del?.length !== 0 && del === "true")) {
-      context = {
-        ...context,
-        isDelete: true,
-      };
-    }
-
     if (error) {
       context = {
         ...context,
@@ -366,10 +307,17 @@ exports.showItemDetail = async (req, res, next) => {
         success,
       };
     }
+    if (success) {
+      context = {
+        ...context,
+        success,
+      };
+    }
 
     res.render("items/itemDetail", context);
-  } catch (err) { 
-    next(err); 
+  }
+  catch(err) {
+    next(err);
   }
 };
 
@@ -379,16 +327,39 @@ exports.editItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const db = getDbProvider();
-    const item = await db.getItemById(id);
-    const form = new multiparty.Form();
+    const item = await itemService.getDBItemById(id);
+    const {
+      filePath,
+      fileBuffer, 
+      fileName, 
+      mimeType,
+      name, 
+      description, 
+      brand, 
+      model, 
+      category, 
+      subCategory, 
+      serial, 
+      status, 
+      dateAcquired,
+      type,
+      redirect,
+    } = await itemService.processItemForm(req);
 
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) return reject(err);
-        resolve({ fields, files });
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
+
+    const existing = await itemService.getDBItemBySerial(serial);
+
+    if (existing) {
+      return res.redirect("/items?error=Serial+already+exists");
+    }
+
+    if (type?.toLowerCase() === "error") {
+      return res.json({
+        type,
+        redirect,
       });
-    });
+    }
 
     if (item.status === "In-Use") {
       return res.json({
@@ -397,77 +368,42 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    // extract fields
-    const name = fields.name?.[0] ?? "";
-    const description = fields.description?.[0] ?? "";
-    const brand = fields.brand?.[0] ?? "";
-    const model = fields.model?.[0] ?? "";
-    const category = fields.category?.[0] ?? "";
-    const subCategory = fields.subCategory?.[0] ?? "";
-    const serial = fields.serial?.[0] ?? "";
-    const status = fields.status?.[0] ?? "";
-    const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
-
     if (
       !name ||
       !description ||
       !brand ||
       !model ||
-      !category ||
-      !serial ||
-      !status
+      !serial
     ) {
-      return res.redirect("/items?error=Missing+required+fields");
+      return res.json({
+        type: "error",
+        redirect: `/items/${id}?error=Missing+required+fields`,
+      })
     }
 
-    if(!["Available", "Maintenance"].includes(status)) {
+    if(!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
         redirect: `/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
 
-    if (!files?.document?.length) {
-      return res.redirect("/items?error=Image+file+required");
-    }
-
-    // upload file
-    let filePath = null;
-    let fileName = null;
-
-    if (files?.image?.length > 0 && files?.image[0]?.size > 0) {
-      const file = files.image[0];
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-
-      if (file.size > MAX_SIZE) {
-        return res.redirect(`/items/${id}?error=File+too+large+(max+50MB)`);
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-
-      fileName = `${Date.now()}_${file.originalFilename}`;
-      filePath = `${fileName}`;
-
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
-
-      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
-    }
-
     const newItem = {
-      name,
-      description,
-      brand,
-      model,
-      category,
-      subCategory,
-      serial,
-      status,
-      dateAcquired,
-      imageName: fileName ?? item.image_name,
-      imageAlt: `Image of ${name}`,
+      name: name || item.name,
+      description: description || item.description,
+      brand: brand || item.brand,
+      model: model || item.model,
+      category: category || item.category,
+      subCategory: subCategory || item.subCategory,
+      serial: serial || item.serial,
+      status: status || item.status,
+      dateAcquired: dateAcquired || item.dateAcquired,
+      imageName: filePath || item.image_name,
+      imageAlt: `Image of ${name || item.name}`,
+      imageUrl: filePath || item.imageUrl,
     };
 
-    await db.updateItem(id, newItem);
+    await itemService.updateDBItem(id, newItem);
 
     return res.json({
       type: "success",
@@ -484,82 +420,38 @@ exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const db = getDbProvider();
-    const item = await db.getItemById(id);
-    const newItem = {
-      ...item,
-      status: "Retired",
-    };
-
-    if(item.status === "In-Use") {
-      return res.json({
-        type: "error",
-        redirect: `/api/items/${id}?error=Item+in-use+cannot+be+retired`,
-      });
-    }
-
-    await db.updateItem(id, newItem);
-    
-    return res.json({
-      type: "success",
-      redirect: `/items/${id}?success=Item+retired+successfully`,
-    });
+    const response = await itemService.deleteDBItem(id);
+    return res.json(response);
   } catch (err) {
     next(err);
   }
 };
 
 exports.showItemHistory = async (req, res, next) => {
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
-    const db = getDbProvider();
-    const itemHistory = await db.getItemHistoryByItemId(id);
-    const item = await db.getItemById(id);
-    const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
-    
-    const users = await Promise.all(userPromises);
+    const itemHistories = await itemService.getDBItemHistoriesById(id);
 
     let context = {
-      item,
-      itemHistories: itemHistory,
+      ...itemHistories,
       isEmpty: false,
       pageTitle: "Item History",
     };
 
-    if(itemHistory.length === 0) {
+    if(itemHistories.itemHistories.length === 0) {
       context = {
         ...context,
         isEmpty: true
       }
     }
 
-    let history = context.itemHistories;
-
-    if (history) {
-        history = history.map(h => {
-          // find username using id 
-          const user = users.find(u => u.id === h.userId);
-
-          return {
-              ...h,
-              assignee: user ? user.name : "No name given"
-          };
-        });
-
-        context = {
-          ...context,
-          itemHistories: history
-        }
-    }
-
     res.render("items/itemHistory", context);
-  } catch (err) { 
-    next(err); 
+  }
+  catch(err) {
+    next(err)
   }
 };
-
-
-
 
 // POST CHECKIN
 exports.checkIn = async (req, res, next) => {

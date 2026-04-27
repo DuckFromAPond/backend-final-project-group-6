@@ -35,7 +35,20 @@ router.patch(
   apiController.updateUserStatus,
 );
 
-// router.get('/keys', apiProtect, requireRoleAPI("Admin"), apiController.getKeys)
+// keys
+router.get("/keys", apiProtect, requireRoleAPI("Admin"), apiController.getKeys);
+router.post(
+  "/keys",
+  apiProtect,
+  requireRoleAPI("Admin"),
+  apiController.createKey,
+);
+router.delete(
+  "/keys/:id",
+  apiProtect,
+  requireRoleAPI("Admin"),
+  apiController.revokeKey,
+);
 
 // router.post('/auth/login', loginLimiter, apiController.apiLogin);
 // router.post('/keys', apiProtect, requireRoleAPI("Admin"), apiController.generateKey);
@@ -43,15 +56,13 @@ router.patch(
 router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
 router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
 
-// router.delete('/keys/:id', apiProtect, requireRoleAPI("Admin"), apiController.deleteKey);
-
 // API ROUTES FOR ITEMS
 router.get("/items", authOrApiKey, apiController.showItems);
-router.get("/items/:id", apiProtect, apiController.showItemDetail);
+router.get("/items/:id", authOrApiKey, apiController.showItemDetail);
 router.post("/items", authOrApiKey, apiController.createItem);
-router.get('/items/:id/history', authOrApiKey, apiController.showItemHistory);
-router.delete("/items/:id", apiProtect, apiController.deleteItem);
-router.put("/items/:id", apiProtect, apiController.editItem);
+router.get("/items/:id/history", authOrApiKey, apiController.showItemHistory);
+router.delete("/items/:id", authOrApiKey, apiController.deleteItem);
+router.put("/items/:id", authOrApiKey, apiController.editItem);
 
 router.get("/files/:bucket/:id", apiProtect, apiController.getFile);
 

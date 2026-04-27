@@ -9,7 +9,7 @@ const User = require("./models/mongoUserModel");
 const Item = require("./models/mongoItemsModel");
 const ItemHistory = require("./models/mongoItemHistoriesModel");
 const ApiKey = require("./models/mongoAPIkeysModel");
-// const Category = require("./models/mongoCategoryModel");
+const Category = require("./models/mongoCategoryModel");
 
 class MongoProvider extends DatabaseProvider {
   constructor() {
@@ -20,7 +20,7 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async connect() {
-    const uri = process.env.MONGO_URI;
+    const uri = config.MONGO_URI;
 
     if (!uri) {
       throw new Error("Missing MONGO_URI");
@@ -126,25 +126,25 @@ class MongoProvider extends DatabaseProvider {
     };
   }
 
-  // mapCategory(category) {
-  //   if (!category) return null;
+  mapCategory(category) {
+    if (!category) return null;
 
-  //   return {
-  //     id: String(category._id),
-  //     name: category.name,
-  //     parentId: String(category.parentId) || null,
-  //   };
-  // }
+    return {
+      id: String(category._id),
+      name: category.name,
+      parentId: String(category.parentId) || null,
+    };
+  }
 
   getImageStream(imageName) {
     return this.itemsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(imageName)
+      new mongoose.Types.ObjectId(imageName),
     );
   }
 
   getDocumentStream(imageName) {
     return this.docsBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(imageName)
+      new mongoose.Types.ObjectId(imageName),
     );
   }
 
@@ -159,8 +159,7 @@ class MongoProvider extends DatabaseProvider {
 
     return `${config.BASE_URL}/api/files/docs/${imageName}`;
   }
-  
-  
+
   async getFile(bucket, id) {
     const valid = mongoose.Types.ObjectId.isValid(id);
     if (!valid) return null;
@@ -182,7 +181,7 @@ class MongoProvider extends DatabaseProvider {
     if (!file) return null;
 
     const stream = gridBucket.openDownloadStream(
-      new mongoose.Types.ObjectId(id)
+      new mongoose.Types.ObjectId(id),
     );
 
     return {
@@ -257,7 +256,8 @@ class MongoProvider extends DatabaseProvider {
 
   async revokeOwnedApiKeys(userId) {
     // for business rule to remove all owned by a disabled acc
-    await ApiKey.updateMany({ userId: userId }, { revoked: true });
+    // await ApiKey.updateMany({ userId: userId }, { revoked: true });
+    await ApiKey.deleteMany({ userId: userId }); // hard-delete
   }
 
   async getAllUsers() {
@@ -389,6 +389,51 @@ class MongoProvider extends DatabaseProvider {
     }));
   }
 
+  // break apart later
+  async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
+    const item = await Item.findById(itemId);
+    if (!item) throw new Error("Item not found");
+
+    const admin = await User.findById(adminId);
+    if (!admin || admin.role !== "Admin") {
+      throw new Error("Unauthorized");
+    }
+
+    if (!["checkout", "checkin"].includes(action)) {
+      throw new Error("Invalid action");
+    }
+
+    if (action === "checkout") {
+      const existing = await ItemHistory.findOne({
+        itemId,
+        returnedAt: null,
+      });
+
+      if (existing) {
+        if (existing.userId.toString() === targetUserId.toString()) {
+          throw new Error("User already owns this item");
+        }
+        throw new Error("Item is already checked out");
+      }
+    }
+
+    const history = await ItemHistory.create({
+      itemId,
+      userId: targetUserId,
+      action,
+      duration: options.duration ?? null,
+      referenceLink: options.referenceLink ?? null,
+      returnedAt: action === "checkin" ? new Date() : null,
+    });
+
+    await this.setItemStatus(
+      itemId,
+      action === "checkout" ? "In-Use" : "Available",
+    );
+
+    return history.toObject();
+  }
+
   // =========================
   // API KEYS
   // =========================
@@ -419,6 +464,19 @@ class MongoProvider extends DatabaseProvider {
     return keys.map((key) => this.mapApiKey(key));
   }
 
+  async verifyApiKey(key) {
+    const apiKeys = await ApiKey.find({ revoked: false }).lean();
+
+    for (const apiKey of apiKeys) {
+        const match = await bcryptjs.compare(key, apiKey.hashedKey)
+        if (match) {
+            return this.mapApiKey(apiKey)
+        }
+    }
+
+    return null;
+  }
+
   // change this to find by the hashed version or just fetch all for service-side comparison
   async getApiKeyByHash(hashedKey) {
     const keyRecord = await ApiKey.findOne({
@@ -444,8 +502,8 @@ class MongoProvider extends DatabaseProvider {
         metadata: {
           contentType: mimeType,
           originalName: filename,
-      },
-    });
+        },
+      });
 
       uploadStream.end(buffer);
 
@@ -463,7 +521,7 @@ class MongoProvider extends DatabaseProvider {
         metadata: {
           contentType: mimeType,
           originalName: filename,
-      },
+        },
       });
 
       uploadStream.end(buffer);
@@ -476,11 +534,10 @@ class MongoProvider extends DatabaseProvider {
     });
   }
 
-//   async getAllCategories() {
-//     const categories = await Category.find().lean();
-
-//     return categories.map((c) => this.mapCategory(c));
-//   }
+  async getAllCategories() {
+    const categories = await Category.find().lean();
+    return categories.map((c) => this.mapCategory(c));
+  }
 
 //   async addCategory(name) {
 //     return await Category.create({

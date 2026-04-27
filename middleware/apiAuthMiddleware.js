@@ -115,7 +115,7 @@ async function authOrApiKey(req, res, next) {
     const apiKey = req.get("x-api-key");
 
     if (apiKey) {
-      const keyRecord = await dbProvider.getApiKeyByKey(apiKey);
+      const keyRecord = await dbProvider.verifyApiKey(apiKey);
 
       if (keyRecord && !keyRecord.revoked) {
         req.apiKey = keyRecord;

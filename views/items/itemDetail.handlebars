@@ -9,7 +9,7 @@
         <p class="text-gray-500 mt-1">Extensive details on the selected item</p>
     </div>
 
-    <div class="grid grid-cols-2 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <a href="/items" class="text-center text-white text-md bg-green-500 p-2 hover:bg-green-700 cursor-pointer rounded-md transition-all duration-300 ease-in-out">
             Back to Items
         </a>
@@ -20,7 +20,7 @@
 
     <section class="w-full flex flex-col justify-center items-center gap-y-5">
         <img src="{{this.imageUrl}}" alt="{{imageAlt}}"
-            class="w-1/3 object-contain rounded-lg shadow-lg shadow-gray-500"
+            class="w-full sm:w-4/5 md:w-3/5 lg:w-1/2 object-contain rounded-lg shadow-lg shadow-gray-500"
         >
         
         <h2 class="text-2xl font-semibold">{{name}}</h2>
@@ -41,61 +41,92 @@
             {{/ifContains}}
         </div>
 
-        <div class="w-full sm:w-4/5 md:w-3/5 lg:w-1/2 grid grid-cols-2 gap-5 rounded-lg shadow-lg shadow-gray-500 p-5">
+        <div class="w-full sm:w-4/5 md:w-3/5 lg:w-1/2 grid grid-cols-1 md:grid-cols-2 gap-5 rounded-lg shadow-lg shadow-gray-500 p-5">
             <p class="text-lg font-medium">Category: {{category}}</p>
             <p class="text-lg font-medium">Subcategory: {{subCategory}}</p>
             <p class="text-lg font-medium">Model: {{model}}</p>
             <p class="text-lg font-medium">Brand: {{brand}}</p>
             <p class="text-lg font-medium">Serial Number: {{serial}}</p>
             <p class="text-lg font-medium">Date of Acquisition: {{dateAcquired}}</p>
-            <p class="text-lg font-medium col-span-2">Description: {{description}}</p>
+            <p class="text-lg font-medium col-span-1 md:col-span-2">Description: {{description}}</p>
         </div>
 
-        <div class="w-1/2 flex justify-between gap-x-10">
-            {{#if isEdit}}
-                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}#editForm'"
-                >
-                    Hide Edit
-                </button>
-            {{else}}
-                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
-                onclick="location.href='/items/{{id}}?edit=true#editForm'"
-                >
-                    Show Edit
-                </button>
-            {{/if}}
+        <div class="w-1/2 flex flex-col sm:flex-row justify-between gap-5">
+            <button 
+                class="hidden rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
+                onclick="toggleEdit(false)"
+                id="hideEditBtn"
+            >
+                Hide Edit
+            </button>
+
+            <button 
+                class="rounded-lg w-full p-2 cursor-pointer text-md bg-purple-500 hover:bg-purple-700 text-white transition-all duration-300 ease-in-out"
+                onclick="toggleEdit(true)"
+                id="showEditBtn"
+            >
+                Show Edit
+            </button>
             
             {{#unless isRetired}}
-                {{#if isDelete}}
-                    <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                        id="deleteBtn"
-                    >
-                        Confirm Retirement
-                    </button>
-                {{else}}
-                    <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
-                        onclick="location.href='/items/{{id}}?del=true#deleteBtn'"
-                    >
-                        Retire
-                    </button>
-                {{/if}}
+                <button class="hidden rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                    onClick="toggleDelete(false)"
+                    id="confirmRetireBtn"
+                >
+                    Confirm Retirement
+                </button>
+
+                <button class="rounded-lg w-full p-2 cursor-pointer text-md bg-red-500 hover:bg-red-700 text-white transition-all duration-300 ease-in-out"
+                    onclick="toggleDelete(true)"
+                    id="retireBtn"
+                >
+                    Retire
+                </button>
             {{/unless}}
         </div>
     </section>
     
-    {{#if isEdit}}
-        <section id="editForm">
-            {{> itemForm}}
-        </section>
-    {{/if}}
+    <section id="editForm" class="hidden">
+        {{> itemForm}}
+    </section>
 </main>
 
 <script>
-    const deleteBtn = document.querySelector('#deleteBtn');
+    const confirmRetireBtn = document.getElementById('confirmRetireBtn');
     const itemId = "{{id}}";
 
-    deleteBtn.addEventListener('click', async (event) => {
+    function toggleEdit(show) {
+        const editForm = document.getElementById('editForm');
+        const showEditBtn = document.getElementById('showEditBtn');
+        const hideEditBtn = document.getElementById('hideEditBtn');
+
+        if(show) {
+            editForm.classList.remove('hidden');
+            hideEditBtn.classList.remove('hidden');
+            showEditBtn.classList.add('hidden');
+            editForm.scrollIntoView();
+        }
+        else {
+            editForm.classList.add('hidden');
+            hideEditBtn.classList.add('hidden');
+            showEditBtn.classList.remove('hidden');
+        }
+    }
+
+    function toggleDelete(show) {
+        const retireBtn = document.getElementById('retireBtn');
+
+        if(show) {
+            retireBtn.classList.add('hidden');
+            confirmRetireBtn.classList.remove('hidden');
+        }
+        else {
+            retireBtn.classList.remove('hidden');
+            confirmRetireBtn.classList.add('hidden');
+        }
+    }
+
+    confirmRetireBtn.addEventListener('click', async (event) => {
         const response = await fetch(`/items/${itemId}`, {
             method: 'DELETE'
         });
