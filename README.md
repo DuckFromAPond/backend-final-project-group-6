@@ -202,7 +202,7 @@ RESTful API with JSON request/response:
 - Proper HTTP status codes and error messages
 - Rate limiting on login endpoints
 
-## 📊 API Endpoints
+## 📊 PUBLIC-facing Endpoints
 
 ### Authentication
 ```
@@ -211,7 +211,6 @@ GET    /login                      - Show login form
 POST   /register                   - Web registration
 GET    /register                   - Show registration form
 GET    /logout                     - Clear session
-POST   /api/login                  - API login
 ```
 
 ### Items
@@ -257,8 +256,17 @@ GET    /home                       - Home page
 GET    /owned                      - User's owned items
 GET    /report                     - Reports page
 GET    /logs                       - Activity logs
-GET    /files/:bucket/:id          - Download file (Admin)
+GET    /files/:bucket/:id          - Reference/Image file
 ```
+
+## API Endpoints
+### Authentication
+```
+POST /api/login                    - Authenticate a user and receive a JSON Web Token (JWT).
+```
+**Body:** { email, password }  
+**Returns:** JWT token  
+**Protection:** rate limiter (429 if exceeded 20 spam requests)
 
 ## 🔐 Security Features
 

@@ -52,6 +52,17 @@ exports.getAllUsers = async (req, res) => {
       createdAt: user.createdAt,
     }));
 
+    const isBrowser = req.headers.accept?.includes("text/html");
+
+    if (isBrowser) {
+      return res.status(200).json({
+        success: true,
+        message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
+        count: safeUsers.length,
+        users: safeUsers,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       count: safeUsers.length,
@@ -133,6 +144,17 @@ exports.getKeys = async (req, res) => {
       createdAt: entry.createdAt,
       revoked: entry.revoked,
     }));
+    
+    const isBrowser = req.headers.accept?.includes("text/html");
+
+    if (isBrowser) {
+      return res.status(200).json({
+        success: true,
+        message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
+        keys: formattedKeys,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       keys: formattedKeys,
@@ -269,11 +291,25 @@ exports.showItems = async (req, res, next) => {
       );
     }
 
+    const isBrowser = req.headers.accept?.includes("text/html");
+
+    if (isBrowser) {
+      return res.status(200).json({
+        success,
+        message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
+        items,
+        categories,
+        statuses,
+        // user: keyFilteredUser || null,
+        error,
+      });
+    }
+
     return res.json({
-      categories,
       items,
+      categories,
       statuses,
-      user: keyFilteredUser || null,
+      // user: keyFilteredUser || null,
       error,
       success,
     });
@@ -371,6 +407,15 @@ exports.showItemDetail = async (req, res) => {
       success,
       isRetired: item.status === "Retired",
     };
+    
+    const isBrowser = req.headers.accept?.includes("text/html");
+
+    if (isBrowser) {
+      return res.status(200).json({
+        message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
+        ...context
+      });
+    }
 
     return res.json(context);
   } catch (err) {
@@ -553,6 +598,16 @@ exports.showItemHistory = async (req, res, next) => {
         isEmpty: true,
       };
     }
+    
+    const isBrowser = req.headers.accept?.includes("text/html");
+
+    if (isBrowser) {
+      return res.status(200).json({
+        message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
+        ...context
+      });
+    }
+    
 
     return res.json(context);
   } catch (err) {
@@ -710,7 +765,7 @@ exports.apiCheckout = async (req, res) => {
 exports.notFound = (req, res) => {
   res.status(404).json({
     success: false,
-    error: "Not Found",
+    error: "404: Not Found",
     message: `Cannot ${req.method} ${req.originalUrl}`,
     path: req.originalUrl,
     method: req.method,
