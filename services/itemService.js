@@ -156,19 +156,6 @@ exports.getUserHistory = async (currentUserId) => {
   return userHistories
 };
 
-
-
-exports.getUserHistory = async (currentUserId) => {
-  const db = getDbProvider();
-
-  const userHistories = await db.getUserHistory(currentUserId);
-
-  return userHistories
-};
-
-
-
-
 // GET ALL HISTORY
 // Description: gets all history from database
 // Precondition: none

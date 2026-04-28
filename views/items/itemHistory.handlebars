@@ -9,13 +9,13 @@
         <table class="w-full border border-gray-200">
             <thead class="bg-blue-500 text-white">
                 <tr>
-                    <th class="px-4 py-2 text-left">Log ID</th>
-                    <th class="px-4 py-2 text-left">Assignee</th>
-                    <th class="px-4 py-2 text-left">Duration</th>
-                    <th class="px-4 py-2 text-left">Action</th>
-                    <th class="px-4 py-2 text-left">Status</th>
-                    <th class="px-4 py-2 text-left">Date</th>
-                    <th class="px-4 py-2 text-left">Reference Link</th>
+                    <th class="px-4 py-2 text-left">LOG ID</th>
+                    <th class="px-4 py-2 text-left">ASSIGNEE</th>
+                    <th class="px-4 py-2 text-left">DURATION</th>
+                    <th class="px-4 py-2 text-left">ACTION</th>
+                    <th class="px-4 py-2 text-left">STATUS</th>
+                    <th class="px-4 py-2 text-left">DATE</th>
+                    <th class="px-4 py-2 text-left">REFERENCE LINK</th>
                 </tr>
             </thead>
             <tbody>
@@ -66,6 +66,8 @@
                 {{/if}}
             </tbody>
         </table>
-        </div>
     </div>
+        {{#if itemHistories.length}} 
+            {{>historyPaginator}}
+        {{/if}}
 </div>

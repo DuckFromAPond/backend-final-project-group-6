@@ -8,8 +8,8 @@ const { items, itemHistories, users, dashboardData } = require("../data/data");
 const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
 const userService = require("../services/userService");
-const adminService = require("../services/adminService"); 
-const { error } = require("console");
+const adminService = require("../services/adminService");  
+const { db } = require("../data/models/mongoUserModel");
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
@@ -121,7 +121,7 @@ exports.showItems = async (req, res, next) => {
     // append query parameters to URL
     let url = "/items?";
 
-    if(subcat) url += `subcat=${subcat}&`;
+    if (subcat) url += `subcat=${subcat}&`;
     if (cat) url += `cat=${cat}&`;
     if (q) url += `q=${q}&`;
     if (isRetired) url += `isRetired=${isRetired}&`;
@@ -428,7 +428,6 @@ exports.editItem = async (req, res, next) => {
   }
 };
 
-// ------------------------------------------------------------------------- ADMIN ONLY ROUTE PLEASE MAKE ADMIN ONLY 
 // soft deletes only 
 exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
@@ -443,9 +442,12 @@ exports.deleteItem = async (req, res, next) => {
 
 exports.showItemHistory = async (req, res, next) => {
   const { id } = req.params;
+  const pageSize = 10;
+  let page = req.query.page;
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
+
     const sessionsByItem = await itemService.buildSessions(itemHistories.itemHistories);
 
     const newItemHist = [...itemHistories.itemHistories].map((log) => {
@@ -499,19 +501,40 @@ exports.showItemHistory = async (req, res, next) => {
       };
     });
 
+    if (!page) {
+      return res.redirect(`/items/${id}/history?page=1`);
+    }
+
+    page = parseInt(page);
+
+    const histories = newItemHist || [];
+    const total = histories.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedHistories = histories.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
     let context = {
       ...itemHistories,
-      itemHistories: newItemHist,
-      isEmpty: false,
+      itemHistories: paginatedHistories,
+      isEmpty: paginatedHistories.length === 0 && total === 0,
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: `items/${id}/history`,
       pageTitle: "Item History",
     };
-
-    if(itemHistories.itemHistories.length === 0) {
-      context = {
-        ...context,
-        isEmpty: true
-      }
-    }
 
     res.render("items/itemHistory", context);
   }
@@ -1129,7 +1152,7 @@ exports.logs = async (req, res, next) => {
       Math.max(0, page - 2),
       Math.min(totalPages, page + 1)
     );
-
+    
     res.render("logs", {
       allHistories: paginatedHistories,
       users,
