@@ -31,7 +31,9 @@ exports.apiLogin = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Internal server error", error: err.message });
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: err.message });
   }
 };
 
@@ -41,21 +43,10 @@ exports.getAllUsers = async (req, res) => {
   try {
     // Calling the service as requested
     const users = await userService.getAllUsers();
-
-    // Map the users to avoid sending sensitive data like hashed passwords
-    const safeUsers = users.map((user) => ({
-      id: user.id || user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      createdAt: user.createdAt,
-    }));
-
     return res.status(200).json({
       success: true,
-      count: safeUsers.length,
-      users: safeUsers,
+      count: users.length,
+      users: users,
     });
   } catch (err) {
     console.error("Error fetching users:", err);
@@ -256,16 +247,13 @@ exports.showItems = async (req, res, next) => {
       isRetired,
     });
 
-    const statuses = [
-      { name: "Available" },
-      { name: "Maintenance" },
-    ];
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
-    const exclude = ['email', 'passwordHash'];
+    const exclude = ["email", "passwordHash"];
     let keyFilteredUser = null;
-    if(req.user) {
+    if (req.user) {
       keyFilteredUser = Object.fromEntries(
-        Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+        Object.entries(req.user).filter(([key]) => !exclude.includes(key)),
       );
     }
 
@@ -303,17 +291,14 @@ exports.createItem = async (req, res, next) => {
       apiRedirect,
     } = await itemService.processItemForm(req);
 
-    const statuses = [
-      { name: "Available" },
-      { name: "Maintenance" },
-    ];
+    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
       return res.redirect(apiRedirect);
     }
 
-    if (!statuses.map(s => s.name).includes(status)) {
+    if (!statuses.map((s) => s.name).includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
@@ -339,7 +324,7 @@ exports.createItem = async (req, res, next) => {
     return res.json({
       ...newItem,
       type: "success",
-      redirect: "/api/items?success=Item+added+successfully"
+      redirect: "/api/items?success=Item+added+successfully",
     });
   } catch (err) {
     next(err);
@@ -349,7 +334,7 @@ exports.createItem = async (req, res, next) => {
 // GET /api/items/:id
 exports.showItemDetail = async (req, res) => {
   const { id } = req.params;
-  const {error, success} = req.query;
+  const { error, success } = req.query;
 
   try {
     let item = await itemService.getDBItemById(id);
@@ -358,7 +343,7 @@ exports.showItemDetail = async (req, res) => {
     if (!item) {
       return res.status(404).json({
         type: "error",
-        redirect: `/items/${id}?error=Item+not+found`
+        redirect: `/items/${id}?error=Item+not+found`,
       });
     }
 
@@ -405,11 +390,11 @@ exports.editItem = async (req, res, next) => {
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     const existing = await itemService.getDBItemBySerial(serial);
-    
+
     if (existing) {
       return res.json({
         type: "error",
-        redirect: "/items?error=Serial+already+exists"
+        redirect: "/items?error=Serial+already+exists",
       });
     }
 
@@ -434,7 +419,7 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    if (!statuses.map(s => s.name).includes(status)) {
+    if (!statuses.map((s) => s.name).includes(status)) {
       return res.json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
@@ -487,15 +472,18 @@ exports.showItemHistory = async (req, res, next) => {
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
-    const sessionsByItem = await itemService.buildSessions(itemHistories.itemHistories);
-  
+    const sessionsByItem = await itemService.buildSessions(
+      itemHistories.itemHistories,
+    );
+
     const newItemHist = [...itemHistories.itemHistories].map((log) => {
       const itemId = log.itemId?.toString();
       const sessions = sessionsByItem.get(itemId) || [];
       const created = new Date(log.createdAt);
 
       const session = sessions.find(
-        s => s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id)
+        (s) =>
+          s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id),
       );
 
       let status = "unknown";
@@ -516,7 +504,6 @@ exports.showItemHistory = async (req, res, next) => {
 
         const hours = (checkinTime - checkoutTime) / (1000 * 60 * 60);
         duration = itemService.formatDuration(hours);
-
       } else {
         status = "active";
 
@@ -539,7 +526,7 @@ exports.showItemHistory = async (req, res, next) => {
         duration,
       };
     });
-    
+
     let context = {
       ...itemHistories,
       itemHistories: newItemHist,
@@ -577,12 +564,11 @@ exports.apiCheckin = async (req, res) => {
     if (!file || file.size === 0) {
       return res.status(400).json({
         success: false,
-        message: "File is required"
+        message: "File is required",
       });
     }
 
     if (req.files?.document) {
-
       const DBlabel = itemService.getDBlabel();
 
       if (DBlabel === "Supabase" && file.size > 50 * 1024 * 1024) {
@@ -598,7 +584,7 @@ exports.apiCheckin = async (req, res) => {
       const allowedMimeTypes = new Set([
         "application/pdf",
         "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ]);
 
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
@@ -606,29 +592,24 @@ exports.apiCheckin = async (req, res) => {
       if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
         return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
       }
-      
-      filePath = await itemService.uploadDBFile(
-        fileName,
-        fileBuffer,
-        mimeType
-      );
+
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
 
     const result = await itemService.checkinItem({
       itemId,
       userId,
       duration,
-      referenceLink: filePath
+      referenceLink: filePath,
     });
 
     return res.status(200).json({
       message: "Item checked in successfully",
-      data: result
+      data: result,
     });
-
   } catch (err) {
     return res.status(400).json({
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -651,12 +632,11 @@ exports.apiCheckout = async (req, res) => {
     if (!file || file.size === 0) {
       return res.status(400).json({
         success: false,
-        message: "File is required"
+        message: "File is required",
       });
     }
 
     if (req.files?.document) {
-
       const DBlabel = itemService.getDBlabel();
 
       if (DBlabel === "Supabase" && file.size > 50 * 1024 * 1024) {
@@ -672,7 +652,7 @@ exports.apiCheckout = async (req, res) => {
       const allowedMimeTypes = new Set([
         "application/pdf",
         "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ]);
 
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
@@ -681,28 +661,23 @@ exports.apiCheckout = async (req, res) => {
         return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
       }
 
-      filePath = await itemService.uploadDBFile(
-        fileName,
-        fileBuffer,
-        mimeType
-      );
+      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
 
     const result = await itemService.checkoutItem({
       itemId,
       userId,
       duration,
-      referenceLink: filePath
+      referenceLink: filePath,
     });
 
     return res.status(200).json({
       message: "Item checked out successfully",
-      data: result
+      data: result,
     });
-
   } catch (err) {
     return res.status(400).json({
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -714,6 +689,6 @@ exports.notFound = (req, res) => {
     message: `Cannot ${req.method} ${req.originalUrl}`,
     path: req.originalUrl,
     method: req.method,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 };
