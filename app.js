@@ -56,11 +56,10 @@ const hbsHelpers = {
 };
 
 // CORS configuration
+const normalize = (url) => url?.replace(/\/$/, "");
 const whitelist = new Set([
-  `http://localhost:${config.PORT}`,
-  "http://127.0.0.1:3000",
-  "http://localhost:5173",
-  config.BASE_URL,
+  normalize(`http://localhost:${config.PORT}`),
+  normalize(config.BASE_URL),
 ]);
 
 const corsOptions = {
@@ -68,10 +67,11 @@ const corsOptions = {
     // allow Postman / server-to-server
     if (!origin) return callback(null, true);
 
-    if (whitelist.has(origin)) {
+    if (whitelist.has(normalize(origin))) {
       return callback(null, true);
     }
 
+    console.log("Blocked");
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
@@ -131,7 +131,7 @@ app.use((req, res, next) => {
 
 // ---------- API -----------------
 const apiApp = express();
-apiApp.use(cors(corsOptions));
+// apiApp.use(cors(corsOptions));
 apiApp.use(express.json());
 apiApp.use(express.urlencoded({ extended: false }));
 apiApp.use(cookieParser());

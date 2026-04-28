@@ -594,7 +594,20 @@ exports.apiCheckin = async (req, res) => {
       const fileName = `${Date.now()}_${file.originalFilename}`;
 
       const mimeType = file.mimetype || "application/octet-stream";
+      const ext = path.extname(file.originalFilename).toLowerCase();
 
+      const allowedMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]);
+
+      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
+
+      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
+        return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
+      }
+      
       filePath = await itemService.uploadDBFile(
         fileName,
         fileBuffer,
@@ -655,6 +668,19 @@ exports.apiCheckout = async (req, res) => {
       const fileName = `${Date.now()}_${file.originalFilename}`;
 
       const mimeType = file.mimetype || "application/octet-stream";
+      const ext = path.extname(file.originalFilename).toLowerCase();
+
+      const allowedMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]);
+
+      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
+
+      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
+        return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
+      }
 
       filePath = await itemService.uploadDBFile(
         fileName,
