@@ -74,6 +74,7 @@ class MongoProvider extends DatabaseProvider {
       role: user.role,
       status: user.status,
       createdAt: user.createdAt,
+      passwordHash: user.passwordHash,
       disabledAt: user.disabledAt,
     };
   }
@@ -262,7 +263,7 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async getAllUsers() {
-    const users = await User.find({}, "-passwordHash").lean();
+    const users = await User.find().lean();
     return users.map((u) => this.mapUser(u));
   }
 

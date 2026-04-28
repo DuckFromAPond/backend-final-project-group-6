@@ -38,7 +38,10 @@ exports.registerNewUser = async (name, email, password) => {
 // list
 exports.getAllUsers = async () => {
   const db = getDbProvider();
-  return await db.getAllUsers();
+  const users = await db.getAllUsers();
+  return users.map(
+    ({ passwordHash, ...userWithoutPassword }) => userWithoutPassword, // manually remove the property from each object
+  );
 };
 
 // update role and status
