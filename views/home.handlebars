@@ -48,7 +48,7 @@
   <div class="bg-white rounded-2xl shadow p-6 overflow-x-auto hover:shadow-lg transition mb-8">
     <h2 class="text-xl font-bold mb-4">Your Recent Transactions</h2>
     {{#if dashboardData.recentTransactions.length}}
-    <div class="max-h-[600px] overflow-y-auto border">
+    <div class="max-h-150 overflow-y-auto border">
       <table class="min-w-full border border-gray-200 rounded-lg">
       <thead class="bg-gray-800 text-white">
         <tr>
@@ -77,6 +77,10 @@
     {{else}}
       <p class="text-gray-500">No transaction data found for this account.</p>
     {{/if}}
+  
+      {{#if dashboardData.recentTransactions.length}} 
+          {{>historyPaginator}}
+      {{/if}}
   </div>
 
   <!-- HELPFUL GUIDELINES -->

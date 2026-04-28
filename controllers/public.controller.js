@@ -16,6 +16,8 @@ exports.home = async (req, res, next) => {
   try {
     const currentUserId = req.user.id;
     const db = getDbProvider();
+    let page = req.query.page;
+    const pageSize = 10; // items to show per page
 
     const [users, items, histories] = await Promise.all([
       userService.getAllUsers(),
@@ -88,14 +90,41 @@ exports.home = async (req, res, next) => {
       };
     });
 
+    if (!page) {
+      return res.redirect(`/home?page=1`);
+    }
+
+    page = parseInt(page);
+
+    const total = recentTransactions.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedTransactions = recentTransactions.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
     // RENDER
     res.render("home", {
       dashboardData: {
         totalOwned,
         activeCount,
         overdueCount,
-        recentTransactions,
+        recentTransactions: paginatedTransactions,
       },
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: `home`,
       pageTitle: "Home",
     });
 
