@@ -133,7 +133,6 @@ exports.getKeys = async (req, res) => {
       createdAt: entry.createdAt,
       revoked: entry.revoked,
     }));
-    console.log(formattedKeys);
     return res.status(200).json({
       success: true,
       keys: formattedKeys,

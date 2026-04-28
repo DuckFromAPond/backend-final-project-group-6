@@ -10,6 +10,24 @@ exports.renderKeyManagement = async (req, res) => {
     const allUsers = await userService.getAllUsers(); // To populate the "Assign to User" dropdown
     const newKey = req.cookies.newRawKey || null;
 
+    const userMap = new Map(allUsers.map(u => [u.id?.toString(), u]));
+
+    const formattedKeys = activeKeys.map(key => {
+      const d = new Date(key.createdAt);
+
+      const pad = (n) => String(n).padStart(2, "0");
+
+      const formatted =
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+        `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+      return {
+        ...key,
+        email: userMap.get(key.userId?.toString())?.email || "Unknown",
+        createdAt: formatted
+      };
+    });
+
     // clear the key from cookie after one render so it disappears on refresh
     if (newKey) {
       res.clearCookie("newRawKey");
@@ -17,7 +35,7 @@ exports.renderKeyManagement = async (req, res) => {
 
     res.render("keys", {
       pageTitle: "API Keys", // changed from Manage API Key Management -> API Keys for consistency 
-      keys: activeKeys,
+      keys: formattedKeys,
       users: allUsers,
       user: req.user, // Current logged-in admin
       // check if there's a freshly generated key in the session to show once

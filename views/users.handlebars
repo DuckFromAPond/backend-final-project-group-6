@@ -51,12 +51,12 @@
               <form action="/users/{{this.id}}/status" method="POST">
                 {{#if (eq this.status "Active")}}
                   <input type="hidden" name="status" value="Disabled">
-                  <button type="submit" class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-red-200 transition">
+                  <button type="submit" class="cursor-pointer bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-red-200 transition">
                     Active
                   </button>
                 {{else}}
                   <input type="hidden" name="status" value="Active">
-                  <button type="submit" class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-200 transition">
+                  <button type="submit" class="cursor-pointer bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-200 transition">
                     Disabled
                   </button>
                 {{/if}}

@@ -48,7 +48,7 @@
                     required>
               <option value="" selected disabled>Select Technician...</option>
               {{#each users}}
-                <option value="{{this.id}}">{{this.name}} ({{this.role}})</option>
+                <option value="{{this.id}}">{{this.name}} • {{this.email}} ({{this.role}})</option>
               {{/each}}
             </select>
 
@@ -61,7 +61,7 @@
         </div>
 
         <div class="md:pt-5">
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition-all active:scale-95">
+          <button type="submit" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition-all active:scale-95">
             Generate
           </button>
         </div>
@@ -74,6 +74,7 @@
           <tr>
             <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Key Name</th>
             <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Owner ID</th>
+            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Owner Email</th>
             <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Created</th>
             <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider">Status / Action</th>
           </tr>
@@ -83,10 +84,11 @@
             <tr class="hover:bg-blue-50/50 transition-colors">
               <td class="px-6 py-4 font-semibold text-gray-700">{{this.name}}</td>
               <td class="px-6 py-4 font-mono text-xs text-gray-400">{{this.userId}}</td>
+              <td class="px-6 py-4 text-sm text-gray-500">{{this.email}}</td>
               <td class="px-6 py-4 text-sm text-gray-500">{{this.createdAt}}</td>
               <td class="px-6 py-4 text-right">
                 <form action="/keys/revoke/{{this.id}}" method="POST" onsubmit="return confirm('Revoke this key? All integrations using it will fail immediately.')">
-                  <button type="submit" class="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-1.5 rounded-full text-xs font-bold transition-all border border-red-100">
+                  <button type="submit" class="cursor-pointer bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-1.5 rounded-full text-xs font-bold transition-all border border-red-100">
                     Revoke Key
                   </button>
                 </form>

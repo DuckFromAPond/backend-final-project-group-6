@@ -19,39 +19,69 @@
     </div>
 
     <section class="w-full flex flex-col justify-center items-center gap-y-5">
-        <img src="{{this.imageUrl}}" alt="{{imageAlt}}"
-            class="w-full sm:w-4/5 md:w-3/5 lg:w-1/2 object-contain rounded-lg shadow-lg shadow-gray-500"
-        >
-        
-        <h2 class="text-2xl font-semibold">{{name}}</h2>
+        <section class="w-full max-w-5xl flex flex-col gap-6">
 
-        {{!-- render status of item --}}
-        <div>
-            {{#ifContains status "Available"}}
-                <p class="text-lg font-medium text-green-500">Available</p>
-            {{/ifContains}}
-            {{#ifContains status "In-Use"}}
-                <p class="text-lg font-medium text-purple-500">In Use by {{#if Owner}}<span class="font-bold underline">{{Owner}}{{/if}}</span> </p> 
-            {{/ifContains}}
-            {{#ifContains status "Maintenance"}}
-                <p class="text-lg font-medium text-orange-500">Maintenance</p>
-            {{/ifContains}}
-            {{#ifContains status "Retired"}}
-                <p class="text-lg font-medium text-gray-500">Retired</p>
-            {{/ifContains}}
-        </div>
+        <!-- IMAGE + BASIC INFO WRAPPER -->
+            <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col lg:flex-row gap-8">
 
-        <div class="w-full sm:w-4/5 md:w-3/5 lg:w-1/2 grid grid-cols-1 md:grid-cols-2 gap-5 rounded-lg shadow-lg shadow-gray-500 p-5">
-            <p class="text-lg font-medium">Item ID: {{id}}</p>
-            <p class="text-lg font-medium">Category: {{category}}</p>
-            <p class="text-lg font-medium">Category: {{category}}</p>
-            <p class="text-lg font-medium">Subcategory: {{subCategory}}</p>
-            <p class="text-lg font-medium">Model: {{model}}</p>
-            <p class="text-lg font-medium">Brand: {{brand}}</p>
-            <p class="text-lg font-medium">Serial Number: {{serial}}</p>
-            <p class="text-lg font-medium">Date of Acquisition: {{dateAcquired}}</p>
-            <p class="text-lg font-medium col-span-1 md:col-span-2">Description: {{description}}</p>
-        </div>
+                <!-- IMAGE -->
+                <div class="w-full lg:w-1/2 flex justify-center">
+                <img src="{{this.imageUrl}}" alt="{{imageAlt}}"
+                    class="w-full max-h-[400px] object-contain rounded-xl border"
+                >
+                </div>
+
+                <!-- INFO -->
+                <div class="w-full lg:w-1/2 flex flex-col gap-4">
+
+                    <h2 class="text-6xl font-bold text-gray-800">{{name}}</h2>
+
+                    <!-- STATUS BADGE -->
+                    <div>
+                        {{#ifContains status "Available"}}
+                        <span class="px-3 py-1 text-sm rounded-full bg-green-100 text-green-700 font-semibold">
+                            Available
+                        </span>
+                        {{/ifContains}}
+
+                        {{#ifContains status "In-Use"}}
+                        <span class="px-3 py-1 text-sm rounded-full bg-purple-100 text-purple-700 font-semibold">
+                            In Use by <span class="underline">{{Owner}}</span>
+                        </span>
+                        {{/ifContains}}
+
+                        {{#ifContains status "Maintenance"}}
+                        <span class="px-3 py-1 text-sm rounded-full bg-orange-100 text-orange-700 font-semibold">
+                            Maintenance
+                        </span>
+                        {{/ifContains}}
+
+                        {{#ifContains status "Retired"}}
+                        <span class="px-3 py-1 text-sm rounded-full bg-gray-200 text-gray-600 font-semibold">
+                            Retired
+                        </span>
+                        {{/ifContains}}
+                    </div>
+
+                    <!-- QUICK DETAILS -->
+                    <div class="grid grid-cols-2 gap-3 text-sm text-gray-700 mt-2">
+                        <p><span class="font-semibold">ID:</span> {{id}}</p>
+                        <p><span class="font-semibold">Category:</span> {{category}}</p>
+                        <p><span class="font-semibold">Sub:</span> {{subCategory}}</p>
+                        <p><span class="font-semibold">Model:</span> {{model}}</p>
+                        <p><span class="font-semibold">Brand:</span> {{brand}}</p>
+                        <p><span class="font-semibold">Serial:</span> {{serial}}</p>
+                        <p class="col-span-2"><span class="font-semibold">Acquired:</span> {{dateAcquired}}</p>
+                    </div>
+                </div>
+            </div>
+            <!-- DESCRIPTION CARD -->
+            <div class="bg-white rounded-2xl shadow p-6">
+                <h3 class="text-lg font-semibold mb-2 text-gray-800">Description</h3>
+                <p class="text-gray-600 leading-relaxed">{{description}}</p>
+            </div>
+        </section>
+    </section>
 
         <div class="w-1/2 flex flex-col sm:flex-row justify-between gap-5">
             <button 

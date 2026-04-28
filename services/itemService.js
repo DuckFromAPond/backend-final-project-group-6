@@ -2,7 +2,7 @@ const { getDbProvider } = require("../utils/dbProviderShared");
 const multiparty = require("multiparty");
 const path = require("path");
 const fs = require("fs");
-const { base } = require("../data/models/mongoUserModel");
+const sharp = require("sharp");
 
 // CHECKIN / CHECKOUT 
 exports.getDBlabel = () => { 
@@ -396,7 +396,6 @@ exports.processItemForm = async (req) => {
       }
     }
 
-    fileBuffer = fs.readFileSync(file.path);
     mimeType = file.headers?.["content-type"] || "application/octet-stream";
     const ext = path.extname(file.originalFilename).toLowerCase();
 
@@ -420,7 +419,15 @@ exports.processItemForm = async (req) => {
         redirect = `/items?error=Only+image+files+are+allowed`;
       }
     }
-    fileName = `${Date.now()}_${file.originalFilename}`;
+    const rawBuffer = fs.readFileSync(file.path);
+
+    const webpBuffer = await sharp(rawBuffer)
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    fileBuffer = webpBuffer;
+    mimeType = "image/webp";
+    fileName = `${Date.now()}_${file.originalFilename}.webp`;
     filePath = await db.uploadItem(fileName, fileBuffer, mimeType);
   }
   else {
