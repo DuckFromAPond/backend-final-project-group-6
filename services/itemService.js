@@ -15,6 +15,11 @@ exports.uploadDBFile = async (fileName, fileBuffer, mimeType) => {
   return await db.uploadFile(fileName, fileBuffer, mimeType);
 }
 
+exports.uploadDBItem = async (fileName, fileBuffer, mimeType) => { 
+  const db = getDbProvider();
+  return await db.uploadItem(fileName, fileBuffer, mimeType);
+}
+
 exports.validateCheckout = async (itemId) => {
   const db = getDbProvider();
 
@@ -34,6 +39,11 @@ exports.validateCheckout = async (itemId) => {
     throw new Error("Item already checked out");
   }
 };
+
+exports.getDBFile = async (bucket, id) => { 
+  const db = getDbProvider();
+  return await db.getFile(bucket, id);
+}
 
 exports.checkoutItem = async ({ itemId, userId, duration, referenceLink }) => { 
   const db = getDbProvider();
@@ -62,7 +72,7 @@ exports.validateCheckin = async (itemId, userId) => {
   if (item.status !== "In-Use") {
     throw new Error("Item is not in-use.");
   }
-
+  
   if (String(item.currentOwner) !== String(userId)) {
     throw new Error("You don't own this item.");
   }
@@ -225,8 +235,8 @@ exports.getCategoryFromDB = async () => {
 
   // 1. build lookup map
   categories.forEach(cat => {
-    map.set(cat.id, {
-      id: cat.id,
+    map.set(cat.id.toString(), {
+      id: cat.id.toString(),
       name: cat.name,
       subCategories: []
     });
@@ -234,17 +244,19 @@ exports.getCategoryFromDB = async () => {
 
   // 2. build tree
   categories.forEach(cat => {
-    if (cat.parentId) {
-      const parent = map.get(cat.parentId);
+    const id = cat.id.toString();
+    const parentId = cat.parentId?.toString();
+
+    if (parentId) {
+      const parent = map.get(parentId);
 
       if (parent) {
-        parent.subCategories.push(map.get(cat.id));
+        parent.subCategories.push(map.get(id));
       }
     } else {
-      result.push(map.get(cat.id));
+      result.push(map.get(id));
     }
   });
-
   return result;
 };
 
@@ -354,6 +366,20 @@ exports.processItemForm = async (req) => {
   const id = req.params.id; // for returning to itemDetail if the form is submitted from /itemDetail
   const form = new multiparty.Form();
   
+  let type = null;
+  let redirect = null;
+  let errCode = null;
+  let message = null
+
+  if (!req.headers["content-type"]?.includes("multipart/form-data")) {
+    return {
+      type: "error",
+      redirect: `/items/?error=Invalid+content+type`,
+      message: "INVALID CONTENT TYPE",
+      errCode: 415
+    };
+  }
+
   const { fields, files } = await new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
       if (err) return reject(err);
@@ -372,13 +398,28 @@ exports.processItemForm = async (req) => {
   const status = fields.status?.[0] ?? null;
   const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
+  if (
+    !name ||
+    !description ||
+    !brand ||
+    !model ||
+    !serial || 
+    !category || 
+    !subCategory || 
+    !status
+  ) {
+    return {
+      type: "error",
+      errCode: 400,
+      message: "MISSING REQUIRED FIELDS",
+      redirect: `/items/${id}?error=Missing+required+fields`,
+    }
+  }
+
   // upload file
-  let filePath = null;
   let fileName = null;
   let fileBuffer = null;
   let mimeType = null;
-  let type = null;
-  let redirect = null;
 
   // check whether file is uploaded
   if (files?.image?.length > 0 && files?.image[0]?.originalFilename.length !== 0) {
@@ -387,12 +428,20 @@ exports.processItemForm = async (req) => {
 
     if (file.size > MAX_SIZE) {
       if(id) {
-        type = "error";
-        redirect = `/items/${id}?error=File+too+large+(max+50MB)`;
+        return {
+          type: "error",
+          errCode: 413,
+          message: "FILE TOO LARGE",
+          redirect : `/items/${id}?error=File+too+large+(max+50MB)`,
+        }
       }
       else {
-        type = "error";
-        redirect = `/items?error=File+too+large+(max+50MB)`;
+        return {
+          type : "error",
+          errCode: 413,
+          message: "FILE TOO LARGE",
+          redirect :`/items?error=File+too+large+(max+50MB)`,
+        }
       }
     }
 
@@ -411,12 +460,20 @@ exports.processItemForm = async (req) => {
 
     if (!allowedImageExtensions.has(ext) || !isImage) {
       if(id) {
-        type = "error";
-        redirect = `/items/${id}?error=Only+image+files+are+allowed`;
+        return {
+        type : "error",
+        errCode: 415,
+        message: "INVALID FILE TYPE",
+        redirect : `/items/${id}?error=Only+image+files+are+allowed`,
+        }
       }
       else {
-        type = "error";
-        redirect = `/items?error=Only+image+files+are+allowed`;
+        return {
+        type : "error",
+        errCode: 415,
+        message: "INVALID FILE TYPE",
+        redirect : `/items?error=Only+image+files+are+allowed`,
+        }
       }
     }
     const rawBuffer = fs.readFileSync(file.path);
@@ -428,21 +485,26 @@ exports.processItemForm = async (req) => {
     fileBuffer = webpBuffer;
     mimeType = "image/webp";
     fileName = `${Date.now()}_${file.originalFilename}.webp`;
-    filePath = await db.uploadItem(fileName, fileBuffer, mimeType);
   }
   else {
     if(id) {
       // for editing, no image defaults to original image instead of error or instead of replacing original with empty.
-      type = "warning";
-      redirect = `/items/${id}?warning=Image+file+missing`;
+      return {
+      type : "warning",
+      redirect : `/items/${id}?warning=Image+file+missing`,
+       }
     }
     else {
-      type = "error";
-      redirect = `/items?error=Image+file+required`;
+       return {
+        type: "error",
+        redirect : `/items?error=Image+file+required`,
+        message: "IMAGE REQUIRED",
+        errCode: 400
+        }
     }
   }
 
-  return {filePath, fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect};
+  return {fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect, message, errCode};
 }
 
 

@@ -1,11 +1,12 @@
 "use strict";
 const multiparty = require("multiparty");
 const fs = require("fs");
+const path = require("path");
 const userService = require("../services/userService");
 const itemService = require("../services/itemService");
 const keyService = require("../services/keyService");
 const { generateToken } = require("../middleware/authMiddleware");
-const { getDbProvider } = require("../utils/dbProviderShared");
+const config = require('../config/app.config')
 
 // --- Auth ---
 exports.apiLogin = async (req, res) => {
@@ -123,7 +124,7 @@ exports.updateUserStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // "Active" or "Disabled"
 
-    if (!status) return res.status(400).json({ message: "Status is required" });
+    if (!status) return res.status(400).json({ message: "Status is required (either Active or Disabled)" });
 
     await userService.updateUserStatus(id, status);
     return res
@@ -225,7 +226,6 @@ exports.revokeKey = async (req, res) => {
 // --- File Management...? ---
 exports.getFile = async (req, res) => {
   try {
-    const db = getDbProvider();
 
     const { bucket, id } = req.params;
 
@@ -235,7 +235,7 @@ exports.getFile = async (req, res) => {
       return res.status(400).send("Invalid bucket");
     }
 
-    const result = await db.getFile(bucket, id);
+    const result = await itemService.getDBFile(bucket, id);
 
     if (!result) {
       return res.status(404).send("File not found");
@@ -296,21 +296,7 @@ exports.showItems = async (req, res, next) => {
       return res.status(200).json({
         success,
         message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
-        items,
-        categories,
-        statuses,
-        // user: keyFilteredUser || null,
-        error,
-      });
-    }
-
-    const isBrowser = req.headers.accept?.includes("text/html");
-
-    if (isBrowser) {
-      return res.status(200).json({
-        success,
-        message: "Browser detected. This endpoint is intended for API use (Postman/curl)",
-        items,
+        newItem,
         categories,
         statuses,
         // user: keyFilteredUser || null,
@@ -335,7 +321,6 @@ exports.showItems = async (req, res, next) => {
 exports.createItem = async (req, res, next) => {
   try {
     const {
-      filePath,
       fileBuffer,
       fileName,
       mimeType,
@@ -349,22 +334,30 @@ exports.createItem = async (req, res, next) => {
       status,
       dateAcquired,
       type,
-      apiRedirect,
+      redirect,
+      message,
+      errCode
     } = await itemService.processItemForm(req);
+    let filePath = null;
 
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
-
+    
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
-      return res.redirect(apiRedirect);
+      return res.status(errCode).json({
+        type: type,
+        message: message,
+      });
     }
 
     if (!statuses.map((s) => s.name).includes(status)) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
+    
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
 
     const newItem = {
       name,
@@ -440,7 +433,6 @@ exports.editItem = async (req, res, next) => {
   try {
     const item = await itemService.getDBItemById(id);
     const {
-      filePath,
       fileBuffer,
       fileName,
       mimeType,
@@ -455,7 +447,10 @@ exports.editItem = async (req, res, next) => {
       dateAcquired,
       type,
       redirect,
+      message,
+      errCode
     } = await itemService.processItemForm(req);
+    let filePath = null;
 
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
@@ -495,6 +490,8 @@ exports.editItem = async (req, res, next) => {
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
+
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
 
     const newItem = {
       name: name || item.name,
@@ -629,26 +626,33 @@ exports.showItemHistory = async (req, res, next) => {
 
 exports.apiCheckin = async (req, res) => {
   try {
-    const { itemId, duration } = req.body;
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
+
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+    
+    const itemId = fields.itemId?.[0];
     const userId = req.user.id;
 
-    if (!itemId) {
-      return res.status(400).json({ error: "itemId is required" });
-    }
-
-    await itemService.validateCheckin(itemId);
+    await itemService.validateCheckin(itemId,userId);
 
     let filePath = null;
-    const file = req.files?.document?.[0];
+    let fileName = null;
+    
+    const file = files?.document?.[0];
 
-    if (!file || file.size === 0) {
+    if (!file || file.size === 0 || !file.originalFilename) {
       return res.status(400).json({
         success: false,
         message: "File is required",
       });
     }
 
-    if (req.files?.document) {
+    if (files?.document?.length > 0) {
       const DBlabel = itemService.getDBlabel();
 
       if (DBlabel === "Supabase" && file.size > 50 * 1024 * 1024) {
@@ -656,9 +660,9 @@ exports.apiCheckin = async (req, res) => {
       }
 
       const fileBuffer = fs.readFileSync(file.path);
-      const fileName = `${Date.now()}_${file.originalFilename}`;
+      fileName = `${Date.now()}_${file.originalFilename}`;
 
-      const mimeType = file.mimetype || "application/octet-stream";
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
       const ext = path.extname(file.originalFilename).toLowerCase();
 
       const allowedMimeTypes = new Set([
@@ -670,7 +674,11 @@ exports.apiCheckin = async (req, res) => {
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
 
       if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
-        return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
+        return res.status(400).json({
+          success: false,
+          error: "Invalid file type",
+          message: "Only PDF or Word files are allowed"
+        });
       }
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
@@ -679,13 +687,19 @@ exports.apiCheckin = async (req, res) => {
     const result = await itemService.checkinItem({
       itemId,
       userId,
-      duration,
-      referenceLink: filePath,
+      referenceLink: filePath || fileName,
     });
+    
+    const resWithLink = {
+      ...result,
+      fileURL: result.referenceLink
+        ? `${config.BASE_URL}/api/files/docs/${result.referenceLink}`
+        : null
+    };
 
     return res.status(200).json({
       message: "Item checked in successfully",
-      data: result,
+      data: resWithLink,
     });
   } catch (err) {
     return res.status(400).json({
@@ -696,18 +710,25 @@ exports.apiCheckin = async (req, res) => {
 
 exports.apiCheckout = async (req, res) => {
   try {
-    const { itemId, duration } = req.body;
-    const userId = req.user.id;
+    const { fields, files } = await new Promise((resolve, reject) => {
+      const form = new multiparty.Form();
 
-    if (!itemId) {
-      return res.status(400).json({ error: "itemId is required" });
-    }
+      form.parse(req, (error, fields, files) => {
+        if (error) return reject(error);
+        resolve({ fields, files });
+      });
+    });
+
+    const itemId = fields.itemId?.[0];
+    const duration = fields.duration?.[0];
+    const userId = req.user.id;
 
     await itemService.validateCheckout(itemId);
 
     let filePath = null;
+    let fileName = null;
 
-    const file = req.files?.document?.[0];
+    const file = files?.document?.[0];
 
     if (!file || file.size === 0) {
       return res.status(400).json({
@@ -716,7 +737,7 @@ exports.apiCheckout = async (req, res) => {
       });
     }
 
-    if (req.files?.document) {
+    if (files?.document?.length > 0) {
       const DBlabel = itemService.getDBlabel();
 
       if (DBlabel === "Supabase" && file.size > 50 * 1024 * 1024) {
@@ -724,9 +745,9 @@ exports.apiCheckout = async (req, res) => {
       }
 
       const fileBuffer = fs.readFileSync(file.path);
-      const fileName = `${Date.now()}_${file.originalFilename}`;
+      fileName = `${Date.now()}_${file.originalFilename}`;
 
-      const mimeType = file.mimetype || "application/octet-stream";
+      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
       const ext = path.extname(file.originalFilename).toLowerCase();
 
       const allowedMimeTypes = new Set([
@@ -738,7 +759,11 @@ exports.apiCheckout = async (req, res) => {
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
 
       if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
-        return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
+        return res.status(400).json({
+          success: false,
+          error: "Invalid file type",
+          message: "Only PDF or Word files are allowed"
+        });
       }
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
@@ -748,12 +773,19 @@ exports.apiCheckout = async (req, res) => {
       itemId,
       userId,
       duration,
-      referenceLink: filePath,
+      referenceLink: filePath || fileName,
     });
+
+    const resWithLink = {
+      ...result,
+      fileURL: result.referenceLink
+        ? `${config.BASE_URL}/api/files/docs/${result.referenceLink}`
+        : null
+    };
 
     return res.status(200).json({
       message: "Item checked out successfully",
-      data: result,
+      data: resWithLink,
     });
   } catch (err) {
     return res.status(400).json({

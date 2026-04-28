@@ -228,6 +228,7 @@ DELETE /items/:id                  - Delete item (Admin)
 POST   /transactions/checkin       - Check in item
 POST   /transactions/checkout      - Check out item
 POST   /transactions/adminCheckout - Admin force checkout
+POST   /transactions/adminCheckin - Admin force checkout
 ```
 
 ### Admin - Users
@@ -266,7 +267,15 @@ POST /api/login                    - Authenticate a user and receive a JSON Web 
 ```
 **Body:** { email, password }  
 **Returns:** JWT token  
-**Protection:** rate limiter (429 if exceeded 20 spam requests)
+**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
+
+### Users (Admin Only)
+```
+GET /api/users - Get all users
+```
+**Body:** { }  
+**Returns:** 
+**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
 
 ## 🔐 Security Features
 
@@ -425,6 +434,7 @@ Both database providers implement the same interface (see `databaseProvider.js`)
 - File: `data/SupabaseProvider.js`
 - Uses PostgreSQL backend
 - Includes auth integration
+- Note: Supabase is deprecated and is no longer updated (the design is left here in case anyone wants to build upon it)
 
 ## 📄 License
 

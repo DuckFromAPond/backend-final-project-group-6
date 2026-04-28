@@ -5,17 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require("../data/data");
-const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
 const userService = require("../services/userService");
-const adminService = require("../services/adminService");  
-const { db } = require("../data/models/mongoUserModel");
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
     const currentUserId = req.user.id;
-    const db = getDbProvider();
     let page = req.query.page;
     const pageSize = 10; // items to show per page
 
@@ -217,7 +213,6 @@ exports.showItems = async (req, res, next) => {
 exports.addItem = async (req, res, next) => {
   try {
     const {
-      filePath,
       fileBuffer, 
       fileName, 
       mimeType,
@@ -232,7 +227,10 @@ exports.addItem = async (req, res, next) => {
       dateAcquired,
       type,
       redirect,
+      message,
+      errCode
     } = await itemService.processItemForm(req);
+    let filePath = null;
 
     const statuses = [
       { name: "Available" },
@@ -266,6 +264,8 @@ exports.addItem = async (req, res, next) => {
       return res.redirect(`/items?error=Status+must+be+available+or+maintenance`);
     }
 
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
+
     const newItem = {
       name,
       description,
@@ -279,7 +279,7 @@ exports.addItem = async (req, res, next) => {
       imageName: filePath,
       imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
     };
-
+    
     await itemService.createDBItem(newItem);
 
     return res.redirect("/items?success=Item+added+successfully");
@@ -369,7 +369,6 @@ exports.editItem = async (req, res, next) => {
   try {
     const item = await itemService.getDBItemById(id);
     const {
-      filePath,
       fileBuffer, 
       fileName, 
       mimeType,
@@ -384,7 +383,10 @@ exports.editItem = async (req, res, next) => {
       dateAcquired,
       type,
       redirect,
+      message,
+      errCode
     } = await itemService.processItemForm(req);
+    let filePath = null;
 
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
@@ -408,19 +410,6 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    if (
-      !name ||
-      !description ||
-      !brand ||
-      !model ||
-      !serial
-    ) {
-      return res.json({
-        type: "error",
-        redirect: `/items/${id}?error=Missing+required+fields`,
-      })
-    }
-
     
     if(!statuses.map(s => s.name).includes(status)) {
       return res.json({
@@ -428,6 +417,8 @@ exports.editItem = async (req, res, next) => {
         redirect: `/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
+
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
 
     const newItem = {
       name: name || item.name,
@@ -586,7 +577,6 @@ exports.checkIn = async (req, res, next) => {
     });
 
     const itemId = fields.itemId?.[0];
-    const duration = fields.duration?.[0];
     const userId = req.user.id;
 
     // validate checkout 
@@ -719,166 +709,6 @@ exports.checkOut = async (req, res, next) => {
   } catch (err) {
     return res.redirect(
       `/items?error=${encodeURIComponent(err.message)}`
-    );
-  }
-};
-
-
-// POST CHECKOUT
-exports.adminCheckout = async (req, res, next) => {
-  try {
-    const { fields, files } = await new Promise((resolve, reject) => {
-      const form = new multiparty.Form();
-
-      form.parse(req, (error, fields, files) => {
-        if (error) return reject(error);
-        resolve({ fields, files });
-      });
-    });
-
-    const itemId = fields.itemId?.[0];
-    const duration = fields.duration?.[0];
-    const userEmail = fields.userEmail?.[0];
-    const adminId = req.user.id;
-
-    // validate checkout 
-    await itemService.validateCheckout(itemId);
-    const userId = await adminService.adminValidateForCheckin(userEmail, adminId);
-
-    let filePath = null;
-    let fileName = null;
-
-    const file = files?.document?.[0];
-
-    if (!file || file.size === 0 || !file.originalFilename) {
-      return res.redirect("/items?error=File+is+required");
-    }
-
-    if (files?.document?.length > 0) {
-      
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-      fileName = `${Date.now()}_${file.originalFilename}`;
-
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
-      const ext = path.extname(file.originalFilename).toLowerCase();
-
-      const allowedMimeTypes = new Set([
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      ]);
-
-      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
-
-      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
-        return res.redirect("/items?error=Only+PDF+or+Word+files+allowed");
-      }
-
-      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
-    }
-
-    await itemService.checkoutItem({
-      itemId,
-      userId,
-      duration,
-      referenceLink: filePath || fileName
-    });
-
-    return res.redirect("/items?success=item+checked+out+sucessfully");
-  } catch (err) {
-    return res.redirect(
-      `/items?error=${encodeURIComponent(err.message)}`
-    );
-  }
-};
-
-
-// POST CHECKOUT
-exports.adminCheckin = async (req, res, next) => {
-  try {
-    const { fields, files } = await new Promise((resolve, reject) => {
-      const form = new multiparty.Form();
-
-      form.parse(req, (error, fields, files) => {
-        if (error) return reject(error);
-        resolve({ fields, files });
-      });
-    });
-
-    const itemId = fields.itemId?.[0];
-    const userEmail = fields.userEmail?.[0];
-    const adminId = req.user.id;
-
-    // validate checkout 
-    const userId = await adminService.adminValidateForCheckin(userEmail, adminId);
-    await itemService.validateCheckin(itemId, userId);
-
-    let filePath = null;
-    let fileName = null;
-
-    const file = files?.document?.[0];
-
-    if (!file || file.size === 0 || !file.originalFilename) {
-      return res.redirect("/report?error=File+is+required");
-    }
-
-    if (files?.document?.length > 0) {
-      
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/report?error=File+too+large+(max+50MB)");
-        }
-      }
-
-      const fileBuffer = fs.readFileSync(file.path);
-      fileName = `${Date.now()}_${file.originalFilename}`;
-
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
-      const ext = path.extname(file.originalFilename).toLowerCase();
-
-      const allowedMimeTypes = new Set([
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      ]);
-
-      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
-
-      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
-        return res.redirect("/items?error=Only+PDF+or+Word+files+allowed");
-      }
-
-      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
-    }
-
-    await itemService.checkinItem({
-      itemId,
-      userId,
-      referenceLink: filePath || fileName
-    });
-
-    const redirectUrl = new URLSearchParams();
-
-    if (userId) redirectUrl.set("userId", userId);
-
-    redirectUrl.set("success", "Item checked in successfully");
-
-    return res.redirect(`/report?${redirectUrl.toString()}`);
-  } catch (err) {
-    return res.redirect(
-      `/report?error=${encodeURIComponent(err.message)}`
     );
   }
 };

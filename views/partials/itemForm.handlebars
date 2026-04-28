@@ -105,35 +105,39 @@
                 class="w-full border-gray-500 border p-2 rounded-lg"
             >
             <label for="category">Category:</label>
-            <select
-            name="category"
-            id="category"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-            value="{{this.category}}"
-            >
-                <option value="" disabled selected>Select category...</option>
-                <option value="Computers">Computers</option>
-                <option value="Peripherals">Peripherals</option>
+            <select name="category" id="category" class="w-full border-gray-500 border p-2 rounded-lg">
+                <option value="" disabled>Select category...</option>
+
+                <option value="Computers" {{#if (eq category "Computers")}}selected{{/if}}>
+                    Computers
+                </option>
+
+                <option value="Peripherals" {{#if (eq category "Peripherals")}}selected{{/if}}>
+                    Peripherals
+                </option>
             </select>
             <label for="subCategory">Subcategory:</label>
-            <select
-            name="subCategory"
-            id="subCategory"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-            value="{{this.subcategory}}"
-            >
-                <option value="" disabled selected>Select subcategory...</option>
+            <select name="subCategory" id="subCategory" class="w-full border-gray-500 border p-2 rounded-lg">
+                <option value="" disabled>Select subcategory...</option>
+
+                {{#each categories}}
+                    {{#if (eq ../category this.name)}}
+                        {{#each this.subCategories}}
+                            <option value="{{this.name}}" {{#if (eq ../../subCategory this.name)}}selected{{/if}}>
+                                {{this.name}}
+                            </option>
+                        {{/each}}
+                    {{/if}}
+                {{/each}}
             </select>
             <label for="status">Status:</label>
-            <select
-            name="status"
-            id="status"
-            class="w-full border-gray-500 border p-2 rounded-lg"
-            value="{{this.status}}"
-            >
-                <option value="" disabled selected>Select status...</option>
+            <select name="status" id="status" class="w-full border-gray-500 border p-2 rounded-lg">
+                <option value="" disabled>Select status...</option>
+
                 {{#each statuses}}
-                    <option value="{{this.name}}">{{this.name}}</option>
+                    <option value="{{this.name}}" {{#if (eq ../status this.name)}}selected{{/if}}>
+                        {{this.name}}
+                    </option>
                 {{/each}}
             </select>
             <label for="image">Item image: </label>

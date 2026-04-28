@@ -17,7 +17,7 @@ const { setDbProvider } = require("./utils/dbProviderShared");
 const config = require("./config/app.config");
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require("./routes/public.routes");
-// const adminRoutes = require("./routes/admin.routes");
+const adminRoutes = require("./routes/admin.routes");
 const apiRoutes = require("./routes/api.routes");
 
 const createDatabaseProvider = require("./utils/createDBProvider");
@@ -140,6 +140,7 @@ apiApp.use(apiRoutes);
 app.use("/api", apiApp);
 
 app.use("/", authRoutes);
+app.use("/", adminRoutes);
 app.use("/", publicRoutes);
 
 // Other routes

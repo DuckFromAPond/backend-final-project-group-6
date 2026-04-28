@@ -64,7 +64,7 @@ router.get("/items/:id/history", authOrApiKey, apiController.showItemHistory);
 router.delete("/items/:id", authOrApiKey, apiController.deleteItem);
 router.put("/items/:id", authOrApiKey, apiController.editItem);
 
-router.get("/files/:bucket/:id", apiProtect, apiController.getFile);
+router.get("/files/:bucket/:id", authOrApiKey, apiController.getFile);
 
 // error 404
 router.use(apiController.notFound);

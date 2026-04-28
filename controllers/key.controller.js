@@ -9,6 +9,8 @@ exports.renderKeyManagement = async (req, res) => {
     const activeKeys = await keyService.getActiveKeys();
     const allUsers = await userService.getAllUsers(); // To populate the "Assign to User" dropdown
     const newKey = req.cookies.newRawKey || null;
+    const error = req.query.error  || null;
+    const success = req.query.success  || null;
 
     const userMap = new Map(allUsers.map(u => [u.id?.toString(), u]));
 
@@ -40,10 +42,12 @@ exports.renderKeyManagement = async (req, res) => {
       user: req.user, // Current logged-in admin
       // check if there's a freshly generated key in the session to show once
       newKey: newKey,
+      error,
+      success
     });
   } catch (error) {
     console.error("Error rendering API management:", error);
-    res.status(500).render("error", { message: "Failed to load API keys" });
+    res.status(500).render("extra_pages/500", { message: "Failed to load API keys" });
   }
 };
 
@@ -52,7 +56,7 @@ exports.handleGenerateKey = async (req, res) => {
   try {
     const { name, userId } = req.body;
     if (!name || !userId)
-      return res.status(400).send("Name and User ID required");
+      return res.redirect("/keys?error=Name+&+UserId+required");
 
     const result = await keyService.createKey(name, userId);
 
@@ -63,7 +67,7 @@ exports.handleGenerateKey = async (req, res) => {
 
     res.redirect("/keys");
   } catch (error) {
-    res.status(500).send("Internal Server Error");
+    res.status(500).render("extra_pages/500", { message: "Internal Server Error" });
   }
 };
 
@@ -75,6 +79,6 @@ exports.handleRevokeKey = async (req, res) => {
     res.redirect("/keys");
   } catch (error) {
     console.error("Error revoking key:", error);
-    res.status(500).send("Internal Server Error");
+    res.status(500).render("extra_pages/500", { message: "Internal Server Error" });
   }
 };

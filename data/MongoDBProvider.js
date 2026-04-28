@@ -132,7 +132,7 @@ class MongoProvider extends DatabaseProvider {
     return {
       id: String(category._id),
       name: category.name,
-      parentId: String(category.parentId) || null,
+      parentId: category.parentId ? String(category.parentId) : null
     };
   }
 
@@ -280,8 +280,6 @@ class MongoProvider extends DatabaseProvider {
     const latest = await ItemHistory.findOne({ itemId })
       .sort({ createdAt: -1 })
       .lean();
-
-    console.log(latest);
     return latest?.action === action && latest?.returnedAt === null;
   }
 
@@ -541,7 +539,6 @@ class MongoProvider extends DatabaseProvider {
 
   async getAllCategories() {
     const categories = await Category.find().lean();
-
     return categories.map((c) => this.mapCategory(c));
   }
 

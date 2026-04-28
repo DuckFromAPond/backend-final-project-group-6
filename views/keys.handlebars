@@ -3,7 +3,9 @@
 --}}
 
 <div class="flex flex-col items-center px-8 py-6 space-y-6">
-  
+  <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+        {{> toast}}
+    </div>
   <div class="w-full max-w-5xl bg-white rounded-2xl shadow-lg p-8">
     
     <h1 class="text-2xl font-bold mb-2 text-center text-gray-800">API Key Management</h1>
@@ -72,6 +74,7 @@
       <table class="min-w-full border border-gray-100 rounded-lg">
         <thead class="bg-gray-800 text-white">
           <tr>
+            <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Key ID</th>
             <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Key Name</th>
             <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Owner ID</th>
             <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">Owner Email</th>
@@ -82,6 +85,7 @@
         <tbody class="divide-y divide-gray-100">
           {{#each keys}}
             <tr class="hover:bg-blue-50/50 transition-colors">
+            <td class="px-6 py-4 font-mono text-xs text-gray-400">{{this.id}}</td>
               <td class="px-6 py-4 font-semibold text-gray-700">{{this.name}}</td>
               <td class="px-6 py-4 font-mono text-xs text-gray-400">{{this.userId}}</td>
               <td class="px-6 py-4 text-sm text-gray-500">{{this.email}}</td>
