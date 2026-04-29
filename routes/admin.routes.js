@@ -5,7 +5,6 @@ const { requireRole } = require("../middleware/roleCheck");
 const adminController = require("../controllers/admin.controller");
 const keyController = require("../controllers/key.controller");
 
-
 // user
 router.get("/users", protect, requireRole("Admin"), adminController.listUsers); // <------------ kinda weird... i think it's easier to just require "Admin role" instead of moving to Admin
 router.post(
@@ -20,6 +19,13 @@ router.post(
   requireRole("Admin"),
   adminController.toggleStatus,
 ); // disable/enable user
+
+router.post(
+  "/users/create",
+  protect,
+  requireRole("Admin"),
+  adminController.adminCreateUser,
+); // for admin to create users
 
 // == keys-management ==
 router.get(
@@ -43,7 +49,17 @@ router.post(
   keyController.handleRevokeKey,
 );
 
-router.post("/transactions/adminCheckout", protect, requireRole("Admin"), adminController.adminCheckout);
-router.post("/transactions/adminCheckin", protect, requireRole("Admin"), adminController.adminCheckin);
+router.post(
+  "/transactions/adminCheckout",
+  protect,
+  requireRole("Admin"),
+  adminController.adminCheckout,
+);
+router.post(
+  "/transactions/adminCheckin",
+  protect,
+  requireRole("Admin"),
+  adminController.adminCheckin,
+);
 
 module.exports = router;

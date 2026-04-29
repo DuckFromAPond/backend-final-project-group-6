@@ -5,12 +5,28 @@ const multiparty = require("multiparty");
 const fs = require("fs");
 const path = require("path");
 
+exports.adminCreateUser = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+    // Use your existing service (Reuse is good!)
+    await userService.registerNewUser(name, email, password, role);
+    return res.redirect("/users?success=User created successfully");
+  } catch (error) {
+    // If it fails, redirect back to the list with the error message
+    return res.redirect(`/users?error=${encodeURIComponent(error.message)}`);
+  }
+};
 
 exports.listUsers = async (req, res) => {
   const users = await userService.getAllUsers();
-  const error = req.query.error  || null;
-  const success = req.query.success  || null;
-  res.render("users", { users, pageTitle: "Users", error: error || null, success: success || null, });    // changed from Manage Users -> Users for consistency
+  const error = req.query.error || null;
+  const success = req.query.success || null;
+  res.render("users", {
+    users,
+    pageTitle: "Users",
+    error: error || null,
+    success: success || null,
+  }); // changed from Manage Users -> Users for consistency
 };
 
 exports.toggleStatus = async (req, res) => {
@@ -21,7 +37,7 @@ exports.toggleStatus = async (req, res) => {
     const ownedItems = await itemService.getUserOwnedItems(id);
 
     await userService.updateUserStatus(id, status, ownedItems);
-    
+
     res.redirect("/users?success=User+status+updated"); // Refresh the page to see changes
   } catch (err) {
     console.error(err);
@@ -35,7 +51,6 @@ exports.changeRole = async (req, res) => {
   await userService.updateUserRole(id, role);
   res.redirect("/users?success=User+role+updated");
 };
-
 
 // POST CHECKOUT
 exports.adminCheckout = async (req, res, next) => {
@@ -54,9 +69,12 @@ exports.adminCheckout = async (req, res, next) => {
     const userEmail = fields.userEmail?.[0];
     const adminId = req.user.id;
 
-    // validate checkout 
+    // validate checkout
     await itemService.validateCheckout(itemId);
-    const userId = await adminService.adminValidateForCheckin(userEmail, adminId);
+    const userId = await adminService.adminValidateForCheckin(
+      userEmail,
+      adminId,
+    );
 
     let filePath = null;
     let fileName = null;
@@ -68,8 +86,7 @@ exports.adminCheckout = async (req, res, next) => {
     }
 
     if (files?.document?.length > 0) {
-      
-      const DBlabel = itemService.getDBlabel(); 
+      const DBlabel = itemService.getDBlabel();
 
       if (DBlabel === "Supabase") {
         const MAX_SIZE = 50 * 1024 * 1024;
@@ -81,13 +98,14 @@ exports.adminCheckout = async (req, res, next) => {
       const fileBuffer = fs.readFileSync(file.path);
       fileName = `${Date.now()}_${file.originalFilename}`;
 
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+      const mimeType =
+        file.headers?.["content-type"] || "application/octet-stream";
       const ext = path.extname(file.originalFilename).toLowerCase();
 
       const allowedMimeTypes = new Set([
         "application/pdf",
         "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ]);
 
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
@@ -103,17 +121,14 @@ exports.adminCheckout = async (req, res, next) => {
       itemId,
       userId,
       duration,
-      referenceLink: filePath || fileName
+      referenceLink: filePath || fileName,
     });
 
     return res.redirect("/items?success=item+checked+out+sucessfully");
   } catch (err) {
-    return res.redirect(
-      `/items?error=${encodeURIComponent(err.message)}`
-    );
+    return res.redirect(`/items?error=${encodeURIComponent(err.message)}`);
   }
 };
-
 
 // POST CHECKOUT
 exports.adminCheckin = async (req, res, next) => {
@@ -131,8 +146,11 @@ exports.adminCheckin = async (req, res, next) => {
     const userEmail = fields.userEmail?.[0];
     const adminId = req.user.id;
 
-    // validate checkout 
-    const userId = await adminService.adminValidateForCheckin(userEmail, adminId);
+    // validate checkout
+    const userId = await adminService.adminValidateForCheckin(
+      userEmail,
+      adminId,
+    );
     await itemService.validateCheckin(itemId, userId);
 
     let filePath = null;
@@ -145,8 +163,7 @@ exports.adminCheckin = async (req, res, next) => {
     }
 
     if (files?.document?.length > 0) {
-      
-      const DBlabel = itemService.getDBlabel(); 
+      const DBlabel = itemService.getDBlabel();
 
       if (DBlabel === "Supabase") {
         const MAX_SIZE = 50 * 1024 * 1024;
@@ -158,13 +175,14 @@ exports.adminCheckin = async (req, res, next) => {
       const fileBuffer = fs.readFileSync(file.path);
       fileName = `${Date.now()}_${file.originalFilename}`;
 
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+      const mimeType =
+        file.headers?.["content-type"] || "application/octet-stream";
       const ext = path.extname(file.originalFilename).toLowerCase();
 
       const allowedMimeTypes = new Set([
         "application/pdf",
         "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ]);
 
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
@@ -179,7 +197,7 @@ exports.adminCheckin = async (req, res, next) => {
     await itemService.checkinItem({
       itemId,
       userId,
-      referenceLink: filePath || fileName
+      referenceLink: filePath || fileName,
     });
 
     const redirectUrl = new URLSearchParams();
@@ -190,8 +208,6 @@ exports.adminCheckin = async (req, res, next) => {
 
     return res.redirect(`/report?${redirectUrl.toString()}`);
   } catch (err) {
-    return res.redirect(
-      `/report?error=${encodeURIComponent(err.message)}`
-    );
+    return res.redirect(`/report?error=${encodeURIComponent(err.message)}`);
   }
 };
