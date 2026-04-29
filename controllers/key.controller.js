@@ -9,6 +9,28 @@ exports.renderKeyManagement = async (req, res) => {
     const activeKeys = await keyService.getActiveKeys();
     const allUsers = await userService.getAllUsers(); // To populate the "Assign to User" dropdown
     const newKey = req.cookies.newRawKey || null;
+    const error = req.query.error  || null;
+    const success = req.query.success  || null;
+
+    const onlyValidUser = allUsers.filter(user => user.status !== "Disabled");
+
+    const userMap = new Map(onlyValidUser.map(u => [u.id?.toString(), u]));
+
+    const formattedKeys = activeKeys.map(key => {
+      const d = new Date(key.createdAt);
+
+      const pad = (n) => String(n).padStart(2, "0");
+
+      const formatted =
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+        `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+      return {
+        ...key,
+        email: userMap.get(key.userId?.toString())?.email || "Unknown",
+        createdAt: formatted
+      };
+    });
 
     // clear the key from cookie after one render so it disappears on refresh
     if (newKey) {
@@ -16,16 +38,18 @@ exports.renderKeyManagement = async (req, res) => {
     }
 
     res.render("keys", {
-      title: "API Key Management",
-      keys: activeKeys,
-      users: allUsers,
+      pageTitle: "API Keys", // changed from Manage API Key Management -> API Keys for consistency 
+      keys: formattedKeys,
+      users: onlyValidUser,
       user: req.user, // Current logged-in admin
       // check if there's a freshly generated key in the session to show once
       newKey: newKey,
+      error,
+      success
     });
   } catch (error) {
     console.error("Error rendering API management:", error);
-    res.status(500).render("error", { message: "Failed to load API keys" });
+    res.status(500).render("extra_pages/500", { message: "Failed to load API keys" });
   }
 };
 
@@ -34,9 +58,9 @@ exports.handleGenerateKey = async (req, res) => {
   try {
     const { name, userId } = req.body;
     if (!name || !userId)
-      return res.status(400).send("Name and User ID required");
+      return res.redirect("/keys?error=Name+and+UserId+required");
 
-    const result = await keyService.generateNewKey(name, userId);
+    const result = await keyService.createKey(name, userId);
 
     res.cookie("newRawKey", result.rawKey, {
       maxAge: 10000, // 10s; may need to change if too short
@@ -45,7 +69,7 @@ exports.handleGenerateKey = async (req, res) => {
 
     res.redirect("/keys");
   } catch (error) {
-    res.status(500).send("Internal Server Error");
+    res.status(500).render("extra_pages/500", { message: "Internal Server Error" });
   }
 };
 
@@ -53,10 +77,12 @@ exports.handleGenerateKey = async (req, res) => {
 exports.handleRevokeKey = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id)
+      return res.redirect("/keys?error=Id+required");
     await keyService.revokeKey(id);
     res.redirect("/keys");
   } catch (error) {
     console.error("Error revoking key:", error);
-    res.status(500).send("Internal Server Error");
+    res.status(500).render("extra_pages/500", { message: "Internal Server Error" });
   }
 };

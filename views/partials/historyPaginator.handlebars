@@ -1,0 +1,47 @@
+<div id="paginate"
+  class="w-full flex justify-center items-center"
+>
+
+  <div class="flex items-center gap-1 bg-white shadow-sm rounded-xl px-2 py-2 pb-6">
+
+    {{#if prevPage}}
+      <a href="/{{pageLink}}?page={{prevPage}}{{#if baseQuery}}&{{baseQuery}}{{/if}}"
+         class="px-3 py-1.5 text-sm rounded-lg text-gray-600 hover:bg-gray-100 transition">
+        ← Prev
+      </a>
+    {{else}}
+      <span class="px-3 py-1.5 text-sm text-gray-300 cursor-not-allowed">
+        ← Prev
+      </span>
+    {{/if}}
+
+    <div class="w-px h-5 bg-gray-200 mx-1"></div>
+
+    {{#each totalPages}}
+      <a href="/{{../pageLink}}?page={{this}}{{#if ../baseQuery}}&{{../baseQuery}}{{/if}}"
+         class="min-w-[34px] text-center px-3 py-1.5 text-sm rounded-lg transition
+         {{#if (eq this ../currentPage)}}
+            bg-blue-500 text-white shadow-sm
+         {{else}}
+            text-gray-700 hover:bg-gray-100
+         {{/if}}">
+        {{this}}
+      </a>
+    {{/each}}
+
+    <div class="w-px h-5 bg-gray-200 mx-1"></div>
+
+    {{#if nextPage}}
+      <a href="/{{pageLink}}?page={{nextPage}}{{#if baseQuery}}&{{baseQuery}}{{/if}}"
+         class="px-3 py-1.5 text-sm rounded-lg text-gray-600 hover:bg-gray-100 transition">
+        Next →
+      </a>
+    {{else}}
+      <span class="px-3 py-1.5 text-sm text-gray-300 cursor-not-allowed">
+        Next →
+      </span>
+    {{/if}}
+
+  </div>
+
+</div>

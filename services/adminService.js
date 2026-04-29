@@ -1,18 +1,29 @@
 const { getDbProvider } = require("../utils/dbProviderShared");
 
 
-exports.adminCheckout = async (itemId, targetUserId, adminId, options = {}) => {
+exports.adminValidateForCheck = async (userEmail,adminId) =>{
   const db = getDbProvider();
+  const user = await db.findUserByEmail(userEmail);
 
   const admin = await db.getUserById(adminId);
+
   if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
+    const err = new Error("Unauthorized");
+    err.statusCode = 403;
+    throw err;
   }
 
-  return checkoutItem({
-    itemId,
-    userId: targetUserId,
-    duration: options.duration,
-    referenceLink: options.referenceLink
-  });
-};
+  if (!user) {
+    const err = new Error("User not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (user.status === "Disabled") {
+    const err = new Error("User is disabled");
+    err.statusCode = 403;
+    throw err;
+  }
+  
+  return user.id;
+}

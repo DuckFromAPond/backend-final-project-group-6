@@ -1,15 +1,17 @@
 {{!-- REPORT PAGE --}}
 {{!-- might be diff for admin and user but for now this is user focus or just use if to alternate --}}
-<div class="p-6">
-
+<div class="px-8 py-6">
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+        {{> toast}}
+    </div>
     {{!-- Header might not be needed  --}}
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-800">Report page</h1>
-        <p class="text-gray-500">Detailed overview</p>
+        <p class="text-gray-500 mt-1">Detailed overview</p>
     </div>
 
     {{!-- Summary Cards --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         
         {{!-- Total Assets --}}
         <div class="bg-white p-6 rounded-2xl shadow hover:shadow-lg transition">
@@ -37,44 +39,46 @@
         {{!-- Asset age --}}
         <div class="bg-white p-6 rounded-2xl shadow col-span-2">
             <h2 class="text-lg font-semibold mb-4">Asset Aging (3+ Years)</h2>
-            <table class="w-full text-left border border-gray-400">
+            {{#if oldAssets.length}}
+            <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <table class="w-full text-left border border-gray-200">
 
             {{!-- table header --}}
-            <thead class="bg-gray-500/50 text-black text-xs uppercase tracking-wider border-b border-gray-400">
+            <thead class="bg-gray-800 text-white uppercase tracking-wider">
                 <tr>
-                    <th class="p-4 border-r border-gray-400">ID</th>
-                    <th class="p-4 border-r border-gray-400">Name</th>
-                    <th class="p-4 border-r border-gray-400">Serial number</th>
-                    <th class="p-4 border-r border-gray-400">Category</th>
-                    <th class="p-4 border-r border-gray-400">Sub Category</th>
-                    <th class="p-4 border-r border-gray-400">Status</th>
-                    <th class="p-4">Date Acquired</th>
+                    <th class="px-4 py-2">ITEM ID</th>
+                    <th class="px-4 py-2">NAME</th>
+                    <th class="px-4 py-2">SERIAL NUMBER</th>
+                    <th class="px-4 py-2">CATEGORY</th>
+                    <th class="px-4 py-2">SUB CATEGORY</th>
+                    <th class="px-4 py-2">STATUS</th>
+                    <th class="px-4 py-2">DATE ACQUIRED</th>
                 </tr>
             </thead>
 
             <tbody>
                 {{#each oldAssets}}
-                    <tr class="border-t border-gray-400 hover:bg-gray-100 transition">
+                    <tr class="border-b hover:bg-gray-50 transition">
 
                         {{!-- ID --}}
-                        <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">
+                        <td class="px-4 py-2 font-mono text-xs font-semibold">
                             {{this.id}}
                         </td>
 
                         {{!-- NAME --}}
-                        <td class="p-4 border-r border-gray-400">
+                        <td class="px-4 py-2">
                             <a href="/items/{{this.id}}" class="font-medium text-blue-600 hover:underline">
                                 {{this.name}}
                             </a>
                         </td>
 
                         {{!-- Serial --}}
-                        <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-700">
                             {{this.serial}}
                         </td>
 
                         {{!-- Category --}}
-                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-800">
                             {{#if this.category}}
                                 {{this.category}}
                             {{else}}
@@ -84,7 +88,7 @@
 
 
                         <!-- Sub -->
-                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-800">
                             {{#if this.subCategory}}
                                 {{this.subCategory}}
                             {{else}}
@@ -93,24 +97,24 @@
                         </td>
 
                         <!-- Status -->
-                        <td class="p-4 border-r border-gray-400">
+                        <td class="px-4 py-2">
                             {{#if (eq this.status "In-Use")}}
                                 <span class="px-3 py-1 text-sm font-semibold rounded-full bg-purple-100 text-purple-800">
-                                    Overdue
+                                    In-Use
                                 </span>
                             {{else if (eq this.status "Available")}}
                                 <span class="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-100 text-emerald-800">
                                     Active
                                 </span>
                             {{else}}
-                                <span class="px-3 py-1 text-sm rounded-full bg-orange-100 text-orange-800 ">
+                                <span class="px-3 py-1 text-sm rounded-full bg-orange-100 text-orange-800">
                                     Maintenance
                                 </span>
                             {{/if}}
                         </td>
 
                         {{!--Date --}}
-                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-800">
                             {{#if this.formatted}}
                                 {{this.formatted}}
                             {{else}}
@@ -123,6 +127,10 @@
                 {{/each}}
             </tbody>
             </table>
+            </div>
+            {{else}}
+                <p class="text-gray-500">No user audit data found.</p>
+            {{/if}}
         </div>
         {{!-- Recent Charts / Logs --}}
         <div class="bg-white p-6 rounded-2xl shadow col-span-2">
@@ -130,8 +138,15 @@
             <form method="GET" action="/report" class="relative w-full pb-4">
 
                 <button type="button" id="dropdownBtn"
-                    class="w-full border border-gray-300 p-2 rounded-lg text-left bg-white">
-                    Select user
+                    class="w-full border border-gray-300 p-2 rounded-lg bg-white flex items-center justify-between">
+                    <span class="truncate">
+                    {{#if selectedUserName}}
+                        {{selectedUserName}}
+                    {{else}}
+                        Select user
+                    {{/if}}
+                    </span>
+                    <span class="pr-2">▼</span>
                 </button>
 
                 <div id="dropdownList"
@@ -153,41 +168,42 @@
             </form>
 
             {{#if userAudit.length}}
-                <div class="w-full overflow-x-auto bg-white">
-                <table class="w-full text-left border border-gray-400">
+                <div class="w-full overflow-x-auto bg-white max-h-[500px] overflow-y-auto">
+                <table class="w-full text-left border border-gray-200">
 
                 {{!-- table header --}}
-                <thead class="bg-gray-500/50 text-black text-xs uppercase tracking-wider border-b border-gray-400">
+                <thead class="bg-blue-500 text-white tracking-wider">
                     <tr>
-                        <th class="p-4 border-r border-gray-400">ID</th>
-                        <th class="p-4 border-r border-gray-400">Item</th>
-                        <th class="p-4 border-r border-gray-400">Date Received</th>
-                        <th class="p-4 border-r border-gray-400">Borrow duration</th>
-                        <th class="p-4 border-r border-gray-400">Return Date</th>
-                        <th class="p-4 border-r border-gray-400">Status</th>
-                        <th class="p-4">Action</th>
+                        <th class="px-4 py-2">ITEM ID</th>
+                        <th class="px-4 py-2">ITEM</th>
+                        <th class="px-4 py-2">DATE RECEIVED</th>
+                        <th class="px-4 py-2">BORROW DURATION</th>
+                        <th class="px-4 py-2">GIVEN DURATION</th>
+                        <th class="px-4 py-2">RETURN DATE</th>
+                        <th class="px-4 py-2">STATUS</th>
+                        <th class="px-4 py-2">ACTION</th>
                     </tr>
                 </thead>
 
                 <tbody>
                 {{#each userAudit}}
 
-                    <tr class="border-t border-gray-400 hover:bg-gray-100 transition">
+                    <tr class="border-b hover:bg-gray-50 transition">
 
                         {{!-- ID --}}
-                        <td class="p-4 font-semibold text-gray-700 border-r border-gray-400">
+                        <td class="px-4 py-2 font-mono text-xs font-semibold">
                             {{this.id}}
                         </td>
 
                         {{!-- NAME --}}
-                        <td class="p-4 border-r border-gray-400">
+                        <td class="px-4 py-2">
                             <a href="/items/{{this.id}}" class="font-medium text-blue-600 hover:underline">
                                 {{this.name}}
                             </a>
                         </td>
 
                         {{!-- RECEIVED --}}
-                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-800">
                             {{#if this.createdAt}}
                                 {{this.createdAt}}
                             {{else}}
@@ -196,7 +212,7 @@
                         </td>
 
                         {{!-- DURATION --}}
-                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-800">
                             {{#if this.duration}}
                                 {{this.duration}}
                             {{else}}
@@ -204,9 +220,16 @@
                             {{/if}}
                         </td>
 
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.givenDuration}}
+                                {{this.givenDuration}}
+                            {{else}}
+                                <span class="text-gray-400">Not set</span>
+                            {{/if}}
+                        </td>
 
                         <!-- DUE -->
-                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                        <td class="px-4 py-2 text-gray-800">
                             {{#if this.dueDate}}
                                 {{this.dueDate}}
                             {{else}}
@@ -215,7 +238,7 @@
                         </td>
 
                         <!-- Status -->
-                        <td class="p-4 border-r border-gray-400">
+                        <td class="px-4 py-2">
                             {{#if (eq this.status "overdue")}}
                                 <span class="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800">
                                     Overdue
@@ -232,11 +255,20 @@
                         </td>
 
                         {{!--Action --}}
-                        <td class="p-4">
+                        <td class="px-4 py-2">
+                            {{#if (eq ../user.role "Admin")}}
+                            <button
+                                type="button"
+                                onclick="openadminForm('{{this.id}}', '{{../selectedUserEmail}}')"
+                                class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm"
+                            >
+                                Assited Check-In
+                            </button>
+                            {{/if}}
                             <a
                                 href="/api/files/docs/{{this.referenceUrl}}"
                                 target="_blank"
-                                class="bg-blue-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
+                                class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
                                 >
                                 View doc ↗
                             </a>
@@ -256,6 +288,16 @@
     </div>
 
 </div>
+
+
+<div id="adminmodal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeadminForm()">
+    {{!-- make closeform only work for background --}}
+    <div class="w-full max-w-lg" onclick="event.stopPropagation()">     
+        {{> adminForm title="Check-in" action="adminCheckin"}}
+    </div>
+</div>
+
+
 <script>
     const btn = document.getElementById("dropdownBtn");
     const list = document.getElementById("dropdownList");
@@ -282,4 +324,16 @@
         list.classList.add("hidden");
     }
     });
+
+    function openadminForm(id,email) {
+        document.getElementById("adminmodal").classList.remove("hidden");
+
+        document.getElementById("file_item_admin").value = id;
+
+        document.getElementById("userEmail").value = email;
+    }
+
+    function closeadminForm() {
+        document.getElementById("adminmodal").classList.add("hidden");
+    }
 </script>

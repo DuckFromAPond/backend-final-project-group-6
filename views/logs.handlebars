@@ -1,0 +1,168 @@
+<div class="flex flex-col items-center px-8 py-6 gap-10">
+    {{!-- GLOBAL LOG SECTION --}}
+    <div class="w-full">
+        <div class="mb-4">
+            <h1 class="text-3xl font-bold text-gray-800">System Log</h1>
+            <p class="text-gray-500 mt-1">All item activity across users</p>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow mb-4">
+        <form method="GET" action="/logs" class="relative w-full">
+
+                <button type="button" id="dropdownBtnLogs"
+                    class="w-full border border-gray-300 p-2 rounded-lg bg-white flex items-center justify-between">
+                    <span class="truncate">
+                    {{#if selectedUserName}}
+                        {{selectedUserName}}
+                    {{else}}
+                        All Users
+                    {{/if}}
+                    </span>
+                    <span class="pr-2">▼</span>
+                </button>
+
+                <div id="dropdownListLogs"
+                    class="hidden absolute z-20 w-full max-h-60 overflow-y-auto bg-white border rounded-lg shadow">
+
+                    <!-- ALL USERS OPTION -->
+                    <div
+                        class="p-2 hover:bg-gray-100 cursor-pointer font-semibold"
+                        onclick="selectUser('', 'All Users')"
+                    >
+                        All Users
+                    </div>
+
+                    <hr class="my-1">
+
+                    <!-- INDIVIDUAL USERS -->
+                    {{#each users}}
+                    <div
+                        class="p-2 hover:bg-gray-100 cursor-pointer"
+                        onclick="selectUser('{{this.id}}', '{{this.name}} ({{this.email}})')"
+                    >
+                        {{this.name}} ({{this.email}})
+                    </div>
+                    {{/each}}
+
+                </div>
+
+                <input type="hidden" name="userId" id="userIdInputLogs">
+
+            </form>
+        </div>
+        <div class="shadow-lg bg-white rounded-2xl p-6">
+            <div class="overflow-x-auto">
+            <table class="w-full border border-gray-200 text-left">
+
+                <thead class="bg-blue-500 text-white">
+                    <tr>
+                        <th class="px-4 py-2">DATE</th>
+                        {{!-- <th class="p-4">Log ID</th> --}}
+                        <th class="px-4 py-2">Item</th>
+                        <th class="px-4 py-2">SERIAL NUMBER</th>
+                        <th class="px-4 py-2">USER</th>
+                        <th class="px-4 py-2">EMAIL</th>
+                        <th class="px-4 py-2">ACTION</th>
+                        <th class="px-4 py-2">DURATION</th>
+                        <th class="px-4 py-2">STATUS</th>
+                        <th class="px-4 py-2">REFERENCE</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {{#if allHistories.length}}
+                        {{#each allHistories}}
+                        <tr class="border-b hover:bg-gray-50 transition">
+                            
+
+                            <td class="px-4 py-2 text-gray-700 font-semibold">
+                                {{this.date}}
+                            </td>
+
+                            {{!-- <td class="px-4 py-2 font-mono text-xs">#{{this.id}}</td> --}}
+
+                            <td class="px-4 py-2 ">
+                                <a href="/items/{{this.itemId}}" class="text-blue-600 hover:underline">
+                                    {{this.item}}
+                                </a>
+                            </td>
+
+                            <td class="px-4 py-2 text-gray-700">
+                                {{this.serial}}
+                            </td>
+
+                            <td class="px-4 py-2 text-gray-700">
+                                {{this.user}}
+                            </td>
+
+                            <td class="p-4 text-gray-700">
+                                {{this.email}}
+                            </td>
+
+                            <td class="px-4 py-2">
+                                {{#if (eq this.action "checkout")}}
+                                    <span class="text-red-600 font-medium">Checked Out</span>
+                                {{else if (eq this.action "checkin")}}
+                                    <span class="text-blue-600 font-medium">Checked In</span>
+                                {{/if}}
+                            </td>
+
+                            <td class="px-4 py-2">
+                                {{this.duration}}
+                            </td>
+
+                            <td class="px-4 py-2">
+                                {{#if (eq this.status "overdue")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800">
+                                        Overdue
+                                    </span>
+                                {{else if (eq this.status "active")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                        Active
+                                    </span>
+                                {{else if (eq this.status "old")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Returned
+                                    </span>
+                                {{else if (eq this.status "returned")}}
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Returned
+                                    </span>
+                                {{else}}
+                                    <span class="px-3 py-1 text-sm font-semibold  rounded-full bg-gray-100 text-gray-800">
+                                        Unknown
+                                    </span>
+                                {{/if}}
+                            </td>
+
+                            <td class="px-4 py-2">
+                                <a
+                                    href="/api/files/docs/{{this.referenceLink}}"
+                                    target="_blank"
+                                    class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
+                                    >
+                                    View doc ↗
+                                </a>
+                            </td>
+
+                        </tr>
+                        {{/each}}
+                    {{else}}
+                        <tr>
+                            <td colspan="7" class="px-4 py-2 text-center text-gray-400">
+                                No logs available
+                            </td>
+                        </tr>
+                    {{/if}}
+                </tbody>
+
+            </table>
+            </div>
+            {{#if allHistories.length}} 
+                {{>historyPaginator}}
+            {{/if}}
+        </div>
+    </div>
+</div>
+
+
+<script src="/js/logs.js"></script>

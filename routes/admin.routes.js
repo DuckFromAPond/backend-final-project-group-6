@@ -3,33 +3,63 @@ const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 const { requireRole } = require("../middleware/roleCheck");
 const adminController = require("../controllers/admin.controller");
-
-router.use(protect);
-router.use(requireRole("Admin"));
-
-// dashboard
-// router.get('/', protect, requireRole("Admin"), adminController.home);
-// router.get('/dashboard', protect, requireRole("Admin"), adminController.home);
+const keyController = require("../controllers/key.controller");
 
 // user
-router.get("/users", adminController.listUsers);
-router.post("/users/:id/role", adminController.changeRole); // <-- or post here if want since it don't matter
-router.post("/users/:id/status", adminController.toggleStatus); // disable/enable user
+router.get("/users", protect, requireRole("Admin"), adminController.listUsers); // <------------ kinda weird... i think it's easier to just require "Admin role" instead of moving to Admin
+router.post(
+  "/users/:id/role",
+  protect,
+  requireRole("Admin"),
+  adminController.changeRole,
+); // <-- or post here if want since it don't matter
+router.post(
+  "/users/:id/status",
+  protect,
+  requireRole("Admin"),
+  adminController.toggleStatus,
+); // disable/enable user
 
-// items
-// router.get('/items', protect, requireRole("Admin"), adminController.createItem);                               // preferably should show all items including who owns it
-// router.delete('/items/:id', protect, requireRole("Admin"), adminController.archiveItem);             // don't hard delete items
-// router.post('/update', protect, requireRole("Admin"), adminController.updateOwnership);            // use provider method to get item
+router.post(
+  "/users/create",
+  protect,
+  requireRole("Admin"),
+  adminController.adminCreateUser,
+); // for admin to create users
 
-// logs
-// router.get('/hisory', protect, requireRole("Admin"), adminController.createItem);                         // use provider method to get history
+// == keys-management ==
+router.get(
+  "/keys",
+  protect,
+  requireRole("Admin"),
+  keyController.renderKeyManagement,
+);
 
-// API
-// router.get('/keys', protect, requireRole("Admin"), adminController.getKeys)
-// router.post('/keys', protect, requireRole("Admin"), adminController.generateKeys)
-// router.delete('/keys/:id', protect, requireRole("Admin"), adminController.deleteKey);
+// Actions
+router.post(
+  "/keys/generate",
+  protect,
+  requireRole("Admin"),
+  keyController.handleGenerateKey,
+);
+router.post(
+  "/keys/revoke/:id",
+  protect,
+  requireRole("Admin"),
+  keyController.handleRevokeKey,
+);
 
-// error 404
-// router.use(adminController.notFound);
+router.post(
+  "/transactions/adminCheckout",
+  protect,
+  requireRole("Admin"),
+  adminController.adminCheckout,
+);
+router.post(
+  "/transactions/adminCheckin",
+  protect,
+  requireRole("Admin"),
+  adminController.adminCheckin,
+);
 
 module.exports = router;

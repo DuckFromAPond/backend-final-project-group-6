@@ -8,6 +8,7 @@ const {
   mapItemRowToModel,
   mapItemHistoryRowToModel,
   mapApiKeyRowToModel,
+  mapCategoryRowToModel
 } = require("./models/supabaseModels");
 
 class SupabaseProvider extends DatabaseProvider {
@@ -124,6 +125,14 @@ class SupabaseProvider extends DatabaseProvider {
       .from(SUPABASE_TABLES.API_KEYS)
       .select("id")
       .limit(1);
+    if (apiError) throw new Error("API keys table missing");
+
+      const { error: categoryError } = await this.supabase
+      .from(SUPABASE_TABLES.CATEGORY)
+      .select("id")
+      .limit(1);
+
+    if (categoryError) throw new Error("Category table missing");
   }
   
 	async getFile(bucket, id) {
@@ -443,60 +452,60 @@ class SupabaseProvider extends DatabaseProvider {
     return mapItemHistoryRowToModel(inserted);
   }
 
-  async getUserHistory(userId) {
-    const normalizedUserId = this.toSupabaseId(userId);
+  // async getUserHistory(userId) {
+  //   const normalizedUserId = this.toSupabaseId(userId);
 
-    const { data, error } = await this.supabase
-      .from(SUPABASE_TABLES.ITEMS)
-      .select(`
-			id,
-			name,
-			serial,
-			model,
-			brand,
-			category,
-			subCategory,
-			status,
-			description,
-			dateAcquired,
-			imageAlt,
-			imageName,
-			item_histories (
-				id,
-				userId,
-				itemId,
-				action,
-				duration,
-				createdAt,
-				referenceLink
-			)
-			`)
-      .eq("currentOwner", normalizedUserId)
-      .order("createdAt", {
-        foreignTable: "item_histories",
-        ascending: false,
-      });
+  //   const { data, error } = await this.supabase
+  //     .from(SUPABASE_TABLES.ITEMS)
+  //     .select(`
+	// 		id,
+	// 		name,
+	// 		serial,
+	// 		model,
+	// 		brand,
+	// 		category,
+	// 		subCategory,
+	// 		status,
+	// 		description,
+	// 		dateAcquired,
+	// 		imageAlt,
+	// 		imageName,
+	// 		item_histories (
+	// 			id,
+	// 			userId,
+	// 			itemId,
+	// 			action,
+	// 			duration,
+	// 			createdAt,
+	// 			referenceLink
+	// 		)
+	// 		`)
+  //     .eq("currentOwner", normalizedUserId)
+  //     .order("createdAt", {
+  //       foreignTable: "item_histories",
+  //       ascending: false,
+  //     });
 
-    if (error) throw error;
+  //   if (error) throw error;
 
-    return data.map(item => {
-      // item_histories is already sorted desc (latest first)
-      const latestHistory = item.item_histories?.[0] || null;
+  //   return data.map(item => {
+  //     // item_histories is already sorted desc (latest first)
+  //     const latestHistory = item.item_histories?.[0] || null;
 
-      return {
-        id: item.id,
+  //     return {
+  //       id: item.id,
 
-        item: {
-          ...mapItemRowToModel(item),
-          imageUrl: this.getImageUrl(item.imageName),
-        },
+  //       item: {
+  //         ...mapItemRowToModel(item),
+  //         imageUrl: this.getImageUrl(item.imageName),
+  //       },
 
-        lastHistory: latestHistory
-          ? mapItemHistoryRowToModel(latestHistory)
-          : null,
-      };
-    });
-  }
+  //       lastHistory: latestHistory
+  //         ? mapItemHistoryRowToModel(latestHistory)
+  //         : null,
+  //     };
+  //   });
+  // }
 
   async getUserHistory(userId) {
     const histories = await ItemHistory.find({ userId })

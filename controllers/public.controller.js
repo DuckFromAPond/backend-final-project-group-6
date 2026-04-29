@@ -5,83 +5,126 @@ const fs = require("fs");
 const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require("../data/data");
-const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
-const userService = require("../services/userService"); 
-const { db } = require("../data/models/mongoUserModel");
-
-// static data
-const categories = [
-  { name: "Peripherals", subCategories: [
-    { name: "Monitor" },
-    { name: "Keyboard" },
-    { name: "Mouse" },
-    { name: "Scanner" },
-    { name: "Printer" },
-  ] },
-  { name: "Computers", subCategories: [
-    { name: "Laptop" },
-    { name: "Desktop" },
-    { name: "Server" },
-  ] },
-];
+const userService = require("../services/userService");
+const { error } = require("console");
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
-    const db = getDbProvider();
+    const currentUserId = req.user.id;
+    let page = req.query.page;
+    const pageSize = 10; // items to show per page
 
     const [users, items, histories] = await Promise.all([
-      db.getAllUsers ? db.getAllUsers() : Promise.resolve([]),
-      db.getItems(),
-      db.getItemHistories(),
+      userService.getAllUsers(),
+      itemService.getDBItems(),
+      itemService.getDBItemsHistory(),
     ]);
-
-    const totalUsers = users.length;
-    const totalItems = items.length;
-
-    // latest per item
-    const latestMap = new Map();
-    const sortedHistories = [...histories].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-    );
-
-    for (const h of sortedHistories) {
-      if (!latestMap.has(h.itemId)) {
-        latestMap.set(h.itemId, h);
-      }
-    }
-
-    const pendingCheckouts = [...latestMap.values()].filter(
-      (h) => h.action === "checkout",
-    ).length;
 
     // lookup maps
     const userMap = new Map(users.map((u) => [u.id, u]));
     const itemMap = new Map(items.map((i) => [i.id, i]));
 
-    const recentTransactions = sortedHistories.slice(0, 5).map((h) => {
-      const user = userMap.get(h.userId);
-      const item = itemMap.get(h.itemId);
+    const sortedHistories = [...histories].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    const userHistories = sortedHistories.filter(
+      (h) => h.userId?.toString() === currentUserId.toString()
+    );
+
+    const ownedItems = await itemService.getUserOwnedItems(currentUserId);
+
+    // counts
+    let overdueCount = 0;
+    let activeCount = 0;
+
+    for (const row of ownedItems) {
+      const created = row.createdAt ? new Date(row.createdAt) : null;
+      if (!created) continue;
+
+      if (row.duration) {
+        const due = new Date(created);
+        due.setHours(due.getHours() + row.duration);
+
+        if (new Date() > due) overdueCount++;
+        else activeCount++;
+      } else {
+        activeCount++;
+      }
+    }
+
+    const totalOwned = ownedItems.length;
+
+    // recent transactions
+    const recentTransactions = userHistories.map((h) => {
+      const created = h.createdAt ? new Date(h.createdAt) : null;
+
+      let status = "unknown";
+
+      if (h.action === "checkin" || h.returnedAt) {
+        status = "returned";
+      } else if (h.duration && h.createdAt) {
+        const due = new Date(h.createdAt);
+        due.setHours(due.getHours() + h.duration);
+        status = new Date() > due ? "overdue" : "active";
+      } else {
+        status = "active";
+      }
 
       return {
         id: h.id,
-        user: user?.name || "Unknown",
-        item: item?.name || "Unknown",
+        user: req.user.name,
+        item: itemMap.get(h.itemId?.toString())?.name || "Unknown",
+
+        date: created
+          ? created.toISOString().split("T")[0]
+          : null,
+
         type: h.action === "checkout" ? "Checkout" : "Checkin",
-        date: new Date(h.createdAt).toLocaleString(),
+        status,
       };
     });
 
+    if (!page) {
+      return res.redirect(`/home?page=1`);
+    }
+
+    page = parseInt(page);
+
+    const total = recentTransactions.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedTransactions = recentTransactions.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
+    // RENDER
     res.render("home", {
       dashboardData: {
-        totalUsers,
-        totalItems,
-        pendingCheckouts,
-        recentTransactions,
+        totalOwned,
+        activeCount,
+        overdueCount,
+        recentTransactions: paginatedTransactions,
       },
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: `home`,
       pageTitle: "Home",
     });
+
   } catch (err) {
     next(err);
   }
@@ -91,48 +134,25 @@ exports.home = async (req, res, next) => {
 exports.showItems = async (req, res, next) => {
   const { cat, q, subcat, isRetired, error, success } = req.query;
   let page = req.query.page;
-  const pageSize = 10; // items to show per page
+  const pageSize = 12; // items to show per page
 
   try {
-    let items = await itemService.getDBItems();
+    let { items, categories } = await itemService.getDBFilteredItems({
+      cat, 
+      subcat, 
+      q, 
+      isRetired
+    });
 
     // append query parameters to URL
     let url = "/items?";
 
-    // filter by subcategory
-    if(subcat) {
-      url += `subcat=${subcat}&`;
-      items = items.filter((item) => item.subCategory === subcat);
-    }
-
-    // filter by category
-    if (cat) {
-      url += `cat=${cat}&`;
-      items = items.filter((item) => item.category === cat);
-    }
-
-    // search by name (case-insensitive)
-    if (q) {
-      url += `q=${q}&`;
-      items = items.filter((item) =>
-        item.name?.toLowerCase().includes(q.toLowerCase()),
-      );
-    }
-
-    if (isRetired) {
-      url += `isRetired=${isRetired}&`;
-      items = items.filter((item) => item.status === "Retired");
-    } else {
-      items = items.filter((item) => item.status !== "Retired");
-    }
-
-    if (error) {
-      url += `error=${error}&`;
-    }
-
-    if (success) {
-      url += `success=${success}&`;
-    }
+    if (subcat) url += `subcat=${subcat}&`;
+    if (cat) url += `cat=${cat}&`;
+    if (q) url += `q=${q}&`;
+    if (isRetired) url += `isRetired=${isRetired}&`;
+    if (error) url += `error=${error}&`;
+    if (success) url += `success=${success}&`;
 
     // append page number to URL
     if (!page) {
@@ -156,13 +176,21 @@ exports.showItems = async (req, res, next) => {
     const prevPage = page > 1 ? page - 1 : null;
     const nextPage = page < totalPages ? page + 1 : null;
 
-    const pagesToRender = totalPagesArray.slice(prevPage, nextPage);
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
 
     const statuses = [
       { name: "Available" },
-      { name: "In-Use" },
       { name: "Maintenance" },
     ];
+
+    // for security's sake, please don't return the entire user object. The password hash is there
+    const exclude = ['email', 'passwordHash'];
+    const keyFilteredUser = Object.fromEntries(
+      Object.entries(req.user).filter(([key]) => !exclude.includes(key))
+    );
 
     res.render("items/items", {
       categories,
@@ -171,7 +199,8 @@ exports.showItems = async (req, res, next) => {
       prevPage,
       nextPage,
       totalPages: pagesToRender,
-      user: req.user || null,
+      currentPage: page,
+      user: keyFilteredUser || null,
       error: error || null,
       success: success || null,
       pageTitle: "Items",
@@ -185,45 +214,29 @@ exports.showItems = async (req, res, next) => {
 exports.addItem = async (req, res, next) => {
   try {
     const {
-      filePath,
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
-      dateAcquired,
-      type,
-      redirect,
-    } = await itemService.processItemForm(req);
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
+      dateAcquired
+    } = await itemService.processItemForm(req, false);
 
-    // an error in form processing must've occured
-    if (type?.toLowerCase() === "error") {
-      return res.redirect(redirect);
-    }
+    let filePath = null;
 
-    const existing = await itemService.getItemBySerial(serial);
+    const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing) {
-      return res.redirect("/items?error=Serial+already+exists");
+      return res.status(409).redirect("/items?error=Serial+already+exists");
     }
 
-    if (
-      !name ||
-      !description ||
-      !brand ||
-      !model ||
-      !category ||
-      !serial ||
-      !status
-    ) {
-      return res.redirect("/items?error=Missing+required+fields");
-    }
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
 
     const newItem = {
       name,
@@ -234,26 +247,38 @@ exports.addItem = async (req, res, next) => {
       subCategory,
       serial,
       status,
-      dateAcquired,
+      dateAcquired: dateAcquired || new Date(),
       imageName: filePath,
       imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
     };
-
+    
     await itemService.createDBItem(newItem);
 
     return res.redirect("/items?success=Item+added+successfully");
   }
   catch (err) {
-    next(err);
+    return res.redirect(
+      err.redirect || `/items?error=${encodeURIComponent(err.message)}`
+    );
   }
 }
 
 exports.showItemDetail = async (req, res, next) => {
   const { id } = req.params;
-  const { edit, del, error, success } = req.query;
+  const { error, success } = req.query;
 
   try {
     let item = await itemService.getDBItemById(id);
+    const categories = await itemService.getCategoryFromDB();
+
+    if (!item) {
+      res.status(404);
+      return res.render("extra_pages/404");
+    }
+    let user = "";
+    if (item.status === "In-Use") {
+      user = await userService.getDBUserById(item.currentOwner);
+    }
 
     const statuses = [
       { name: "Available" },
@@ -262,32 +287,20 @@ exports.showItemDetail = async (req, res, next) => {
 
     let context = {
       ...item,
+      dateAcquired: item.dateAcquired
+          ? new Date(item.dateAcquired).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric"})
+          : "No given date",
+      Owner: user?.name ?? "Unknown",
       categories,
       statuses,
-      isEdit: false,
-      isDelete: false,
+      isEdit: true,
+      isDelete: true,
       isRetired: item.status === "Retired",
       pageTitle: "ItemDetail",
     };
-
-    if (!context) {
-      res.status(404);
-      return res.render("404");
-    }
-
-    if (edit || (edit?.length !== 0 && edit === "true")) {
-      context = {
-        ...context,
-        isEdit: true,
-      };
-    }
-
-    if (del || (del?.length !== 0 && del === "true")) {
-      context = {
-        ...context,
-        isDelete: true,
-      };
-    }
 
     if (error) {
       context = {
@@ -295,7 +308,19 @@ exports.showItemDetail = async (req, res, next) => {
         error,
       };
     }
+    if (error) {
+      context = {
+        ...context,
+        error,
+      };
+    }
 
+    if (success) {
+      context = {
+        ...context,
+        success,
+      };
+    }
     if (success) {
       context = {
         ...context,
@@ -315,85 +340,83 @@ exports.editItem = async (req, res, next) => {
 
   try {
     const item = await itemService.getDBItemById(id);
+    if (!item) {
+      return res.status(404).json({
+        type: "error",
+        message: "ITEM NOT FOUND",
+        redirect: `/items/${id}?error=Item+not+found`,
+      });
+    }
+
     const {
-      filePath,
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
-      dateAcquired,
-      type,
-      redirect,
-    } = await itemService.processItemForm(req);
-
-    if (type?.toLowerCase() === "error") {
-      return res.json({
-        type,
-        redirect,
-      });
-    }
-
-    if (item.status === "In-Use") {
-      return res.json({
-        type: "error",
-        redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`,
-      });
-    }
-
-    if (
-      !name ||
-      !description ||
-      !brand ||
-      !model ||
-      !serial
-    ) {
-      return res.json({
-        type: "error",
-        redirect: `/items/${id}?error=Missing+required+fields`,
-      })
-    }
-
-    if(!["Available", "Maintenance"].includes(status)) {
-      return res.json({
-        type: "error",
-        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
-      });
-    }
-
-    const newItem = {
       name,
       description,
       brand,
       model,
+      category,
+      subCategory,
+      serial,
+      status,
+      dateAcquired, 
+    } = await itemService.processItemForm(req, true);
+    
+    const existing = await itemService.getDBItemBySerial(serial);
+
+    if (existing && existing.id.toString() !== id.toString()) {
+      return res.status(409).json({
+        type: "error",
+        message: "SERIAL ALREADY EXISTS",
+        redirect: `/items?${id}error=Serial+already+exists`,
+      });
+    }
+
+    let filePath = null;
+
+    if (status === "In-Use" || item.status === "In-Use") {
+      return res.status(403).json({
+        type: "error",
+        message: "ITEM IN USE CANNOT BE EDITED",
+        redirect: `/items/${id}?error=Item+in+use+cannot+be+edited`,
+      });
+    }
+    
+    if (fileBuffer) {
+      filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
+    }
+
+    const newItem = {
+      name: name || item.name,
+      description: description || item.description,
+      brand: brand || item.brand,
+      model: model || item.model,
       category: category || item.category,
       subCategory: subCategory || item.subCategory,
-      serial,
+      serial: serial || item.serial,
       status: status || item.status,
-      dateAcquired,
+      dateAcquired: dateAcquired || item.dateAcquired,
       imageName: filePath || item.imageName,
-      imageAlt: `Image of ${name}`,
-      imageUrl: filePath || item.imageUrl,
+      imageAlt: `Image of ${name || item.name}`
     };
 
     await itemService.updateDBItem(id, newItem);
 
-    return res.json({
+    return res.status(200).json({
       type: "success",
+      message: "ITEM UPDATED SUCCESSFULLY",
       redirect: `/items/${id}?success=Item+updated+successfully`,
     });
   } catch (err) {
-    next(err);
+    return res.status(err.status || 500).json({
+      type: "error",
+      message: err.message || "Internal Server Error",
+      redirect: err.redirect || `/items/${id}?error=${encodeURIComponent(err.message)}`
+    });
   }
 };
 
-// ------------------------------------------------------------------------- ADMIN ONLY ROUTE PLEASE MAKE ADMIN ONLY 
 // soft deletes only 
 exports.deleteItem = async (req, res, next) => {
   const { id } = req.params;
@@ -408,22 +431,99 @@ exports.deleteItem = async (req, res, next) => {
 
 exports.showItemHistory = async (req, res, next) => {
   const { id } = req.params;
+  const pageSize = 10;
+  let page = req.query.page;
 
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
 
+    const sessionsByItem = await itemService.buildSessions(itemHistories.itemHistories);
+
+    const newItemHist = [...itemHistories.itemHistories].map((log) => {
+      const itemId = log.itemId?.toString();
+      const sessions = sessionsByItem.get(itemId) || [];
+      const created = new Date(log.createdAt);
+
+      const session = sessions.find(
+        s => s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id)
+      );
+
+      let status = "unknown";
+      let duration = "———";
+
+      if (!session) {
+        status = "old";
+        return { ...log, status, duration };
+      }
+
+      const checkoutTime = new Date(session.checkout.createdAt);
+      const checkinTime = session.checkin
+        ? new Date(session.checkin.createdAt)
+        : null;
+
+      if (session.checkin) {
+        status = "returned";
+
+        const hours = (checkinTime - checkoutTime) / (1000 * 60 * 60);
+        duration = itemService.formatDuration(hours);
+
+      } else {
+        status = "active";
+
+        const hours = (Date.now() - checkoutTime) / (1000 * 60 * 60);
+        if (session.checkout?.duration != null) {
+            const dueDate = new Date(checkoutTime);
+            dueDate.setHours(dueDate.getHours() + session.checkout.duration);
+
+            status = new Date() > dueDate ? "overdue" : "active";
+          }
+        duration =
+          hours < 1
+            ? "<1 min"
+            : `${itemService.formatDuration(hours)} (ongoing)`;
+      }
+
+      return {
+        ...log,
+        status,
+        duration,
+      };
+    });
+
+    if (!page) {
+      return res.redirect(`/items/${id}/history?page=1`);
+    }
+
+    page = parseInt(page);
+
+    const histories = newItemHist || [];
+    const total = histories.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedHistories = histories.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
     let context = {
       ...itemHistories,
-      isEmpty: false,
+      itemHistories: paginatedHistories,
+      isEmpty: paginatedHistories.length === 0 && total === 0,
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: `items/${id}/history`,
       pageTitle: "Item History",
     };
-
-    if(itemHistories.length === 0) {
-      context = {
-        ...context,
-        isEmpty: true
-      }
-    }
 
     res.render("items/itemHistory", context);
   }
@@ -446,36 +546,44 @@ exports.checkIn = async (req, res, next) => {
     });
 
     const itemId = fields.itemId?.[0];
-    const duration = fields.duration?.[0];
     const userId = req.user.id;
 
     // validate checkout 
-    await itemService.validateCheckin(itemId);
+    await itemService.validateCheckin(itemId, userId);
 
     // upload file
     let filePath = null;
     let fileName = null;
 
-    if (!files?.document?.length) {
-      return res.redirect("/items?error=Reference+file+is+required");
+    const file = files?.document?.[0];
+
+    if (!file || file.size === 0 || !file.originalFilename) {
+      return res.redirect("/owned?error=File+is+required");
     }
 
     if (files?.document?.length > 0) {
-      const file = files.document[0];
-      
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/owned?error=File+too+large+(max+20MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
       fileName = `${Date.now()}_${file.originalFilename}`;
 
       const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+      const ext = path.extname(file.originalFilename).toLowerCase();
+
+      const allowedMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]);
+
+      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
+
+      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
+        return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
+      }
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
@@ -483,14 +591,13 @@ exports.checkIn = async (req, res, next) => {
     await itemService.checkinItem({
       itemId,
       userId,
-      duration,
       referenceLink: filePath || fileName
     });
 
-    return res.redirect("/owned");
+    return res.redirect("/owned?success=item+checked+in+sucessfully");
   } catch (err) {
     return res.redirect(
-      `/items?error=${encodeURIComponent(err.message)}`
+      `/owned?error=${encodeURIComponent(err.message)}`
     );
   }
 };
@@ -518,26 +625,36 @@ exports.checkOut = async (req, res, next) => {
     let filePath = null;
     let fileName = null;
 
-    if (!files?.document?.length) {
-      return res.redirect("/items?error=Image+file+required");
+    const file = files?.document?.[0];
+
+    if (!file || file.size === 0 || !file.originalFilename) {
+      return res.redirect("/items?error=File+is+required");
     }
 
     if (files?.document?.length > 0) {
-      const file = files.document[0];
-      
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/items?error=File+too+large+(max+20MB)");
       }
+      
 
       const fileBuffer = fs.readFileSync(file.path);
       fileName = `${Date.now()}_${file.originalFilename}`;
 
       const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+      const ext = path.extname(file.originalFilename).toLowerCase();
+
+      const allowedMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]);
+
+      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
+
+      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
+        return res.redirect("/items?error=Only+PDF+or+Word+files+allowed");
+      }
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
@@ -560,7 +677,9 @@ exports.checkOut = async (req, res, next) => {
 
 exports.showOwned = async (req, res, next) => {
   try {
-    const currentUserId = req.user.id;
+    const currentUserId = req.user.id;    
+    const error = req.query.error  || null;
+    const success = req.query.success  || null;
 
     const items = await itemService.getUserOwnedItems(currentUserId);
 
@@ -576,6 +695,7 @@ exports.showOwned = async (req, res, next) => {
         dueDate.setHours(dueDate.getHours() + row.duration);
 
         const now = new Date();
+        hoursSince = (now - created) / (1000 * 60 * 60);
         status = now > dueDate ? "overdue" : "active";
       } 
       else if (created) {
@@ -584,18 +704,21 @@ exports.showOwned = async (req, res, next) => {
 
         status = "active";
       }
+
+      
       return {
         id: row.itemId || row.item?.id,
-        referenceUrl: row.referenceUrl,
+        referenceUrl: row.referenceLink,
         name: row.item?.name,
 
         createdAt: created
           ? created.toISOString().split("T")[0]
           : null,
 
-        duration: row.duration 
+        duration: itemService.formatDuration(hoursSince) + " (ongoing)",
+        givenDuration: row.duration 
           ? `${itemService.formatDuration(row.duration)}`
-          : `${itemService.formatDuration(hoursSince)} (ongoing)`,
+          : `———`,
 
         dueDate: dueDate
           ? dueDate.toISOString().split("T")[0]
@@ -607,7 +730,9 @@ exports.showOwned = async (req, res, next) => {
 
     res.render("owned", {
       items: allOwned,
-      pageTitle: "Owned",
+      pageTitle: "Owned", 
+      error, 
+      success
     });
   } catch (err) {
     next(err);
@@ -619,13 +744,19 @@ exports.report = async (req, res, next) => {
     // get history for the last 7 days 
     const AllHistories = await itemService.getDBItemsHistory();
     const AllItems = await itemService.getDBItems();
-    const users = await userService.getAllUsers();
-
+    const allUsers = await userService.getAllUsers();
+    const users = allUsers.filter(user => user.status !== "Disabled");
+    const error = req.query.error  || null;
+    const success = req.query.success  || null;
+    const selectedUserId = req.query.userId || null;
+    
     const totalUsers = users.length;
-    const totalItems = AllItems.length;
+    const totalItems = AllItems.filter(item =>
+      item.status !== "Retired"
+    ).length;
 
     const deployedItems = AllItems.filter(item =>
-      item.current_owner &&
+      item.currentOwner &&
       item.status === "In-Use"
     ).length;
 
@@ -650,14 +781,20 @@ exports.report = async (req, res, next) => {
 
 
     // 4. USER AUDIT 
-    const selectedUserId = req.query.userId || null;
 
     let selectedUserName = "";
+    let selectedUserEmail = "";
 
     if (selectedUserId) {
-      const user = await itemService.getUserById(selectedUserId);
-      selectedUserName = `${user.name} (${user.email})`;
+      const user = await userService.getDBUserById(selectedUserId);
+
+      if (user) {
+        selectedUserName = `${user.name} (${user.email})`;
+        selectedUserEmail = user.email;
+
+      }
     }
+
 
     const items = await itemService.getUserOwnedItems(selectedUserId);
 
@@ -671,18 +808,20 @@ exports.report = async (req, res, next) => {
       if (created && row.duration) {
         dueDate = new Date(created);
         dueDate.setHours(dueDate.getHours() + row.duration);
-
+        
         const now = new Date();
+        hoursSince = (now - created) / (1000 * 60 * 60);
         status = now > dueDate ? "overdue" : "active";
       } else if (created) {
         const now = new Date();
-        hoursSince = Math.floor((now - created) / (1000 * 60 * 60));
+        hoursSince = (now - created) / (1000 * 60 * 60);
         status = "active";
       }
 
       return {
         id: row.itemId || row.item?.id,
-        referenceUrl: row.referenceUrl,
+        referenceUrl: row.referenceLink,
+        currentOwner: row.currentOwner,
 
         name: row.item?.name,
 
@@ -690,20 +829,17 @@ exports.report = async (req, res, next) => {
           ? created.toISOString().split("T")[0]
           : null,
 
-        duration: row.duration
-          ? itemService.formatDuration(row.duration)
-          : itemService.formatDuration(hoursSince) + " (ongoing)",
+        duration: itemService.formatDuration(hoursSince) + " (ongoing)",
+        givenDuration: row.duration 
+          ? `${itemService.formatDuration(row.duration)}`
+          : `———`,
 
         dueDate: dueDate
           ? dueDate.toISOString().split("T")[0]
           : "Until returned",
-
         status
       };
     });
-
-    // console.log(oldAssets)
-    // console.log(userAudit)
     
     res.render("report", {
         totalUsers,
@@ -711,11 +847,146 @@ exports.report = async (req, res, next) => {
         deployedItems,
         userAudit,
         users,
+        selectedUserEmail,
         selectedUserName,
-        selectedUserId,
         oldAssets,
-        pageTitle: "Report"
+        pageTitle: "Report",
+        error: error || null,
+        success: success || null,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.logs = async (req, res, next) => {
+  try {
+    const selectedUserId = req.query.userId || null;
+    const pageSize = 12;
+    const page = parseInt(req.query.page) || 1;
+    const queryParams = new URLSearchParams();
+
+    if (selectedUserId) queryParams.set("userId", selectedUserId);
+
+    const baseQuery = queryParams.toString();
+
+    // DATA FETCH FIRST
+    const [allHistories, items, users] = await Promise.all([
+      itemService.getDBItemsHistory(),
+      itemService.getDBItems(),
+      userService.getAllUsers(),
+    ]);
+    
+    // FILTER
+    let logs = selectedUserId
+      ? allHistories.filter(h => h.userId?.toString() === selectedUserId)
+      : allHistories;
+
+    let selectedUserName = "";
+    
+    if (selectedUserId) { 
+      const user = await userService.getDBUserById(selectedUserId); 
+      
+      if (user) { 
+        selectedUserName = `${user.name} (${user.email})`; 
+      } 
+    }
+
+    // MAPS
+    const itemMap = new Map(items.map(i => [i.id?.toString(), i]));
+    const userMap = new Map(users.map(u => [u.id?.toString(), u]));
+
+    // TRANSFORM
+    const sessionsByItem = await itemService.buildSessions(allHistories);
+
+    const newLogs = allHistories.map((log) => {
+      const itemId = log.itemId?.toString();
+      const sessions = sessionsByItem.get(itemId) || [];
+      const created = new Date(log.createdAt);
+
+      const session = sessions.find(
+        s => s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id)
+      );
+
+      let status = "unknown";
+      let duration = "———";
+
+      if (!session) {
+        status = "old";
+        return { ...log, status, duration };
+      }
+
+      const checkoutTime = new Date(session.checkout.createdAt);
+      const checkinTime = session.checkin
+        ? new Date(session.checkin.createdAt)
+        : null;
+
+      if (session.checkin) {
+        status = "returned";
+
+        const hours = (checkinTime - checkoutTime) / (1000 * 60 * 60);
+        duration = itemService.formatDuration(hours);
+
+      } else {
+        status = "active";
+
+        const hours = (Date.now() - checkoutTime) / (1000 * 60 * 60);
+        if (session.checkout?.duration != null) {
+          const dueDate = new Date(checkoutTime);
+          dueDate.setHours(dueDate.getHours() + session.checkout.duration);
+
+          status = new Date() > dueDate ? "overdue" : "active";
+        }
+        duration =
+          hours < 1
+            ? "<1 min"
+            : `${itemService.formatDuration(hours)} (ongoing)`;
+      }
+
+      return {
+        ...log,
+        item: itemMap.get(log.itemId?.toString())?.name || "Unknown",
+        serial: itemMap.get(log.itemId?.toString())?.serial || "Unknown",
+        user: userMap.get(log.userId?.toString())?.name || "Unknown",
+        email: userMap.get(log.userId?.toString())?.email || "Unknown",
+        date: created ? created.toISOString().replace("T", " ").split(".")[0]: "No date",
+        status,
+        duration
+      };
+    });
+
+    // PAGINATION
+    const total = newLogs.length;
+    const totalPages = Math.ceil(total / pageSize);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+
+    const paginatedHistories = newLogs.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+    
+    res.render("logs", {
+      allHistories: paginatedHistories,
+      users,
+      selectedUserName,
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: "logs",
+      baseQuery,
+      pageTitle: "Logs",
+    });
+
   } catch (err) {
     next(err);
   }
@@ -723,7 +994,12 @@ exports.report = async (req, res, next) => {
 
 // 404 handler
 exports.notFound = (req, res) => {
+  const isAuthRoute =
+    req.path.startsWith("/login") ||
+    req.path.startsWith("/register");
+
   res.status(404).render("extra_pages/404", {
+    layout: isAuthRoute ? "no_nav_bar" : "main",
     message: "The page you are looking for does not exist.",
     pageTitle: "404",
   });

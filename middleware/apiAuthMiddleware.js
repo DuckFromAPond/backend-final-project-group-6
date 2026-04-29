@@ -3,7 +3,6 @@ const secret = process.env.JWT_SECRET || "your-super-secret-key";
 const { getDbProvider } = require("../utils/dbProviderShared");
 const { verifyToken } = require("./authMiddleware")
 
-
 // APIPROTECT (API version of protect using JWT TOKEN)
 async function apiProtect(req, res, next) {
   try {
@@ -115,7 +114,7 @@ async function authOrApiKey(req, res, next) {
     const apiKey = req.get("x-api-key");
 
     if (apiKey) {
-      const keyRecord = await dbProvider.getApiKeyByKey(apiKey);
+      const keyRecord = await dbProvider.verifyApiKey(apiKey);
 
       if (keyRecord && !keyRecord.revoked) {
         req.apiKey = keyRecord;
@@ -134,4 +133,4 @@ async function authOrApiKey(req, res, next) {
   }
 }
 
-module.exports = { apiProtect, authOrApiKey }
+module.exports = { apiProtect, authOrApiKey}

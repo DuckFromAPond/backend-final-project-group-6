@@ -3,6 +3,7 @@ const SUPABASE_TABLES = Object.freeze({
 	ITEMS: "items",
 	ITEM_HISTORIES: "item_histories",
 	API_KEYS: "api_keys",
+	CATEGORY: "category",
 });
 
 function toIdString(value) {
@@ -81,21 +82,19 @@ function mapApiKeyRowToModel(row) {
 }
 
 
-// function mapCategoryRowToModel(row) {
-//   return {
-//     id: toIdString(row.id),
-// 	hashKey: row.hashKey,
-//     name: row.name,
-// 	adminId: row.adminId,
-//     createdAt: row.createdAt,
-//     revoked: row.revoked,
-//   };
-// }
+function mapCategoryRowToModel(row) {
+  return {
+    id: toIdString(row.id),
+    name: row.name,
+	parentId: toIdString(row.parentId),
+  };
+}
 
 module.exports = {
 	SUPABASE_TABLES,
 	mapUserRowToModel,
 	mapItemRowToModel,
 	mapItemHistoryRowToModel,
-	mapApiKeyRowToModel
+	mapApiKeyRowToModel,
+	mapCategoryRowToModel
 };

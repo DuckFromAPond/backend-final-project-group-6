@@ -1,15 +1,44 @@
-<div id="paginate"
-    class="w-full flex flex-row justify-center items-center"
->
-    {{#if prevPage}}
-        <a href="/items?page={{prevPage}}" class="rounded-lg py-2 px-3 font-bold border border-gray-500 hover:bg-gray-200 {{active}}">Prev</a>
-    {{/if}}
+<div id="paginate" class="w-full flex justify-center items-center">
 
-    {{#each totalPages}}
-        <a href="/items?page={{this}}" class="rounded-lg py-2 px-3 font-bold border border-gray-500 hover:bg-gray-200 {{active}}">{{this}}</a>
-    {{/each}}
+    <div class="flex items-center gap-1 bg-white shadow-sm rounded-xl px-2 py-2">
 
-    {{#if nextPage}}
-        <a href="/items?page={{nextPage}}" class="rounded-lg py-2 px-3 font-bold border border-gray-500 hover:bg-gray-200 {{active}}">Next</a>
-    {{/if}}
+        {{#if prevPage}}
+            <a href="/items?page={{prevPage}}"
+                class="px-3 py-1.5 text-sm rounded-lg text-gray-600 hover:bg-gray-100 transition">
+                ← Prev
+            </a>
+        {{else}}
+            <span class="px-3 py-1.5 text-sm text-gray-300 cursor-not-allowed">
+                ← Prev
+            </span>
+        {{/if}}
+
+        <div class="w-px h-5 bg-gray-200 mx-1"></div>
+
+        {{#each totalPages}}
+            <a href="/items?page={{this}}" class="min-w-[34px] text-center px-3 py-1.5 text-sm rounded-lg transition
+                {{#if (eq this ../currentPage)}}
+                    bg-blue-500 text-white shadow-sm
+                {{else}}
+                    text-gray-700 hover:bg-gray-100
+                {{/if}}">
+                    {{this}}
+            </a>
+        {{/each}}
+
+        <div class="w-px h-5 bg-gray-200 mx-1"></div>
+
+        {{#if nextPage}}
+            <a href="/items?page={{nextPage}}"
+                class="px-3 py-1.5 text-sm rounded-lg text-gray-600 hover:bg-gray-100 transition">
+                Next →
+            </a>
+        {{else}}
+            <span class="px-3 py-1.5 text-sm text-gray-300 cursor-not-allowed">
+                Next →
+            </span>
+        {{/if}}
+
+    </div>
+
 </div>

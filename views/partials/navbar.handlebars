@@ -1,45 +1,85 @@
 <div class="bg-white shadow-md">
-  <div class="max-w mx-auto px-10">
+  <div class="w-full mx-auto px-4 sm:px-6">
 
     <div class="flex justify-between h-16 items-center">
 
-      {{!-- LEFT: user + nav grouped --}}
-      <div class="flex items-center space-x-8">
+      <!-- LEFT -->
+      <div class="flex items-center space-x-4">
 
-        {{!-- USER --}}
-        <div>
-            <h1 class="text-lg font-semibold text-gray-800">
-                {{user.name}} <span class="text-xs font-normal text-gray-500">• {{#if user.role}}{{user.role}}{{else}}User{{/if}}</span>
-            </h1>
+        <!-- USER -->
+        <div class="px-3">
+          <h1 class="text-lg sm:text-lg font-semibold text-gray-800">
+            <a href="/" class="cursor-pointer hover:text-blue-500">
+            {{user.name}}
+            </a>
+            <span class="text-xs text-gray-500">
+              • {{#if user.role}}{{user.role}}{{else}}Technician{{/if}}
+            </span>
+          </h1>
         </div>
 
-        {{!-- NAV --}}
-        <nav class="flex space-x-4">
-          <a href="/home" class="{{#if navHome}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Home</a>
-
-          <a href="/items" class="{{#if navItems}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Items</a>
-
-          <a href="/owned" class="{{#if navCheckin}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Owned</a>
-
-          <a href="/report" class="{{#if navReport}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Report</a>
+        <!-- DESKTOP NAV -->
+        <nav class="hidden md:flex space-x-3">
+          <a href="/home" class="{{#if navHome}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Home</a>
+          <a href="/items" class="{{#if navItems}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Items</a>
+          <a href="/owned" class="{{#if navCheckin}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Owned</a>
+          <a href="/report" class="{{#if navReport}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Report</a>
+          <a href="/logs" class="{{#if navLogs}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Logs</a>
 
           {{#if (eq user.role "Admin")}}
-            <a href="/users" class="{{#if navUsers}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Users</a>
-
-            <a href="/keys" class="{{#if navKeys}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg transition">Keys</a>
+            <a href="/users" class="{{#if navUsers}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Users</a>
+            <a href="/keys" class="{{#if navKeys}}text-blue-500 font-bold{{else}}text-gray-700 hover:text-blue-500{{/if}} px-3 py-1 rounded-lg">Keys</a>
           {{/if}}
         </nav>
 
       </div>
 
-      {{!-- RIGHT: logout --}}
-      <div>
+      <!-- RIGHT -->
+      <div class="flex items-center space-x-3">
+
+        <!-- LOGOUT (desktop) -->
         <a href="/logout"
-          class="px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold hover:bg-red-500 hover:text-white transition">
+          class="hidden md:block px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg text-sm hover:bg-red-500 hover:text-white transition">
           Logout
         </a>
-      </div>
 
+        <!-- MOBILE MENU BUTTON -->
+        <button onclick="toggleMenu()" class="cursor-pointer md:hidden p-2 rounded-lg hover:bg-gray-200">
+          ☰
+        </button>
+
+      </div>
     </div>
+
+    <!-- MOBILE MENU -->
+    <div id="mobileMenu" class="hidden md:hidden pb-4">
+      <nav class="flex flex-col space-y-2">
+
+        <a href="/home" class="px-3 py-2 rounded-lg hover:bg-gray-200">Home</a>
+        <a href="/items" class="px-3 py-2 rounded-lg hover:bg-gray-200">Items</a>
+        <a href="/owned" class="px-3 py-2 rounded-lg hover:bg-gray-200">Owned</a>
+        <a href="/report" class="px-3 py-2 rounded-lg hover:bg-gray-200">Report</a>
+        <a href="/logs" class="px-3 py-2 rounded-lg hover:bg-gray-200">Logs</a>
+
+        {{#if (eq user.role "Admin")}}
+          <a href="/users" class="px-3 py-2 rounded-lg hover:bg-gray-200">Users</a>
+          <a href="/keys" class="px-3 py-2 rounded-lg hover:bg-gray-200">Keys</a>
+        {{/if}}
+
+        <a href="/logout"
+          class="px-3 py-2 rounded-lg border border-red-500 text-red-500 hover:bg-red-500 hover:text-white">
+          Logout
+        </a>
+
+      </nav>
+    </div>
+
   </div>
 </div>
+
+<script>
+  function toggleMenu() {
+    const menu = document.getElementById("mobileMenu");
+    menu.classList.toggle("hidden");
+  }
+</script>
