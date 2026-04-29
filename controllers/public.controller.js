@@ -5,17 +5,15 @@ const fs = require("fs");
 const path = require("path");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require("../data/data");
-const { getDbProvider } = require("../utils/dbProviderShared");
 const itemService = require("../services/itemService"); 
 const userService = require("../services/userService");
-const adminService = require("../services/adminService");  
-const { db } = require("../data/models/mongoUserModel");
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
   try {
     const currentUserId = req.user.id;
-    const db = getDbProvider();
+    let page = req.query.page;
+    const pageSize = 10; // items to show per page
 
     const [users, items, histories] = await Promise.all([
       userService.getAllUsers(),
@@ -88,14 +86,41 @@ exports.home = async (req, res, next) => {
       };
     });
 
+    if (!page) {
+      return res.redirect(`/home?page=1`);
+    }
+
+    page = parseInt(page);
+
+    const total = recentTransactions.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedTransactions = recentTransactions.slice(start, end);
+
+    const prevPage = page > 1 ? page - 1 : null;
+    const nextPage = page < totalPages ? page + 1 : null;
+
+    const pagesToRender = totalPagesArray.slice(
+      Math.max(0, page - 2),
+      Math.min(totalPages, page + 1)
+    );
+
     // RENDER
     res.render("home", {
       dashboardData: {
         totalOwned,
         activeCount,
         overdueCount,
-        recentTransactions,
+        recentTransactions: paginatedTransactions,
       },
+      prevPage,
+      nextPage,
+      currentPage: page,
+      totalPages: pagesToRender,
+      pageLink: `home`,
       pageTitle: "Home",
     });
 
@@ -188,7 +213,6 @@ exports.showItems = async (req, res, next) => {
 exports.addItem = async (req, res, next) => {
   try {
     const {
-      filePath,
       fileBuffer, 
       fileName, 
       mimeType,
@@ -203,9 +227,12 @@ exports.addItem = async (req, res, next) => {
       dateAcquired,
       type,
       redirect,
+      message,
+      errCode
     } = await itemService.processItemForm(req);
 
     const { categories } = itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
+    let filePath = null;
 
     const statuses = [
       { name: "Available" },
@@ -236,7 +263,7 @@ exports.addItem = async (req, res, next) => {
     }
 
     if(!statuses.map(s => s.name).includes(status)) {
-      return res.redirect(`/api/items?error=Status+must+be+available+or+maintenance`);
+      return res.redirect(`/items?error=Status+must+be+available+or+maintenance`);
     }
 
     if(!categories.map(c => c.name).includes(category)) {
@@ -252,6 +279,8 @@ exports.addItem = async (req, res, next) => {
       return res.redirect(`/api/items?error=Invalid+subcategory`)
     }
 
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
+
     const newItem = {
       name,
       description,
@@ -261,11 +290,11 @@ exports.addItem = async (req, res, next) => {
       subCategory,
       serial,
       status,
-      dateAcquired,
+      dateAcquired: dateAcquired || new Date(),
       imageName: filePath,
       imageAlt: `Image of ${name}`,       // add 'imageAlt ||' later if img alt given 
     };
-
+    
     await itemService.createDBItem(newItem);
 
     return res.redirect("/items?success=Item+added+successfully");
@@ -287,6 +316,10 @@ exports.showItemDetail = async (req, res, next) => {
       res.status(404);
       return res.render("extra_pages/404");
     }
+    let user = "";
+    if (item.status === "In-Use") {
+      user = await userService.getDBUserById(item.currentOwner);
+    }
 
     const statuses = [
       { name: "Available" },
@@ -295,6 +328,13 @@ exports.showItemDetail = async (req, res, next) => {
 
     let context = {
       ...item,
+      dateAcquired: item.dateAcquired
+          ? new Date(item.dateAcquired).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric"})
+          : "No given date",
+      Owner: user?.name ?? "Unknown",
       categories,
       statuses,
       isEdit: true,
@@ -338,11 +378,12 @@ exports.showItemDetail = async (req, res, next) => {
 
 exports.editItem = async (req, res, next) => {
   const { id } = req.params;
+  const error = req.query.error  || null;
+  const success = req.query.success  || null;
 
   try {
     const item = await itemService.getDBItemById(id);
     const {
-      filePath,
       fileBuffer, 
       fileName, 
       mimeType,
@@ -357,15 +398,18 @@ exports.editItem = async (req, res, next) => {
       dateAcquired,
       type,
       redirect,
+      message,
+      errCode
     } = await itemService.processItemForm(req);
 
     const {categories} = itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
+    let filePath = null;
 
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     const existing = await itemService.getDBItemBySerial(serial);
 
-    if (existing) {
+    if (existing && existing.id.toString() !== id.toString()) {
       return res.redirect("/items?error=Serial+already+exists");
     }
 
@@ -383,19 +427,7 @@ exports.editItem = async (req, res, next) => {
       });
     }
 
-    if (
-      !name ||
-      !description ||
-      !brand ||
-      !model ||
-      !serial
-    ) {
-      return res.json({
-        type: "error",
-        redirect: `/items/${id}?error=Missing+required+fields`,
-      })
-    }
-
+    
     if(!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
@@ -422,6 +454,8 @@ exports.editItem = async (req, res, next) => {
       })
     }
 
+    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
+
     const newItem = {
       name: name || item.name,
       description: description || item.description,
@@ -435,6 +469,8 @@ exports.editItem = async (req, res, next) => {
       imageName: filePath || item.image_name,
       imageAlt: `Image of ${name || item.name}`,
       imageUrl: filePath || item.imageUrl,
+      error,
+      success
     };
 
     await itemService.updateDBItem(id, newItem);
@@ -468,13 +504,66 @@ exports.showItemHistory = async (req, res, next) => {
   try {
     const itemHistories = await itemService.getDBItemHistoriesById(id);
 
+    const sessionsByItem = await itemService.buildSessions(itemHistories.itemHistories);
+
+    const newItemHist = [...itemHistories.itemHistories].map((log) => {
+      const itemId = log.itemId?.toString();
+      const sessions = sessionsByItem.get(itemId) || [];
+      const created = new Date(log.createdAt);
+
+      const session = sessions.find(
+        s => s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id)
+      );
+
+      let status = "unknown";
+      let duration = "———";
+
+      if (!session) {
+        status = "old";
+        return { ...log, status, duration };
+      }
+
+      const checkoutTime = new Date(session.checkout.createdAt);
+      const checkinTime = session.checkin
+        ? new Date(session.checkin.createdAt)
+        : null;
+
+      if (session.checkin) {
+        status = "returned";
+
+        const hours = (checkinTime - checkoutTime) / (1000 * 60 * 60);
+        duration = itemService.formatDuration(hours);
+
+      } else {
+        status = "active";
+
+        const hours = (Date.now() - checkoutTime) / (1000 * 60 * 60);
+        if (session.checkout?.duration != null) {
+            const dueDate = new Date(checkoutTime);
+            dueDate.setHours(dueDate.getHours() + session.checkout.duration);
+
+            status = new Date() > dueDate ? "overdue" : "active";
+          }
+        duration =
+          hours < 1
+            ? "<1 min"
+            : `${itemService.formatDuration(hours)} (ongoing)`;
+      }
+
+      return {
+        ...log,
+        status,
+        duration,
+      };
+    });
+
     if (!page) {
       return res.redirect(`/items/${id}/history?page=1`);
     }
 
     page = parseInt(page);
 
-    const histories = itemHistories.itemHistories || [];
+    const histories = newItemHist || [];
     const total = histories.length;
     const totalPages = Math.ceil(total / pageSize);
     const totalPagesArray = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -524,11 +613,10 @@ exports.checkIn = async (req, res, next) => {
     });
 
     const itemId = fields.itemId?.[0];
-    const duration = fields.duration?.[0];
     const userId = req.user.id;
 
     // validate checkout 
-    await itemService.validateCheckin(itemId);
+    await itemService.validateCheckin(itemId, userId);
 
     // upload file
     let filePath = null;
@@ -537,7 +625,7 @@ exports.checkIn = async (req, res, next) => {
     const file = files?.document?.[0];
 
     if (!file || file.size === 0 || !file.originalFilename) {
-      return res.redirect("/items?error=File+is+required");
+      return res.redirect("/owned?error=File+is+required");
     }
 
     if (files?.document?.length > 0) {
@@ -555,6 +643,19 @@ exports.checkIn = async (req, res, next) => {
       fileName = `${Date.now()}_${file.originalFilename}`;
 
       const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+      const ext = path.extname(file.originalFilename).toLowerCase();
+
+      const allowedMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]);
+
+      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
+
+      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
+        return res.redirect("/owned?error=Only+PDF+or+Word+files+allowed");
+      }
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
@@ -562,7 +663,6 @@ exports.checkIn = async (req, res, next) => {
     await itemService.checkinItem({
       itemId,
       userId,
-      duration,
       referenceLink: filePath || fileName
     });
 
@@ -617,71 +717,19 @@ exports.checkOut = async (req, res, next) => {
       fileName = `${Date.now()}_${file.originalFilename}`;
 
       const mimeType =file.headers?.["content-type"] || "application/octet-stream";
+      const ext = path.extname(file.originalFilename).toLowerCase();
 
-      filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
-    }
+      const allowedMimeTypes = new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ]);
 
-    await itemService.checkoutItem({
-      itemId,
-      userId,
-      duration,
-      referenceLink: filePath || fileName
-    });
+      const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
 
-    return res.redirect("/items?success=item+checked+out+sucessfully");
-  } catch (err) {
-    return res.redirect(
-      `/items?error=${encodeURIComponent(err.message)}`
-    );
-  }
-};
-
-
-// POST CHECKOUT
-exports.adminCheckout = async (req, res, next) => {
-  try {
-    const { fields, files } = await new Promise((resolve, reject) => {
-      const form = new multiparty.Form();
-
-      form.parse(req, (error, fields, files) => {
-        if (error) return reject(error);
-        resolve({ fields, files });
-      });
-    });
-
-    const itemId = fields.itemId?.[0];
-    const duration = fields.duration?.[0];
-    const userEmail = fields.userEmail?.[0];
-    const adminId = req.user.id;
-
-    // validate checkout 
-    await itemService.validateCheckout(itemId);
-    const userId = await adminService.adminValidateForCheckout(userEmail, adminId);
-
-    let filePath = null;
-    let fileName = null;
-
-    const file = files?.document?.[0];
-
-    if (!file || file.size === 0 || !file.originalFilename) {
-      return res.redirect("/items?error=File+is+required");
-    }
-
-    if (files?.document?.length > 0) {
-      
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
+      if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
+        return res.redirect("/items?error=Only+PDF+or+Word+files+allowed");
       }
-
-      const fileBuffer = fs.readFileSync(file.path);
-      fileName = `${Date.now()}_${file.originalFilename}`;
-
-      const mimeType =file.headers?.["content-type"] || "application/octet-stream";
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
@@ -704,7 +752,9 @@ exports.adminCheckout = async (req, res, next) => {
 
 exports.showOwned = async (req, res, next) => {
   try {
-    const currentUserId = req.user.id;
+    const currentUserId = req.user.id;    
+    const error = req.query.error  || null;
+    const success = req.query.success  || null;
 
     const items = await itemService.getUserOwnedItems(currentUserId);
 
@@ -720,6 +770,7 @@ exports.showOwned = async (req, res, next) => {
         dueDate.setHours(dueDate.getHours() + row.duration);
 
         const now = new Date();
+        hoursSince = (now - created) / (1000 * 60 * 60);
         status = now > dueDate ? "overdue" : "active";
       } 
       else if (created) {
@@ -739,9 +790,10 @@ exports.showOwned = async (req, res, next) => {
           ? created.toISOString().split("T")[0]
           : null,
 
-        duration: row.duration 
+        duration: itemService.formatDuration(hoursSince) + " (ongoing)",
+        givenDuration: row.duration 
           ? `${itemService.formatDuration(row.duration)}`
-          : `${itemService.formatDuration(hoursSince)} (ongoing)`,
+          : `———`,
 
         dueDate: dueDate
           ? dueDate.toISOString().split("T")[0]
@@ -753,7 +805,9 @@ exports.showOwned = async (req, res, next) => {
 
     res.render("owned", {
       items: allOwned,
-      pageTitle: "Owned"
+      pageTitle: "Owned", 
+      error, 
+      success
     });
   } catch (err) {
     next(err);
@@ -766,9 +820,14 @@ exports.report = async (req, res, next) => {
     const AllHistories = await itemService.getDBItemsHistory();
     const AllItems = await itemService.getDBItems();
     const users = await userService.getAllUsers();
-
+    const error = req.query.error  || null;
+    const success = req.query.success  || null;
+    const selectedUserId = req.query.userId || null;
+    
     const totalUsers = users.length;
-    const totalItems = AllItems.length;
+    const totalItems = AllItems.filter(item =>
+      item.status !== "Retired"
+    ).length;
 
     const deployedItems = AllItems.filter(item =>
       item.currentOwner &&
@@ -796,14 +855,20 @@ exports.report = async (req, res, next) => {
 
 
     // 4. USER AUDIT 
-    const selectedUserId = req.query.userId || null;
 
     let selectedUserName = "";
+    let selectedUserEmail = "";
 
     if (selectedUserId) {
-      const user = await itemService.getUserById(selectedUserId);
-      selectedUserName = `${user.name} (${user.email})`;
+      const user = await userService.getDBUserById(selectedUserId);
+
+      if (user) {
+        selectedUserName = `${user.name} (${user.email})`;
+        selectedUserEmail = user.email;
+
+      }
     }
+
 
     const items = await itemService.getUserOwnedItems(selectedUserId);
 
@@ -817,18 +882,20 @@ exports.report = async (req, res, next) => {
       if (created && row.duration) {
         dueDate = new Date(created);
         dueDate.setHours(dueDate.getHours() + row.duration);
-
+        
         const now = new Date();
+        hoursSince = (now - created) / (1000 * 60 * 60);
         status = now > dueDate ? "overdue" : "active";
       } else if (created) {
         const now = new Date();
-        hoursSince = Math.floor((now - created) / (1000 * 60 * 60));
+        hoursSince = (now - created) / (1000 * 60 * 60);
         status = "active";
       }
 
       return {
         id: row.itemId || row.item?.id,
         referenceUrl: row.referenceLink,
+        currentOwner: row.currentOwner,
 
         name: row.item?.name,
 
@@ -836,14 +903,14 @@ exports.report = async (req, res, next) => {
           ? created.toISOString().split("T")[0]
           : null,
 
-        duration: row.duration
-          ? itemService.formatDuration(row.duration)
-          : itemService.formatDuration(hoursSince) + " (ongoing)",
+        duration: itemService.formatDuration(hoursSince) + " (ongoing)",
+        givenDuration: row.duration 
+          ? `${itemService.formatDuration(row.duration)}`
+          : `———`,
 
         dueDate: dueDate
           ? dueDate.toISOString().split("T")[0]
           : "Until returned",
-
         status
       };
     });
@@ -854,10 +921,12 @@ exports.report = async (req, res, next) => {
         deployedItems,
         userAudit,
         users,
+        selectedUserEmail,
         selectedUserName,
-        selectedUserId,
         oldAssets,
-        pageTitle: "Report"
+        pageTitle: "Report",
+        error: error || null,
+        success: success || null,
     });
   } catch (err) {
     next(err);
@@ -867,10 +936,13 @@ exports.report = async (req, res, next) => {
 exports.logs = async (req, res, next) => {
   try {
     const selectedUserId = req.query.userId || null;
-    const userId = req.user?.id;
-
-    const pageSize = 8;
+    const pageSize = 12;
     const page = parseInt(req.query.page) || 1;
+    const queryParams = new URLSearchParams();
+
+    if (selectedUserId) queryParams.set("userId", selectedUserId);
+
+    const baseQuery = queryParams.toString();
 
     // DATA FETCH FIRST
     const [allHistories, items, users] = await Promise.all([
@@ -879,32 +951,15 @@ exports.logs = async (req, res, next) => {
       userService.getAllUsers(),
     ]);
     
-    // SORT FIRST
-    const sorted = [...allHistories].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
-
-    // Build latest record per itemId
-    const latestByItem = new Map();
-
-    for (const h of sorted) {
-      const key = h.itemId?.toString();
-      if (!latestByItem.has(key)) {
-        latestByItem.set(key, h); // first seen = latest because sorted DESC
-      }
-    }
-
     // FILTER
-    let logs = sorted;
+    let logs = selectedUserId
+      ? allHistories.filter(h => h.userId?.toString() === selectedUserId)
+      : allHistories;
 
     let selectedUserName = "";
-
-    if (selectedUserId) { 
-      logs = logs.filter(h => h.userId?.toString() === selectedUserId.toString() ); 
-    } 
     
     if (selectedUserId) { 
-      const user = await itemService.getUserById(selectedUserId); 
+      const user = await userService.getDBUserById(selectedUserId); 
       
       if (user) { 
         selectedUserName = `${user.name} (${user.email})`; 
@@ -916,39 +971,61 @@ exports.logs = async (req, res, next) => {
     const userMap = new Map(users.map(u => [u.id?.toString(), u]));
 
     // TRANSFORM
-    const newLogs = logs.map((h) => {
-      const itemId = h.itemId?.toString();
-      const latest = latestByItem.get(itemId);
+    const sessionsByItem = await itemService.buildSessions(allHistories);
 
-      const created = h.createdAt ? new Date(h.createdAt) : null;
+    const newLogs = allHistories.map((log) => {
+      const itemId = log.itemId?.toString();
+      const sessions = sessionsByItem.get(itemId) || [];
+      const created = new Date(log.createdAt);
+
+      const session = sessions.find(
+        s => s.checkout.id === log.id || (s.checkin && s.checkin.id === log.id)
+      );
 
       let status = "unknown";
+      let duration = "———";
 
-      if (latest?.id?.toString() !== h.id?.toString()) {
-        // older history rows should NOT be "active/returned logic"
+      if (!session) {
         status = "old";
-      } else {
-        // ONLY latest record determines real status
-        if (latest.action === "checkin") {
-          status = "returned";
-        } else if (latest.action === "checkout") {
-          if (created && h.duration) {
-            const dueDate = new Date(created);
-            dueDate.setHours(dueDate.getHours() + h.duration);
+        return { ...log, status, duration };
+      }
 
-            status = new Date() > dueDate ? "overdue" : "active";
-          } else {
-            status = "active";
-          }
+      const checkoutTime = new Date(session.checkout.createdAt);
+      const checkinTime = session.checkin
+        ? new Date(session.checkin.createdAt)
+        : null;
+
+      if (session.checkin) {
+        status = "returned";
+
+        const hours = (checkinTime - checkoutTime) / (1000 * 60 * 60);
+        duration = itemService.formatDuration(hours);
+
+      } else {
+        status = "active";
+
+        const hours = (Date.now() - checkoutTime) / (1000 * 60 * 60);
+        if (session.checkout?.duration != null) {
+          const dueDate = new Date(checkoutTime);
+          dueDate.setHours(dueDate.getHours() + session.checkout.duration);
+
+          status = new Date() > dueDate ? "overdue" : "active";
         }
+        duration =
+          hours < 1
+            ? "<1 min"
+            : `${itemService.formatDuration(hours)} (ongoing)`;
       }
 
       return {
-        ...h,
-        item: itemMap.get(h.itemId?.toString())?.name || "Unknown",
-        user: userMap.get(h.userId?.toString())?.name || "Unknown",
-        date: created ? created.toISOString().split("T")[0] : "No date",
+        ...log,
+        item: itemMap.get(log.itemId?.toString())?.name || "Unknown",
+        serial: itemMap.get(log.itemId?.toString())?.serial || "Unknown",
+        user: userMap.get(log.userId?.toString())?.name || "Unknown",
+        email: userMap.get(log.userId?.toString())?.email || "Unknown",
+        date: created ? created.toISOString().replace("T", " ").split(".")[0]: "No date",
         status,
+        duration
       };
     });
 
@@ -980,7 +1057,7 @@ exports.logs = async (req, res, next) => {
       currentPage: page,
       totalPages: pagesToRender,
       pageLink: "logs",
-      query: selectedUserId ? `&userId=${selectedUserId}` : "",
+      baseQuery,
       pageTitle: "Logs",
     });
 

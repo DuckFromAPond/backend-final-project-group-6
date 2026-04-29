@@ -54,7 +54,7 @@ class MongoProvider extends DatabaseProvider {
       Item.init(),
       ItemHistory.init(),
       ApiKey.init(),
-      Category.init()
+      Category.init(),
     ]);
 
     console.log("MongoDB initialized");
@@ -132,7 +132,7 @@ class MongoProvider extends DatabaseProvider {
     return {
       id: String(category._id),
       name: category.name,
-      parentId: String(category.parentId) || null,
+      parentId: category.parentId ? String(category.parentId) : null
     };
   }
 
@@ -244,7 +244,9 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async updateUser(userId, updates) {
-    const user = await User.findByIdAndUpdate(userId, updates, { returnDocument: "after" });
+    const user = await User.findByIdAndUpdate(userId, updates, {
+      returnDocument: "after",
+    });
 
     // business rule: revoke API keys
     if (user.status === "Disabled") {
@@ -278,7 +280,6 @@ class MongoProvider extends DatabaseProvider {
     const latest = await ItemHistory.findOne({ itemId })
       .sort({ createdAt: -1 })
       .lean();
-
     return latest?.action === action && latest?.returnedAt === null;
   }
 
@@ -322,7 +323,9 @@ class MongoProvider extends DatabaseProvider {
   }
 
   async updateItem(id, data) {
-    const item = await Item.findByIdAndUpdate(id, data, { returnDocument: "after" }).lean();
+    const item = await Item.findByIdAndUpdate(id, data, {
+      returnDocument: "after",
+    }).lean();
     return this.mapItem(item);
   }
 
@@ -468,10 +471,10 @@ class MongoProvider extends DatabaseProvider {
     const apiKeys = await ApiKey.find({ revoked: false }).lean();
 
     for (const apiKey of apiKeys) {
-        const match = await bcryptjs.compare(key, apiKey.hashedKey)
-        if (match) {
-            return this.mapApiKey(apiKey)
-        }
+      const match = await bcryptjs.compare(key, apiKey.hashedKey);
+      if (match) {
+        return this.mapApiKey(apiKey);
+      }
     }
 
     return null;
@@ -536,14 +539,13 @@ class MongoProvider extends DatabaseProvider {
 
   async getAllCategories() {
     const categories = await Category.find().lean();
-
     return categories.map((c) => this.mapCategory(c));
   }
 
   async addCategory(name) {
     return await Category.create({
       name,
-      parentId: null
+      parentId: null,
     });
   }
 
@@ -555,7 +557,7 @@ class MongoProvider extends DatabaseProvider {
 
     return await Category.create({
       name,
-      parentId: categoryId
+      parentId: categoryId,
     });
   }
 
@@ -567,7 +569,7 @@ class MongoProvider extends DatabaseProvider {
     }
 
     const itemCount = await Item.countDocuments({
-      category: category.name
+      category: category.name,
     });
 
     if (itemCount > 0) {
@@ -600,11 +602,9 @@ class MongoProvider extends DatabaseProvider {
       update.parentId = data.parentId;
     }
 
-    const updated = await Category.findByIdAndUpdate(
-      subCategoryId,
-      update,
-      { new: true }
-    ).lean();
+    const updated = await Category.findByIdAndUpdate(subCategoryId, update, {
+      new: true,
+    }).lean();
 
     return this.mapCategory(updated);
   }

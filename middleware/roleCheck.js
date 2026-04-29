@@ -11,6 +11,7 @@ function requireRole(role) {
       // 403 Forbidden
       return res.status(403).render("extra_pages/403", {
         layout: "no_nav_bar",
+        pageTitle: "403",
         message:
           "Access Denied. Your session has been terminated for security.",
       });

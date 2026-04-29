@@ -2,7 +2,7 @@ const { getDbProvider } = require("../utils/dbProviderShared");
 const multiparty = require("multiparty");
 const path = require("path");
 const fs = require("fs");
-const { base } = require("../data/models/mongoUserModel");
+const sharp = require("sharp");
 
 // CHECKIN / CHECKOUT 
 exports.getDBlabel = () => { 
@@ -13,6 +13,11 @@ exports.getDBlabel = () => {
 exports.uploadDBFile = async (fileName, fileBuffer, mimeType) => { 
   const db = getDbProvider();
   return await db.uploadFile(fileName, fileBuffer, mimeType);
+}
+
+exports.uploadDBItem = async (fileName, fileBuffer, mimeType) => { 
+  const db = getDbProvider();
+  return await db.uploadItem(fileName, fileBuffer, mimeType);
 }
 
 exports.validateCheckout = async (itemId) => {
@@ -35,6 +40,11 @@ exports.validateCheckout = async (itemId) => {
   }
 };
 
+exports.getDBFile = async (bucket, id) => { 
+  const db = getDbProvider();
+  return await db.getFile(bucket, id);
+}
+
 exports.checkoutItem = async ({ itemId, userId, duration, referenceLink }) => { 
   const db = getDbProvider();
   await db.updateItem(itemId, {
@@ -50,7 +60,7 @@ exports.checkoutItem = async ({ itemId, userId, duration, referenceLink }) => {
   });
 };
 
-exports.validateCheckin = async (itemId) => {
+exports.validateCheckin = async (itemId, userId) => {
   const db = getDbProvider();
 
   const item = await db.getItemById(itemId);
@@ -62,6 +72,10 @@ exports.validateCheckin = async (itemId) => {
   if (item.status !== "In-Use") {
     throw new Error("Item is not in-use.");
   }
+  
+  if (String(item.currentOwner) !== String(userId)) {
+    throw new Error("You don't own this item.");
+  }
 
   const active = await db.findActiveAction(itemId, "checkin");
 
@@ -70,7 +84,7 @@ exports.validateCheckin = async (itemId) => {
   }
 };
 
-exports.checkinItem = async ({ itemId, userId, duration, referenceLink }) => { 
+exports.checkinItem = async ({ itemId, userId, referenceLink }) => { 
   const db = getDbProvider();
   await db.updateItem(itemId, {
     currentOwner: null,
@@ -80,6 +94,7 @@ exports.checkinItem = async ({ itemId, userId, duration, referenceLink }) => {
   return await db.addItemHistory(itemId, {
     userId,
     action: "checkin",
+    duration: null,
     referenceLink: referenceLink ?? null,
     returnedAt:  Date.now(),
   });
@@ -89,18 +104,36 @@ exports.checkinItem = async ({ itemId, userId, duration, referenceLink }) => {
 exports.formatDuration = (hours) => {
   if (hours == null) return null;
 
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
+  const totalMinutes = Math.floor(hours * 60);
 
-  if (days > 0) {
-    if (remainingHours === 0) {
-      return `${days} day${days > 1 ? "s" : ""}`;
-    }
-    return `${days} day${days > 1 ? "s" : ""} ${remainingHours} hour${remainingHours > 1 ? "s" : ""}`;
+  if (totalMinutes === 0) return "<1 min";
+
+  // less than 1 hour → show minutes
+  if (totalMinutes < 60) {
+    return `${totalMinutes} min${totalMinutes !== 1 ? "s" : ""}`;
   }
 
-  return `${hours} hour${hours > 1 ? "s" : ""}`;
-}
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const remainingMinutesAfterDays = totalMinutes % (60 * 24);
+
+  const h = Math.floor(remainingMinutesAfterDays / 60);
+  const m = remainingMinutesAfterDays % 60;
+
+  // days
+  if (days > 0) {
+    if (h === 0) {
+      return `${days} day${days > 1 ? "s" : ""}`;
+    }
+    return `${days} day${days > 1 ? "s" : ""} ${h} hour${h > 1 ? "s" : ""}`;
+  }
+
+  // hours + minutes (optional nice UX)
+  if (m > 0) {
+    return `${h} hour${h > 1 ? "s" : ""} ${m} min${m > 1 ? "s" : ""}`;
+  }
+
+  return `${h} hour${h > 1 ? "s" : ""}`;
+};
 
 exports.getUserOwnedItems = async (currentUserId) => {
   const db = getDbProvider();
@@ -180,11 +213,6 @@ exports.getDBItemHistoriesById = async (id) => {
   return itemHistories;
 };
 
-exports.getUserById = async (selectedUserId) => {
-  const db = getDbProvider();
-  return await db.getUserById(selectedUserId);
-};
-
 // GET ITEMS
 // Description: gets all items from database
 // Precondition: none
@@ -207,8 +235,8 @@ exports.getCategoryFromDB = async () => {
 
   // 1. build lookup map
   categories.forEach(cat => {
-    map.set(cat.id, {
-      id: cat.id,
+    map.set(cat.id.toString(), {
+      id: cat.id.toString(),
       name: cat.name,
       subCategories: []
     });
@@ -216,17 +244,19 @@ exports.getCategoryFromDB = async () => {
 
   // 2. build tree
   categories.forEach(cat => {
-    if (cat.parentId) {
-      const parent = map.get(cat.parentId);
+    const id = cat.id.toString();
+    const parentId = cat.parentId?.toString();
+
+    if (parentId) {
+      const parent = map.get(parentId);
 
       if (parent) {
-        parent.subCategories.push(map.get(cat.id));
+        parent.subCategories.push(map.get(id));
       }
     } else {
-      result.push(map.get(cat.id));
+      result.push(map.get(id));
     }
   });
-
   return result;
 };
 
@@ -336,6 +366,20 @@ exports.processItemForm = async (req) => {
   const id = req.params.id; // for returning to itemDetail if the form is submitted from /itemDetail
   const form = new multiparty.Form();
   
+  let type = null;
+  let redirect = null;
+  let errCode = null;
+  let message = null
+
+  if (!req.headers["content-type"]?.includes("multipart/form-data")) {
+    return {
+      type: "error",
+      redirect: `/items/?error=Invalid+content+type`,
+      message: "INVALID CONTENT TYPE",
+      errCode: 415
+    };
+  }
+
   const { fields, files } = await new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
       if (err) return reject(err);
@@ -354,13 +398,28 @@ exports.processItemForm = async (req) => {
   const status = fields.status?.[0] ?? null;
   const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
 
+  if (
+    !name ||
+    !description ||
+    !brand ||
+    !model ||
+    !serial || 
+    !category || 
+    !subCategory || 
+    !status
+  ) {
+    return {
+      type: "error",
+      errCode: 400,
+      message: "MISSING REQUIRED FIELDS",
+      redirect: `/items/${id}?error=Missing+required+fields`,
+    }
+  }
+
   // upload file
-  let filePath = null;
   let fileName = null;
   let fileBuffer = null;
   let mimeType = null;
-  let type = null;
-  let redirect = null;
 
   // check whether file is uploaded
   if (files?.image?.length > 0 && files?.image[0]?.originalFilename.length !== 0) {
@@ -369,31 +428,120 @@ exports.processItemForm = async (req) => {
 
     if (file.size > MAX_SIZE) {
       if(id) {
-        type = "error";
-        redirect = `/items/${id}?error=File+too+large+(max+50MB)`;
+        return {
+          type: "error",
+          errCode: 413,
+          message: "FILE TOO LARGE",
+          redirect : `/items/${id}?error=File+too+large+(max+50MB)`,
+        }
       }
       else {
-        type = "error";
-        redirect = `/items?error=File+too+large+(max+50MB)`;
+        return {
+          type : "error",
+          errCode: 413,
+          message: "FILE TOO LARGE",
+          redirect :`/items?error=File+too+large+(max+50MB)`,
+        }
       }
     }
 
-    fileBuffer = fs.readFileSync(file.path);
     mimeType = file.headers?.["content-type"] || "application/octet-stream";
-    fileName = `${Date.now()}_${file.originalFilename}`;
-    filePath = await db.uploadItem(fileName, fileBuffer, mimeType);
+    const ext = path.extname(file.originalFilename).toLowerCase();
+
+    const allowedImageExtensions = new Set([
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".gif"
+    ]);
+
+    const isImage = mimeType.startsWith("image/");
+
+    if (!allowedImageExtensions.has(ext) || !isImage) {
+      if(id) {
+        return {
+        type : "error",
+        errCode: 415,
+        message: "INVALID FILE TYPE",
+        redirect : `/items/${id}?error=Only+image+files+are+allowed`,
+        }
+      }
+      else {
+        return {
+        type : "error",
+        errCode: 415,
+        message: "INVALID FILE TYPE",
+        redirect : `/items?error=Only+image+files+are+allowed`,
+        }
+      }
+    }
+    const rawBuffer = fs.readFileSync(file.path);
+
+    const webpBuffer = await sharp(rawBuffer)
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    fileBuffer = webpBuffer;
+    mimeType = "image/webp";
+    fileName = `${Date.now()}_${file.originalFilename}.webp`;
   }
   else {
     if(id) {
       // for editing, no image defaults to original image instead of error or instead of replacing original with empty.
-      type = "warning";
-      redirect = `/items/${id}?warning=Image+file+missing`;
+      return {
+      type : "warning",
+      redirect : `/items/${id}?warning=Image+file+missing`,
+       }
     }
     else {
-      type = "error";
-      redirect = `/items?error=Image+file+required`;
+       return {
+        type: "error",
+        redirect : `/items?error=Image+file+required`,
+        message: "IMAGE REQUIRED",
+        errCode: 400
+        }
     }
   }
 
-  return {filePath, fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect};
+  return {fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect, message, errCode};
+}
+
+
+exports.buildSessions= async(logs) => {
+  // sort oldest → newest (important for pairing)
+  const sorted = [...logs].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+  );
+
+  const sessionsByItem = new Map();
+
+  for (const log of sorted) {
+    const itemId = log.itemId?.toString();
+
+    if (!sessionsByItem.has(itemId)) {
+      sessionsByItem.set(itemId, []);
+    }
+
+    const sessions = sessionsByItem.get(itemId);
+
+    if (log.action === "checkout") {
+      // start new session
+      sessions.push({
+        checkout: log,
+        checkin: null
+      });
+    }
+
+    if (log.action === "checkin") {
+      // attach to latest open session
+      const openSession = [...sessions].reverse().find(s => !s.checkin);
+
+      if (openSession) {
+        openSession.checkin = log;
+      }
+    }
+  }
+
+  return sessionsByItem;
 }

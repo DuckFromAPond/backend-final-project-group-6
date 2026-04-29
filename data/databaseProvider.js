@@ -46,11 +46,11 @@ class DatabaseProvider {
 	async uploadFile(filename, buffer, mimeType) {throw new Error("missing implementation");}
 	async uploadItem(filename, buffer, mimeType) {throw new Error("missing implementation");}
 
-	// async getAllCategories() {}
-	// async addCategory(name) {}
-	// async addSubCategory(categoryId, name) {}
-	// async updateSubCategory(subCategoryId, data) {}
-	// async deleteCategory(categoryId) {}
+	async getAllCategories() {}
+	async addCategory(name) {}
+	async addSubCategory(categoryId, name) {}
+	async updateSubCategory(subCategoryId, data) {}
+	async deleteCategory(categoryId) {}
 	// ===== HELPER goes down here  (moved to conflictCheck)
 	
 }

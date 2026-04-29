@@ -8,14 +8,12 @@ const apiController = require("../controllers/api.controller");
 
 // users
 router.post("/login", loginLimiter, apiController.apiLogin);
-
 router.get(
   "/users",
   apiProtect,
   requireRoleAPI("Admin"),
   apiController.getAllUsers,
 );
-
 router.post(
   "/users",
   apiProtect,
@@ -35,6 +33,7 @@ router.patch(
   apiController.updateUserStatus,
 );
 
+
 // keys
 router.get("/keys", apiProtect, requireRoleAPI("Admin"), apiController.getKeys);
 router.post(
@@ -50,13 +49,12 @@ router.delete(
   apiController.revokeKey,
 );
 
-// router.post('/auth/login', loginLimiter, apiController.apiLogin);
-// router.post('/keys', apiProtect, requireRoleAPI("Admin"), apiController.generateKey);
 
+// CHECKIN / CHECKOUT
 router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
 router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
 
-// router.delete('/keys/:id', apiProtect, requireRoleAPI("Admin"), apiController.deleteKey);
+
 
 // API ROUTES FOR ITEMS
 router.get("/items", authOrApiKey, apiController.showItems);
@@ -66,7 +64,7 @@ router.get("/items/:id/history", authOrApiKey, apiController.showItemHistory);
 router.delete("/items/:id", authOrApiKey, apiController.deleteItem);
 router.put("/items/:id", authOrApiKey, apiController.editItem);
 
-router.get("/files/:bucket/:id", apiProtect, apiController.getFile);
+router.get("/files/:bucket/:id", authOrApiKey, apiController.getFile);
 
 // error 404
 router.use(apiController.notFound);

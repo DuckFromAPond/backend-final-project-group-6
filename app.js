@@ -1,7 +1,6 @@
 "use strict"; // for debugging
 const mongoose = require("mongoose");
 const express = require("express");
-
 const { engine } = require("express-handlebars");
 const cookieParser = require("cookie-parser");
 const path = require("path");
@@ -18,7 +17,7 @@ const { setDbProvider } = require("./utils/dbProviderShared");
 const config = require("./config/app.config");
 const authRoutes = require("./routes/auth.routes");
 const publicRoutes = require("./routes/public.routes");
-// const adminRoutes = require("./routes/admin.routes");
+const adminRoutes = require("./routes/admin.routes");
 const apiRoutes = require("./routes/api.routes");
 
 const createDatabaseProvider = require("./utils/createDBProvider");
@@ -45,16 +44,22 @@ const hbsHelpers = {
     return options.inverse(this);
   },
   eq: (a, b) => a === b,
-  formatDate: (date) => new Date(date).toISOString().split("T")[0], // return YYYY-MM-DD
+  formatDate: (value) => {
+  const date = new Date(value);
+
+  if (!value || isNaN(date.getTime())) {
+    return "No date";
+  }
+
+  return date.toISOString().split("T")[0];}, // return YYYY-MM-DD
   json: (context) => JSON.stringify(context),
 };
 
 // CORS configuration
+const normalize = (url) => url?.replace(/\/$/, "");
 const whitelist = new Set([
-  `http://localhost:${config.PORT}`,
-  "http://127.0.0.1:3000",
-  "http://localhost:5173",
-  config.BASE_URL,
+  normalize(`http://localhost:${config.PORT}`),
+  normalize(config.BASE_URL),
 ]);
 
 const corsOptions = {
@@ -62,10 +67,11 @@ const corsOptions = {
     // allow Postman / server-to-server
     if (!origin) return callback(null, true);
 
-    if (whitelist.has(origin)) {
+    if (whitelist.has(normalize(origin))) {
       return callback(null, true);
     }
 
+    console.log("Blocked");
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
@@ -74,8 +80,8 @@ const corsOptions = {
 };
 
 // configurations for public app ───────────────────────────────────
-const publicApp = express();
-publicApp.engine(
+const app = express();
+app.engine(
   "handlebars",
   engine({
     defaultLayout: "main",
@@ -84,23 +90,30 @@ publicApp.engine(
     helpers: hbsHelpers,
   }),
 );
-publicApp.set("view engine", "handlebars");
-publicApp.set("views", path.join(__dirname, "views"));
+app.set("view engine", "handlebars");
+app.set("views", path.join(__dirname, "views"));
 
 // middleware ───────────────────────────────────
-publicApp.use(cors(corsOptions));
-publicApp.use(cookieParser());
-publicApp.use(express.static(path.join(__dirname, "public")));
-publicApp.use(express.urlencoded({ extended: true })); // for forms (login/register)
-publicApp.use(express.json());
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.urlencoded({ extended: true })); // for forms (login/register)
+app.use(express.json());
 
-publicApp.use(attachUser);
+app.use(attachUser);
+
+// safety
+app.disable("x-powered-by");
 
 // Morgan logging
-// publicApp.use(morgan('dev'));
+if (config.NODE_ENV === "production") {
+  app.use(morgan("combined"));
+} else {
+  app.use(morgan("dev"));
+}
 
 // temp (will change when nav is finalized)
-publicApp.use((req, res, next) => {
+app.use((req, res, next) => {
   const pathName = req.path;
 
   res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
@@ -115,68 +128,19 @@ publicApp.use((req, res, next) => {
   next();
 });
 
-publicApp.use("/", authRoutes);
-publicApp.use("/", publicRoutes);
 
 // ---------- API -----------------
 const apiApp = express();
-apiApp.use(cors(corsOptions));
+// apiApp.use(cors(corsOptions));
 apiApp.use(express.json());
 apiApp.use(express.urlencoded({ extended: false }));
 apiApp.use(cookieParser());
 apiApp.use(apiRoutes);
 
-// ------ Main app ------
-const app = express();
-app.engine(
-  "handlebars",
-  engine({
-    extname: ".handlebars",
-    layoutsDir: path.join(__dirname, "views/layouts"),
-    partialsDir: path.join(__dirname, "views/partials"),
-    helpers: hbsHelpers,
-  }),
-);
-
-app.set("view engine", "handlebars");
-app.set("views", path.join(__dirname, "views"));
-
-// middleware ───────────────────────────────────
-app.use(cors(corsOptions));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
-app.use(express.urlencoded({ extended: true })); // for forms (login/register)
-app.use(express.json());
-
-app.use((req, res, next) => {
-  const pathName = req.path;
-
-  res.locals.navHome = pathName === "/" || pathName.startsWith("/home");
-  res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
-  res.locals.navCheckin = pathName.startsWith("/owned");
-  res.locals.navReport = pathName.startsWith("/report");
-  res.locals.navUsers = pathName.startsWith("/users"); //
-  res.locals.navKeys = pathName.startsWith("/keys"); //
-  res.locals.currentYear = (new Date()).getFullYear();
-
-  res.locals.config = config;
-  next();
-});
-
-app.set("view engine", "handlebars");
-app.set("views", path.join(__dirname, "views"));
-// safety
-app.disable("x-powered-by");
-
-// Morgan logging
-if (config.NODE_ENV === "production") {
-  app.use(morgan("combined"));
-} else {
-  app.use(morgan("dev"));
-}
-
 app.use("/api", apiApp);
+
 app.use("/", authRoutes);
+app.use("/", adminRoutes);
 app.use("/", publicRoutes);
 
 // Other routes

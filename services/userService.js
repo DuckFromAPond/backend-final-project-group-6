@@ -38,7 +38,10 @@ exports.registerNewUser = async (name, email, password) => {
 // list
 exports.getAllUsers = async () => {
   const db = getDbProvider();
-  return await db.getAllUsers();
+  const users = await db.getAllUsers();
+  return users.map(
+    ({ passwordHash, ...userWithoutPassword }) => userWithoutPassword, // manually remove the property from each object
+  );
 };
 
 // update role and status
@@ -47,8 +50,14 @@ exports.updateUserRole = async (userId, newRole) => {
   return await db.updateUser(userId, { role: newRole });
 };
 
-exports.updateUserStatus = async (userId, newStatus) => {
+exports.updateUserStatus = async (userId, newStatus, ownedItems) => {
   const db = getDbProvider();
+
+  if (newStatus === "Disabled" && ownedItems.length > 0) {
+    throw new Error(
+      "User must return all items before being disabled - Admins can force check-in selected user on the report page",
+    );
+  }
 
   const user = await db.updateUser(userId, { status: newStatus });
 
@@ -57,4 +66,9 @@ exports.updateUserStatus = async (userId, newStatus) => {
   }
 
   return user;
+};
+
+exports.getDBUserById = async (selectedUserId) => {
+  const db = getDbProvider();
+  return await db.getUserById(selectedUserId);
 };

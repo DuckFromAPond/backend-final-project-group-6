@@ -92,38 +92,10 @@ function redirectIfAuth(req, res, next) {
   next();
 }
 
-// async function apiProtect(req, res, next) {
-//   // Check the Authorization Header: "Bearer [token]"
-//   const authHeader = req.headers.authorization;
-//   const token = authHeader && authHeader.split(" ")[1];
-
-//   if (!token) {
-//     return res
-//       .status(401)
-//       .json({ message: "No token provided. Please use Bearer token." });
-//   }
-
-//   const decoded = jwt.verify(token, secret); // Using secret variable
-//   if (!decoded) {
-//     return res.status(401).json({ message: "Invalid or expired token" });
-//   }
-
-//   const dbProvider = getDbProvider();
-//   const user = await dbProvider.getUserById(decoded.id);
-
-//   if (!user || user.status === "Disabled") {
-//     return res.status(403).json({ message: "Account disabled or not found" });
-//   }
-
-//   req.user = user; // allows requireRoleAPI("Admin") to work
-//   next();
-// }
-
 module.exports = {
   generateToken,
   verifyToken,
   protect,
   redirectIfAuth,
   attachUser
-  // apiProtect,
 };

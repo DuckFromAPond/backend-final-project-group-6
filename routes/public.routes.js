@@ -19,7 +19,7 @@ router.get("/items/:id/history", protect, publicController.showItemHistory);
 
 router.post("/items", protect, publicController.addItem);
 router.put("/items/:id", protect, publicController.editItem);
-router.delete("/items/:id", protect,requireRole("Admin"), publicController.deleteItem);
+router.delete("/items/:id", protect, requireRole("Admin"), publicController.deleteItem);
 
 // Owned (should done but a little empty)
 router.get("/owned", protect, publicController.showOwned);
@@ -31,50 +31,8 @@ router.get("/report", protect, publicController.report);
 router.post("/transactions/checkin", protect, publicController.checkIn);
 router.post("/transactions/checkout", protect, publicController.checkOut);
 
-router.post("/transactions/adminCheckout", protect,requireRole("Admin"), publicController.adminCheckout);
-// router.post("/transactions/adminCheckin", protect,requireRole("Admin"), publicController.adminCheckin);
 
 router.get('/logs', protect, publicController.logs);
-
-// ===== Admin-only Routes =====
-// == user-management ==
-router.get("/users", protect, requireRole("Admin"), adminController.listUsers); // <------------ kinda weird... i think it's easier to just require "Admin role" instead of moving to Admin
-router.post(
-  "/users/:id/role",
-  protect,
-  requireRole("Admin"),
-  adminController.changeRole,
-); // <-- or post here if want since it don't matter
-router.post(
-  "/users/:id/status",
-  protect,
-  requireRole("Admin"),
-  adminController.toggleStatus,
-); // disable/enable user
-
-// == keys-management ==
-router.get(
-  "/keys",
-  protect,
-  requireRole("Admin"),
-  keyController.renderKeyManagement,
-);
-
-// Actions
-router.post(
-  "/keys/generate",
-  protect,
-  requireRole("Admin"),
-  keyController.handleGenerateKey,
-);
-router.post(
-  "/keys/revoke/:id",
-  protect,
-  requireRole("Admin"),
-  keyController.handleRevokeKey,
-);
-
-// autorender can go down here if want to add later
 
 // error 404
 router.use(publicController.notFound);

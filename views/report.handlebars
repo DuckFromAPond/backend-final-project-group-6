@@ -1,7 +1,9 @@
 {{!-- REPORT PAGE --}}
 {{!-- might be diff for admin and user but for now this is user focus or just use if to alternate --}}
-<div class="p-6">
-
+<div class="px-8 py-6">
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+        {{> toast}}
+    </div>
     {{!-- Header might not be needed  --}}
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-800">Report page</h1>
@@ -38,19 +40,19 @@
         <div class="bg-white p-6 rounded-2xl shadow col-span-2">
             <h2 class="text-lg font-semibold mb-4">Asset Aging (3+ Years)</h2>
             {{#if oldAssets.length}}
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
             <table class="w-full text-left border border-gray-200">
 
             {{!-- table header --}}
             <thead class="bg-gray-800 text-white uppercase tracking-wider">
                 <tr>
-                    <th class="px-4 py-2">ID</th>
-                    <th class="px-4 py-2">Name</th>
-                    <th class="px-4 py-2">Serial number</th>
-                    <th class="px-4 py-2">Category</th>
-                    <th class="px-4 py-2">Sub Category</th>
-                    <th class="px-4 py-2">Status</th>
-                    <th class="px-4 py-2">Date Acquired</th>
+                    <th class="px-4 py-2">ITEM ID</th>
+                    <th class="px-4 py-2">NAME</th>
+                    <th class="px-4 py-2">SERIAL NUMBER</th>
+                    <th class="px-4 py-2">CATEGORY</th>
+                    <th class="px-4 py-2">SUB CATEGORY</th>
+                    <th class="px-4 py-2">STATUS</th>
+                    <th class="px-4 py-2">DATE ACQUIRED</th>
                 </tr>
             </thead>
 
@@ -98,7 +100,7 @@
                         <td class="px-4 py-2">
                             {{#if (eq this.status "In-Use")}}
                                 <span class="px-3 py-1 text-sm font-semibold rounded-full bg-purple-100 text-purple-800">
-                                    Overdue
+                                    In-Use
                                 </span>
                             {{else if (eq this.status "Available")}}
                                 <span class="px-3 py-1 text-sm font-semibold rounded-full bg-emerald-100 text-emerald-800">
@@ -136,12 +138,15 @@
             <form method="GET" action="/report" class="relative w-full pb-4">
 
                 <button type="button" id="dropdownBtn"
-                    class="w-full border border-gray-300 p-2 rounded-lg text-left bg-white">
+                    class="w-full border border-gray-300 p-2 rounded-lg bg-white flex items-center justify-between">
+                    <span class="truncate">
                     {{#if selectedUserName}}
                         {{selectedUserName}}
                     {{else}}
                         Select user
                     {{/if}}
+                    </span>
+                    <span class="pr-2">▼</span>
                 </button>
 
                 <div id="dropdownList"
@@ -163,19 +168,20 @@
             </form>
 
             {{#if userAudit.length}}
-                <div class="w-full overflow-x-auto">
+                <div class="w-full overflow-x-auto bg-white max-h-[500px] overflow-y-auto">
                 <table class="w-full text-left border border-gray-200">
 
                 {{!-- table header --}}
                 <thead class="bg-blue-500 text-white tracking-wider">
                     <tr>
-                        <th class="px-4 py-2">ID</th>
-                        <th class="px-4 py-2">Item</th>
-                        <th class="px-4 py-2">Date Received</th>
-                        <th class="px-4 py-2">Borrow duration</th>
-                        <th class="px-4 py-2">Return Date</th>
-                        <th class="px-4 py-2">Status</th>
-                        <th class="px-4 py-2">Action</th>
+                        <th class="px-4 py-2">ITEM ID</th>
+                        <th class="px-4 py-2">ITEM</th>
+                        <th class="px-4 py-2">DATE RECEIVED</th>
+                        <th class="px-4 py-2">BORROW DURATION</th>
+                        <th class="px-4 py-2">GIVEN DURATION</th>
+                        <th class="px-4 py-2">RETURN DATE</th>
+                        <th class="px-4 py-2">STATUS</th>
+                        <th class="px-4 py-2">ACTION</th>
                     </tr>
                 </thead>
 
@@ -214,6 +220,13 @@
                             {{/if}}
                         </td>
 
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.givenDuration}}
+                                {{this.givenDuration}}
+                            {{else}}
+                                <span class="text-gray-400">Not set</span>
+                            {{/if}}
+                        </td>
 
                         <!-- DUE -->
                         <td class="px-4 py-2 text-gray-800">
@@ -243,10 +256,19 @@
 
                         {{!--Action --}}
                         <td class="px-4 py-2">
+                            {{#if (eq ../user.role "Admin")}}
+                            <button
+                                type="button"
+                                onclick="openadminForm('{{this.id}}', '{{../selectedUserEmail}}')"
+                                class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm"
+                            >
+                                Assited Check-In
+                            </button>
+                            {{/if}}
                             <a
                                 href="/api/files/docs/{{this.referenceUrl}}"
                                 target="_blank"
-                                class="bg-blue-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
+                                class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm inline-block"
                                 >
                                 View doc ↗
                             </a>
@@ -266,6 +288,16 @@
     </div>
 
 </div>
+
+
+<div id="adminmodal" class="fixed inset-0 bg-black/65 flex items-center justify-center hidden z-50" onclick="closeadminForm()">
+    {{!-- make closeform only work for background --}}
+    <div class="w-full max-w-lg" onclick="event.stopPropagation()">     
+        {{> adminForm title="Check-in" action="adminCheckin"}}
+    </div>
+</div>
+
+
 <script>
     const btn = document.getElementById("dropdownBtn");
     const list = document.getElementById("dropdownList");
@@ -292,4 +324,16 @@
         list.classList.add("hidden");
     }
     });
+
+    function openadminForm(id,email) {
+        document.getElementById("adminmodal").classList.remove("hidden");
+
+        document.getElementById("file_item_admin").value = id;
+
+        document.getElementById("userEmail").value = email;
+    }
+
+    function closeadminForm() {
+        document.getElementById("adminmodal").classList.add("hidden");
+    }
 </script>

@@ -5,7 +5,8 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "build": "npx tailwindcss -i ./utils/styles.css -o ./public/css/styles.css --watch"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.2",
+    "@tailwindcss/cli": "^4.2.4",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -33,7 +35,9 @@
     "mongodb": "^7.1.1",
     "mongoose": "^9.4.1",
     "morgan": "^1.10.1",
-    "multiparty": "^4.2.3"
+    "multiparty": "^4.2.3",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

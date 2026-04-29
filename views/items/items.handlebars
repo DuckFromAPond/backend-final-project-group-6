@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-6 p-6">
+<div class="flex flex-col gap-6 px-8 py-6">
     {{!-- TOAST BANNER --}}
     <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
         {{> toast}}
@@ -55,7 +55,7 @@
                 <ul class="space-y-1">
                     
                     <li>
-                        <a class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                        <a class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out transition"
                             href="/items"
                         >All</a>
                     </li>
@@ -63,14 +63,14 @@
                     {{#each categories}}
                     <li>
                         <a href="/items?cat={{this.name}}"
-                        class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition">
+                        class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out transition">
                         {{this.name}}
                         </a>
                     </li>
                     {{/each}}
                     <li>
                         <button
-                        class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                        class="text-left w-full cursor-pointer block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out transition"
                         onclick="openSubcategory()"
                         >
                         Subcategories
@@ -80,7 +80,7 @@
                     
                     <li>
                         <a href="/items?isRetired=true"
-                        class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out duration-300 transition"
+                        class="block px-2 py-1 rounded hover:bg-gray-500 hover:text-white ease-in-out transition"
                         >
                         Retired
                         </a>

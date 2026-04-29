@@ -202,7 +202,7 @@ RESTful API with JSON request/response:
 - Proper HTTP status codes and error messages
 - Rate limiting on login endpoints
 
-## 📊 API Endpoints
+## 📊 PUBLIC-facing Endpoints
 
 ### Authentication
 ```
@@ -211,7 +211,6 @@ GET    /login                      - Show login form
 POST   /register                   - Web registration
 GET    /register                   - Show registration form
 GET    /logout                     - Clear session
-POST   /api/login                  - API login
 ```
 
 ### Items
@@ -229,6 +228,7 @@ DELETE /items/:id                  - Delete item (Admin)
 POST   /transactions/checkin       - Check in item
 POST   /transactions/checkout      - Check out item
 POST   /transactions/adminCheckout - Admin force checkout
+POST   /transactions/adminCheckin - Admin force checkout
 ```
 
 ### Admin - Users
@@ -257,8 +257,25 @@ GET    /home                       - Home page
 GET    /owned                      - User's owned items
 GET    /report                     - Reports page
 GET    /logs                       - Activity logs
-GET    /files/:bucket/:id          - Download file (Admin)
+GET    /files/:bucket/:id          - Reference/Image file
 ```
+
+## API Endpoints
+### Authentication
+```
+POST /api/login                    - Authenticate a user and receive a JSON Web Token (JWT).
+```
+**Body:** { email, password }  
+**Returns:** JWT token  
+**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
+
+### Users (Admin Only)
+```
+GET /api/users - Get all users
+```
+**Body:** { }  
+**Returns:** 
+**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
 
 ## 🔐 Security Features
 
@@ -417,6 +434,7 @@ Both database providers implement the same interface (see `databaseProvider.js`)
 - File: `data/SupabaseProvider.js`
 - Uses PostgreSQL backend
 - Includes auth integration
+- Note: Supabase is deprecated and is no longer updated (the design is left here in case anyone wants to build upon it)
 
 ## 📄 License
 

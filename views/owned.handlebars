@@ -5,17 +5,17 @@ SHOWS CURRENTLY OWNED ITEMS
 --}}
 
 {{!-- style later --}}
-<div class="flex flex-col items-center p-6 ">
+<div class="flex flex-col items-center px-8 py-6 ">
     <div class="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
         {{> toast}}
     </div>
     {{!-- header --}}
-    <div class="w-full max-w-6xl mb-6">
+    <div class="w-full mb-6">
         <h1 class="text-3xl font-bold text-gray-800">Owned Items</h1>
         <p class="text-gray-500 mt-1">Items currently checked out to you</p>
     </div>
 
-    <div class="w-full max-w-6xl overflow-x-auto shadow-lg bg-white rounded-2xl p-6">
+    <div class="w-full overflow-x-auto shadow-lg bg-white rounded-2xl p-6">
         <table class="w-full border border-gray-200 text-left">
 
             {{!-- table header --}}
@@ -25,6 +25,7 @@ SHOWS CURRENTLY OWNED ITEMS
                     <th class="px-4 py-2">ITEM</th>
                     <th class="px-4 py-2">DATE RECEIVED</th>
                     <th class="px-4 py-2">BORROW DURATION</th>
+                    <th class="px-4 py-2">GIVEN DURATION</th>
                     <th class="px-4 py-2">RETURN DATE</th>
                     <th class="px-4 py-2">STATUS</th>
                     <th class="px-4 py-2">ACTION</th>
@@ -66,6 +67,13 @@ SHOWS CURRENTLY OWNED ITEMS
                             {{/if}}
                         </td>
 
+                        <td class="p-4 text-gray-800 border-r border-gray-400">
+                            {{#if this.givenDuration}}
+                                {{this.givenDuration}}
+                            {{else}}
+                                <span class="text-gray-400">Not set</span>
+                            {{/if}}
+                        </td>
 
                         <!-- DUE -->
                         <td class="px-4 py-2 text-gray-800">
@@ -100,7 +108,7 @@ SHOWS CURRENTLY OWNED ITEMS
                                 onclick="openForm('{{this.id}}')"
                                 class="bg-blue-500 cursor-pointer hover:bg-blue-600 text-white text-sm px-4 py-2 m-1 rounded-lg transition shadow-sm"
                             >
-                                Check In
+                                Check-In
                             </button>
                             <a
                                 href="/api/files/docs/{{this.referenceUrl}}"
@@ -142,10 +150,6 @@ SHOWS CURRENTLY OWNED ITEMS
 
         function closeForm() {
             document.getElementById("modal").classList.add("hidden");
-        }
-        
-        function setDuration(hours) {
-            document.getElementById("duration").value = hours;
         }
     </script>
 </div>

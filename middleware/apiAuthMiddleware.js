@@ -133,4 +133,4 @@ async function authOrApiKey(req, res, next) {
   }
 }
 
-module.exports = { apiProtect, authOrApiKey }
+module.exports = { apiProtect, authOrApiKey}
