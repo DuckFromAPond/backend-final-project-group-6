@@ -17,6 +17,7 @@
                 <a href="/items" class="text-xs text-gray-500 hover:text-blue-500 transition">Items</a>
                 <a href="/owned" class="text-xs text-gray-500 hover:text-blue-500 transition">Owned</a>
                 <a href="/report" class="text-xs text-gray-500 hover:text-blue-500 transition">Report</a>
+                <a href="/logs" class="text-xs text-gray-500 hover:text-blue-500 transition">Logs</a>
                 {{#if (eq user.role "Admin")}}
                 <a href="/users" class="text-xs text-gray-500 hover:text-blue-500 transition">Users</a>
                 <a href="/keys" class="text-xs text-gray-500 hover:text-blue-500 transition">Keys</a>
@@ -37,11 +38,16 @@
 
         {{!-- BOTTOM: divider + signed in as --}}
         <div class="border-t border-gray-100 mt-4 pt-4 flex justify-between items-center">
+            <div>
             <p class="text-xs text-gray-400">
                 Signed in as <span class="font-medium text-gray-600">{{user.name}}</span>
                 <span class="text-gray-300 mx-1">•</span>
                 <span class="text-gray-400">{{#if user.role}}{{user.role}}{{else}}User{{/if}}</span>
             </p>
+            {{#if user.role}}
+            <p class="text-xs text-gray-400">ID: {{user.id}} </p>
+            {{/if}}
+            </div>
             <p class="text-xs text-gray-300">v1.0.0</p>
         </div>
 

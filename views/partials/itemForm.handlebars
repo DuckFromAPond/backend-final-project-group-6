@@ -83,29 +83,35 @@
             <label for="name">Item name: </label>
             <input type="text" name="name" id="name" placeholder="Item Name..." value="{{name}}"
                 class="w-full border-gray-500 border p-2 rounded-lg"
+                required
             >
             <label for="description">Item description: </label>
             <input type="text" name="description" id="description" placeholder="Item Description..." value="{{description}}"
                 class="w-full border-gray-500 border p-2 rounded-lg"
+                required
             >
             <label for="brand">Brand: </label>
             <input type="text" name="brand" id="brand" placeholder="Item Brand..." value="{{brand}}"
                 class="w-full border-gray-500 border p-2 rounded-lg"
+                required
             >
             <label for="model">Model: </label>
             <input type="text" name="model" id="model" placeholder="Item Model..." value="{{model}}"
                 class="w-full border-gray-500 border p-2 rounded-lg"
+                required
             >
             <label for="serial">Serial Number: </label>
             <input type="text" name="serial" id="serial" placeholder="Item Serial Number..." value="{{serial}}"
                 class="w-full border-gray-500 border p-2 rounded-lg"
+                required
             >
             <label for="dateAcquired">Date of Acquisition: </label>
             <input type="date" name="dateAcquired" id="dateAcquired" value="{{formatDate this.dateAcquired}}"
                 class="w-full border-gray-500 border p-2 rounded-lg"
+                required
             >
             <label for="category">Category:</label>
-            <select name="category" id="category" class="w-full border-gray-500 border p-2 rounded-lg">
+            <select name="category" id="category" required class="w-full border-gray-500 border p-2 rounded-lg">
                 <option value="" disabled>Select category...</option>
 
                 <option value="Computers" {{#if (eq category "Computers")}}selected{{/if}}>
@@ -117,7 +123,7 @@
                 </option>
             </select>
             <label for="subCategory">Subcategory:</label>
-            <select name="subCategory" id="subCategory" class="w-full border-gray-500 border p-2 rounded-lg">
+            <select name="subCategory" id="subCategory" required class="w-full border-gray-500 border p-2 rounded-lg">
                 <option value="" disabled>Select subcategory...</option>
 
                 {{#each categories}}
@@ -131,7 +137,7 @@
                 {{/each}}
             </select>
             <label for="status">Status:</label>
-            <select name="status" id="status" class="w-full border-gray-500 border p-2 rounded-lg">
+            <select name="status" id="status" required class="w-full border-gray-500 border p-2 rounded-lg">
                 <option value="" disabled>Select status...</option>
 
                 {{#each statuses}}
@@ -189,10 +195,13 @@
                 body: formData
             });
 
-            if (response.ok) {
-                const data = await response.json();
+            const data = await response.json();
+            if (data.redirect) {
                 window.location.href = data.redirect;
+                return;
             }
+
+            window.location.href = `/items/${itemId}?error=Unexpected+error`;
         });
     }
 </script>

@@ -8,11 +8,11 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    passwordHash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('Admin', 'Technician')),
     status TEXT NOT NULL CHECK (status IN ('Active', 'Disabled')),
-    created_at TIMESTAMP DEFAULT NOW(),
-    disabled_at TIMESTAMP NULL
+    createdAt TIMESTAMP DEFAULT NOW(),
+    disabledAt TIMESTAMP NULL
 );
 
 -- =========================
@@ -59,7 +59,13 @@ CREATE TABLE api_keys (
     id SERIAL PRIMARY KEY,
     hashKey TEXT UNIQUE NOT NULL,
     name TEXT,
-    adminId INTEGER NOT NULL REFERENCES users(id),
+    userId INTEGER NOT NULL REFERENCES users(id),
     createdAt TIMESTAMP DEFAULT NOW(),
     revoked BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE category (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE,
+    parentId INTEGER NOT NULL REFERENCES category(id),
 );

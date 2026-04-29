@@ -10,7 +10,7 @@ exports.adminCreateUser = async (req, res) => {
     const { name, email, password, role } = req.body;
     // Use your existing service (Reuse is good!)
     await userService.registerNewUser(name, email, password, role);
-    return res.redirect("/users?success=User created successfully");
+    return res.redirect("/users?success=User+created+successfully");
   } catch (error) {
     // If it fails, redirect back to the list with the error message
     return res.redirect(`/users?error=${encodeURIComponent(error.message)}`);
@@ -46,10 +46,16 @@ exports.toggleStatus = async (req, res) => {
 };
 
 exports.changeRole = async (req, res) => {
-  const { id } = req.params;
-  const { role } = req.body;
-  await userService.updateUserRole(id, role);
-  res.redirect("/users?success=User+role+updated");
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    await userService.updateUserRole(id, role);
+    res.redirect("/users?success=User+role+updated");
+  } catch(err) { 
+    console.error(err);
+    res.redirect(`/users?error=${encodeURIComponent(err.message)}`);
+  }
 };
 
 // POST CHECKOUT
@@ -71,7 +77,7 @@ exports.adminCheckout = async (req, res, next) => {
 
     // validate checkout
     await itemService.validateCheckout(itemId);
-    const userId = await adminService.adminValidateForCheckin(
+    const userId = await adminService.adminValidateForCheck(
       userEmail,
       adminId,
     );
@@ -86,13 +92,9 @@ exports.adminCheckout = async (req, res, next) => {
     }
 
     if (files?.document?.length > 0) {
-      const DBlabel = itemService.getDBlabel();
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/items?error=File+too+large+(max+20MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
@@ -147,7 +149,7 @@ exports.adminCheckin = async (req, res, next) => {
     const adminId = req.user.id;
 
     // validate checkout
-    const userId = await adminService.adminValidateForCheckin(
+    const userId = await adminService.adminValidateForCheck(
       userEmail,
       adminId,
     );
@@ -163,13 +165,9 @@ exports.adminCheckin = async (req, res, next) => {
     }
 
     if (files?.document?.length > 0) {
-      const DBlabel = itemService.getDBlabel();
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/report?error=File+too+large+(max+50MB)");
-        }
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/report?error=File+too+large+(max+20MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);

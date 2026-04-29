@@ -1,35 +1,28 @@
 const { getDbProvider } = require("../utils/dbProviderShared");
 
 
-exports.adminValidateForCheckout = async (userEmail,adminId) =>{
-  const db = getDbProvider();
-  const user = await db.findUserByEmail(userEmail);
-
-  const admin = await db.getUserById(adminId);
-  if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
-  }
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  return user.id;
-}
-
-
-exports.adminValidateForCheckin = async (userEmail,adminId) =>{
+exports.adminValidateForCheck = async (userEmail,adminId) =>{
   const db = getDbProvider();
   const user = await db.findUserByEmail(userEmail);
 
   const admin = await db.getUserById(adminId);
 
   if (!admin || admin.role !== "Admin") {
-    throw new Error("Unauthorized");
+    const err = new Error("Unauthorized");
+    err.statusCode = 403;
+    throw err;
   }
 
   if (!user) {
-    throw new Error("User not found");
+    const err = new Error("User not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (user.status === "Disabled") {
+    const err = new Error("User is disabled");
+    err.statusCode = 403;
+    throw err;
   }
   
   return user.id;

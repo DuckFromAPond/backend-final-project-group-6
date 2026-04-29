@@ -47,22 +47,75 @@ exports.getAllUsers = async () => {
 // update role and status
 exports.updateUserRole = async (userId, newRole) => {
   const db = getDbProvider();
+  
+  if (!userId) {
+    const err = new Error("User id is required");
+    err.status = 400;
+    throw err;
+  }
+
+  if (!newRole) {
+    const err = new Error("Role required (Admin or Technician)");
+    err.status = 400;
+    throw err;
+  }
+
+  const allowedRoles = ["Admin", "Technician"];
+
+  if (!allowedRoles.includes(newRole)) {
+    const err = new Error("Invalid role (must be Admin or Technician)");
+    err.status = 400;
+    throw err;
+  }
+
+  const user = await exports.getDBUserById(userId);
+
+  if (!user) {
+    const err = new Error("User does not exist");
+    err.status = 404;
+    throw err;
+  }
+
   return await db.updateUser(userId, { role: newRole });
 };
 
 exports.updateUserStatus = async (userId, newStatus, ownedItems) => {
   const db = getDbProvider();
 
-  if (newStatus === "Disabled" && ownedItems.length > 0) {
-    throw new Error(
-      "User must return all items before being disabled - Admins can force check-in selected user on the report page",
-    );
+  if (!userId) {
+    const err = new Error("User id is required");
+    err.status = 400;
+    throw err;
   }
 
-  const user = await db.updateUser(userId, { status: newStatus });
+  if (!newStatus) {
+    const err = new Error("Status required (Active or Disabled)");
+    err.status = 400;
+    throw err;
+  }
 
-  if (newStatus === "Disabled") {
-    await db.revokeOwnedApiKeys(userId);
+  const allowedStatus = ["Active", "Disabled"];
+
+  if (!allowedStatus.includes(newStatus)) {
+    const err = new Error("Invalid status (must be Active or Disabled)");
+    err.status = 400;
+    throw err;
+  }
+
+  const searchUser = await exports.getDBUserById(userId);
+
+  if (!searchUser) {
+    const err = new Error("User does not exist");
+    err.status = 404;
+    throw err;
+  }
+
+  if (newStatus === "Disabled" && ownedItems?.length > 0) {
+    const err = new Error(
+      "User must return all items before being disabled"
+    );
+    err.status = 409; // conflict (business rule prevents action)
+    throw err;
   }
 
   return user;

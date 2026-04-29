@@ -8,11 +8,11 @@ const keyController = require("../controllers/key.controller");
 const { requireRole } = require("../middleware/roleCheck");
 
 
-// Home (need design with frontend)
+// Home 
 router.get("/", protect, publicController.home);
 router.get("/home", protect, publicController.home);
 
-// CRUD (missing integration)
+// CRUD 
 router.get("/items", protect, publicController.showItems);
 router.get("/items/:id", protect, publicController.showItemDetail);
 router.get("/items/:id/history", protect, publicController.showItemHistory);
@@ -21,17 +21,17 @@ router.post("/items", protect, publicController.addItem);
 router.put("/items/:id", protect, publicController.editItem);
 router.delete("/items/:id", protect, requireRole("Admin"), publicController.deleteItem);
 
-// Owned (should done but a little empty)
+// Owned 
 router.get("/owned", protect, publicController.showOwned);
 
-// Report (missing implementation with frontend)    ------------------------- finish later
+// Report 
 router.get("/report", protect, publicController.report);
 
-// Check in/out (shoud be working)
+// Check in/out 
 router.post("/transactions/checkin", protect, publicController.checkIn);
 router.post("/transactions/checkout", protect, publicController.checkOut);
 
-
+// Logs
 router.get('/logs', protect, publicController.logs);
 
 // error 404

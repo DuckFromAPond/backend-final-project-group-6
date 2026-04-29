@@ -12,7 +12,9 @@ exports.renderKeyManagement = async (req, res) => {
     const error = req.query.error  || null;
     const success = req.query.success  || null;
 
-    const userMap = new Map(allUsers.map(u => [u.id?.toString(), u]));
+    const onlyValidUser = allUsers.filter(user => user.status !== "Disabled");
+
+    const userMap = new Map(onlyValidUser.map(u => [u.id?.toString(), u]));
 
     const formattedKeys = activeKeys.map(key => {
       const d = new Date(key.createdAt);
@@ -38,7 +40,7 @@ exports.renderKeyManagement = async (req, res) => {
     res.render("keys", {
       pageTitle: "API Keys", // changed from Manage API Key Management -> API Keys for consistency 
       keys: formattedKeys,
-      users: allUsers,
+      users: onlyValidUser,
       user: req.user, // Current logged-in admin
       // check if there's a freshly generated key in the session to show once
       newKey: newKey,
@@ -56,7 +58,7 @@ exports.handleGenerateKey = async (req, res) => {
   try {
     const { name, userId } = req.body;
     if (!name || !userId)
-      return res.redirect("/keys?error=Name+&+UserId+required");
+      return res.redirect("/keys?error=Name+and+UserId+required");
 
     const result = await keyService.createKey(name, userId);
 
@@ -75,6 +77,8 @@ exports.handleGenerateKey = async (req, res) => {
 exports.handleRevokeKey = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id)
+      return res.redirect("/keys?error=Id+required");
     await keyService.revokeKey(id);
     res.redirect("/keys");
   } catch (error) {

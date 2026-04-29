@@ -392,51 +392,6 @@ class MongoProvider extends DatabaseProvider {
     }));
   }
 
-  // break apart later
-  async updateUserItem(itemId, targetUserId, adminId, action, options = {}) {
-    const item = await Item.findById(itemId);
-    if (!item) throw new Error("Item not found");
-
-    const admin = await User.findById(adminId);
-    if (!admin || admin.role !== "Admin") {
-      throw new Error("Unauthorized");
-    }
-
-    if (!["checkout", "checkin"].includes(action)) {
-      throw new Error("Invalid action");
-    }
-
-    if (action === "checkout") {
-      const existing = await ItemHistory.findOne({
-        itemId,
-        returnedAt: null,
-      });
-
-      if (existing) {
-        if (existing.userId.toString() === targetUserId.toString()) {
-          throw new Error("User already owns this item");
-        }
-        throw new Error("Item is already checked out");
-      }
-    }
-
-    const history = await ItemHistory.create({
-      itemId,
-      userId: targetUserId,
-      action,
-      duration: options.duration ?? null,
-      referenceLink: options.referenceLink ?? null,
-      returnedAt: action === "checkin" ? new Date() : null,
-    });
-
-    await this.setItemStatus(
-      itemId,
-      action === "checkout" ? "In-Use" : "Available",
-    );
-
-    return history.toObject();
-  }
-
   // =========================
   // API KEYS
   // =========================

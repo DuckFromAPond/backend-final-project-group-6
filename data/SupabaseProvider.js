@@ -8,6 +8,7 @@ const {
   mapItemRowToModel,
   mapItemHistoryRowToModel,
   mapApiKeyRowToModel,
+  mapCategoryRowToModel
 } = require("./models/supabaseModels");
 
 class SupabaseProvider extends DatabaseProvider {
@@ -124,6 +125,14 @@ class SupabaseProvider extends DatabaseProvider {
       .from(SUPABASE_TABLES.API_KEYS)
       .select("id")
       .limit(1);
+    if (apiError) throw new Error("API keys table missing");
+
+      const { error: categoryError } = await this.supabase
+      .from(SUPABASE_TABLES.CATEGORY)
+      .select("id")
+      .limit(1);
+
+    if (categoryError) throw new Error("Category table missing");
   }
   
 	async getFile(bucket, id) {

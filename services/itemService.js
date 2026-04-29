@@ -20,25 +20,31 @@ exports.uploadDBItem = async (fileName, fileBuffer, mimeType) => {
   return await db.uploadItem(fileName, fileBuffer, mimeType);
 }
 
-exports.validateCheckout = async (itemId) => {
-  const db = getDbProvider();
+  exports.validateCheckout = async (itemId) => {
+    const db = getDbProvider();
 
-  const item = await db.getItemById(itemId);
+    const item = await db.getItemById(itemId);
 
-  if (!item) {
-    throw new Error("Item not found");
-  }
+    if (!item) {
+      const err = new Error("Item not found");
+      err.status = 404;
+      throw err;
+    }
 
-  if (item.status !== "Available") {
-    throw new Error("Item not available");
-  }
+    if (item.status !== "Available") {
+      const err = new Error("Item not available");
+      err.status = 409; // conflict (already not available)
+      throw err;
+    }
 
-  const active = await db.findActiveAction(itemId, "checkout");
+    const active = await db.findActiveAction(itemId, "checkout");
 
-  if (active) {
-    throw new Error("Item already checked out");
-  }
-};
+    if (active) {
+      const err = new Error("Item already checked out");
+      err.status = 409;
+      throw err;
+    }
+  };
 
 exports.getDBFile = async (bucket, id) => {
   const db = getDbProvider();
@@ -66,21 +72,29 @@ exports.validateCheckin = async (itemId, userId) => {
   const item = await db.getItemById(itemId);
 
   if (!item) {
-    throw new Error("Item not found");
+    const err = new Error("Item not found");
+    err.status = 404;
+    throw err;
   }
 
   if (item.status !== "In-Use") {
-    throw new Error("Item is not in-use.");
+    const err = new Error("Item is not in-use");
+    err.status = 409;
+    throw err;
   }
 
   if (String(item.currentOwner) !== String(userId)) {
-    throw new Error("You don't own this item.");
+    const err = new Error("You don't own this item");
+    err.status = 403;
+    throw err;
   }
 
   const active = await db.findActiveAction(itemId, "checkin");
 
   if (active) {
-    throw new Error("Item already checked in");
+    const err = new Error("Item already checked in");
+    err.status = 409;
+    throw err;
   }
 };
 
@@ -230,6 +244,30 @@ exports.getCategoryFromDB = async () => {
   const db = getDbProvider();
   const categories = await db.getAllCategories();
 
+  // safety fallback
+  if (!categories || categories.length === 0) {
+    return [
+      {
+        name: "Peripherals",
+        subCategories: [
+          { name: "Monitor" },
+          { name: "Keyboard" },
+          { name: "Mouse" },
+          { name: "Scanner" },
+          { name: "Printer" },
+        ],
+      },
+      {
+        name: "Computers",
+        subCategories: [
+          { name: "Laptop" },
+          { name: "Desktop" },
+          { name: "Server" },
+        ],
+      },
+    ];
+  }
+
   const map = new Map();
   const result = [];
 
@@ -257,6 +295,8 @@ exports.getCategoryFromDB = async () => {
       result.push(map.get(id));
     }
   });
+
+
   return result;
 };
 
@@ -365,23 +405,16 @@ exports.deleteDBItem = async (id) => {
 // description: process item form
 // precondition: request object, fs, multiparty, path
 // postcondition: object {type, redirect, name, description, brand, model, category, subCategory, serial, status, dateAcquired, filePath, fileBuffer, fileName, mimeType}
-exports.processItemForm = async (req) => {
+exports.processItemForm = async (req, isEdit) => {
   const db = getDbProvider();
   const id = req.params.id; // for returning to itemDetail if the form is submitted from /itemDetail
   const form = new multiparty.Form();
 
-  let type = null;
-  let redirect = null;
-  let errCode = null;
-  let message = null
-
   if (!req.headers["content-type"]?.includes("multipart/form-data")) {
-    return {
-      type: "error",
-      redirect: `/items/?error=Invalid+content+type`,
-      message: "INVALID CONTENT TYPE",
-      errCode: 415
-    };
+    const err = new Error("Invalid content type (requires form-data for image input)");
+    err.status = 415;
+    err.redirect = `/items/?error=Invalid+content+type`;
+    throw err;
   }
 
   const { fields, files } = await new Promise((resolve, reject) => {
@@ -390,7 +423,7 @@ exports.processItemForm = async (req) => {
       resolve({ fields, files });
     });
   });
-
+    
   // extract fields
   const name = fields.name?.[0] ?? null;
   const description = fields.description?.[0] ?? null;
@@ -400,24 +433,57 @@ exports.processItemForm = async (req) => {
   const subCategory = fields.subCategory?.[0] ?? null;
   const serial = fields.serial?.[0] ?? null;
   const status = fields.status?.[0] ?? null;
-  const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
+  const rawDate = fields.dateAcquired?.[0];
+
+  if (rawDate && isNaN(Date.parse(rawDate))) {
+    const err = new Error("Invalid dateAcquired (MM-DD-YY)");
+    err.status = 400;
+    err.redirect = "/items?error=Invalid+date";
+    throw err;
+  }
+
+  const dateAcquired = rawDate;
   
-  if (
-    !name ||
-    !description ||
-    !brand ||
-    !model ||
-    !serial ||
-    !category ||
-    !subCategory ||
-    !status
-  ) {
-    return {
-      type: "error",
-      errCode: 400,
-      message: "MISSING REQUIRED FIELDS",
-      redirect: id && id.length > 0 ? `/items/${id}?error=Missing+required+fields` : `/items?error=Missing+required+fields`,
-    }
+  if (!name || !description || !brand || !model || !serial || !category || !subCategory || !status) {
+    const err = new Error("Missing required fields (name, brand, model, serial, category, subCategory, status, description, dateAcquired, imagge - refer to readme for detail)");
+    err.status = 400;
+    err.redirect = id
+    ? `/items/${id}?error=Missing+required+fields`
+    : `/items?error=Missing+required+fields`;
+    throw err;
+  }
+
+  const {categories} = await exports.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
+  if (!categories?.some(c => c.name === category)) {
+    const err = new Error("Invalid category (Computers or Peripherals)");
+    err.status = 400;
+    err.redirect = id
+      ? `/items/${id}?error=Invalid+category`
+      : `/items?error=Invalid+category`;
+    throw err;
+  }
+
+  const allowedStatuses = ["Available", "Maintenance"];
+  if (!allowedStatuses.includes(status)) {
+    const err = new Error("Status must be Available or Maintenance");
+    err.status = 400;
+    err.redirect = id
+      ? `/items/${id}?error=Status+must+be+Available+or+Maintenance`
+      : `/items?error=Status+must+be+Available+or+Maintenance`;
+    throw err;
+  }
+
+  const isValidSubcategory = categories.some(c =>
+    c.subCategories?.some(sc => sc.name === subCategory)
+  );
+
+  if (!isValidSubcategory) {
+    const err = new Error("Invalid subcategory. Sub category must be apart of the appropriate category and an existing sub category (more details listed in the readme)");
+    err.status = 400;
+    err.redirect = id
+      ? `/items/${id}?error=Invalid+subcategory`
+      : `/items?error=Invalid+subcategory`;
+    throw err;
   }
 
   // upload file
@@ -428,15 +494,15 @@ exports.processItemForm = async (req) => {
   // check whether file is uploaded
   if (files?.image?.length > 0 && files?.image[0]?.originalFilename.length !== 0) {
     const file = files.image[0];
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
     if (file.size > MAX_SIZE) {
-      return {
-        type: "error",
-        errCode: 413,
-        message: "FILE TOO LARGE",
-        redirect: id && id.length > 0 ? `/items/${id}?error=File+too+large+(max+50MB)` : `/items?error=File+too+large+(max+50MB)`,
-      }
+      const err = new Error("File too large");
+      err.status = 413;
+      err.redirect = id
+        ? `/items/${id}?error=File+too+large+(max+5MB)`
+        : `/items?error=File+too+large+(max+5MB)`;
+      throw err;
     }
 
     mimeType = file.headers?.["content-type"] || "application/octet-stream";
@@ -453,12 +519,12 @@ exports.processItemForm = async (req) => {
     const isImage = mimeType.startsWith("image/");
 
     if (!allowedImageExtensions.has(ext) || !isImage) {
-      return {
-        type: "error",
-        errCode: 415,
-        message: "INVALID FILE TYPE",
-        redirect: id && id.length > 0 ? `/items/${id}?error=Only+image+files+are+allowed` : `/items?error=Only+image+files+are+allowed`,
-      }
+      const err = new Error("Invalid file type");
+      err.status = 415;
+      err.redirect = id
+        ? `/items/${id}?error=Only+image+files+are+allowed`
+        : `/items?error=Only+image+files+are+allowed`;
+      throw err;
     }
     const rawBuffer = fs.readFileSync(file.path);
 
@@ -469,18 +535,21 @@ exports.processItemForm = async (req) => {
     fileBuffer = webpBuffer;
     mimeType = "image/webp";
     fileName = `${Date.now()}_${file.originalFilename}.webp`;
+  } else if (isEdit) {
+    fileBuffer = null;
+    fileName = null;
+    mimeType = null;
   }
   else {
-    return {
-      type: "error",
-      redirect: `/items?error=Image+file+required`,
-      redirect: id && id.length > 0 ? `/items/${id}?error=Image+file+required` : `/items?error=Image+file+required`,
-      message: "IMAGE REQUIRED",
-      errCode: 400
-    }
+    const err = new Error("Image file required (in image field using form-data)");
+    err.status = 400;
+    err.redirect = id
+      ? `/items/${id}?error=Image+file+required`
+      : `/items?error=Image+file+required`;
+    throw err;
   }
 
-  return { fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect, message, errCode };
+  return { fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired };
 }
 
 

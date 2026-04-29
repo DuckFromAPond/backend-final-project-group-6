@@ -7,6 +7,7 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const { items, itemHistories, users, dashboardData } = require("../data/data");
 const itemService = require("../services/itemService"); 
 const userService = require("../services/userService");
+const { error } = require("console");
 
 // GET: /HOME ---------------------------------------------- need to fix later
 exports.home = async (req, res, next) => {
@@ -213,70 +214,26 @@ exports.showItems = async (req, res, next) => {
 exports.addItem = async (req, res, next) => {
   try {
     const {
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
-      dateAcquired,
-      type,
-      redirect,
-      message,
-      errCode
-    } = await itemService.processItemForm(req);
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
+      dateAcquired
+    } = await itemService.processItemForm(req, false);
 
-    const { categories } = itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
     let filePath = null;
-
-    const statuses = [
-      { name: "Available" },
-      { name: "Maintenance" },
-    ];
-
-    // an error in form processing must've occured
-    if (type?.toLowerCase() === "error") {
-      return res.status(errCode).redirect(redirect);
-    }
 
     const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing) {
-      return res.status(400).redirect("/items?error=Serial+already+exists");
-    }
-
-    if (
-      !name ||
-      !description ||
-      !brand ||
-      !model ||
-      !category ||
-      !serial ||
-      !status
-    ) {
-      return res.status(400).redirect("/items?error=Missing+required+fields");
-    }
-
-    if(!statuses.map(s => s.name).includes(status)) {
-      return res.status(400).redirect(`/items?error=Status+must+be+available+or+maintenance`);
-    }
-
-    if(!categories.map(c => c.name).includes(category)) {
-      return res.status(400).redirect(`/items?error=Invalid+category`)
-    }
-
-    const subcat = subCategory;
-    const isValidSubcat = categories.some(c =>
-      c.subCategories?.some(sc => sc.name === subcat)
-    )
-
-    if (!isValidSubcat) {
-      return res.status(400).redirect(`/items?error=Invalid+subcategory`)
+      return res.status(409).redirect("/items?error=Serial+already+exists");
     }
 
     filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
@@ -300,7 +257,9 @@ exports.addItem = async (req, res, next) => {
     return res.redirect("/items?success=Item+added+successfully");
   }
   catch (err) {
-    next(err);
+    return res.redirect(
+      err.redirect || `/items?error=${encodeURIComponent(err.message)}`
+    );
   }
 }
 
@@ -378,85 +337,55 @@ exports.showItemDetail = async (req, res, next) => {
 
 exports.editItem = async (req, res, next) => {
   const { id } = req.params;
-  const error = req.query.error  || null;
-  const success = req.query.success  || null;
 
   try {
     const item = await itemService.getDBItemById(id);
+    if (!item) {
+      return res.status(404).json({
+        type: "error",
+        message: "ITEM NOT FOUND",
+        redirect: `/items/${id}?error=Item+not+found`,
+      });
+    }
+
     const {
-      fileBuffer, 
-      fileName, 
+      fileBuffer,
+      fileName,
       mimeType,
-      name, 
-      description, 
-      brand, 
-      model, 
-      category, 
-      subCategory, 
-      serial, 
-      status, 
-      dateAcquired,
-      type,
-      redirect,
-      message,
-      errCode
-    } = await itemService.processItemForm(req);
-    const {categories} = itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
-    let filePath = null;
-    const statuses = [{ name: "Available" }, { name: "Maintenance" }];
+      name,
+      description,
+      brand,
+      model,
+      category,
+      subCategory,
+      serial,
+      status,
+      dateAcquired, 
+    } = await itemService.processItemForm(req, true);
+    
     const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing && existing.id.toString() !== id.toString()) {
-      return res.redirect("/items?error=Serial+already+exists");
-    }
-
-    if (type?.toLowerCase() === "error") {
-      return res.status(errCode).json({
-        type,
-        message,
-        redirect,
+      return res.status(409).json({
+        type: "error",
+        message: "SERIAL ALREADY EXISTS",
+        redirect: `/items?${id}error=Serial+already+exists`,
       });
     }
 
-    if (item.status === "In-Use") {
-      return res.status(400).json({
+    let filePath = null;
+
+    if (status === "In-Use" || item.status === "In-Use") {
+      return res.status(403).json({
         type: "error",
         message: "ITEM IN USE CANNOT BE EDITED",
-        redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`,
+        redirect: `/items/${id}?error=Item+in+use+cannot+be+edited`,
       });
     }
-
     
-    if(!statuses.map(s => s.name).includes(status)) {
-      return res.status(400).json({
-        type: "error",
-        message: "STATUS MUST BE AVAILABLE OR MAINTENANCE",
-        redirect: `/items/${id}?error=Status+must+be+available+or+maintenance`,
-      });
+    if (fileBuffer) {
+      filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
     }
-
-    if(!categories.map(c => c.name).includes(category)) {
-      return res.status(400).json({
-        type: "error",
-        message: "INVALID CATEGORY",
-        redirect: `/items/${id}?error=Invalid+category`
-      })
-    }
-
-    const subcat = subCategory;
-    const isValidSubcat = categories.some(c =>
-      c.subCategories?.some(sc => sc.name === subcat)
-    )
-
-    if (!isValidSubcat) {
-      return res.json({
-          type: "error",
-          message: "INVALID SUBCATEGORY",
-          redirect: `/items/${id}?error=Invalid+subcategory`
-      })
-    }
-
-    filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
 
     const newItem = {
       name: name || item.name,
@@ -468,22 +397,23 @@ exports.editItem = async (req, res, next) => {
       serial: serial || item.serial,
       status: status || item.status,
       dateAcquired: dateAcquired || item.dateAcquired,
-      imageName: filePath || item.image_name,
-      imageAlt: `Image of ${name || item.name}`,
-      imageUrl: filePath || item.imageUrl,
-      error,
-      success
+      imageName: filePath || item.imageName,
+      imageAlt: `Image of ${name || item.name}`
     };
 
     await itemService.updateDBItem(id, newItem);
 
-    return res.json({
+    return res.status(200).json({
       type: "success",
       message: "ITEM UPDATED SUCCESSFULLY",
       redirect: `/items/${id}?success=Item+updated+successfully`,
     });
   } catch (err) {
-    next(err);
+    return res.status(err.status || 500).json({
+      type: "error",
+      message: err.message || "Internal Server Error",
+      redirect: err.redirect || `/items/${id}?error=${encodeURIComponent(err.message)}`
+    });
   }
 };
 
@@ -632,14 +562,9 @@ exports.checkIn = async (req, res, next) => {
     }
 
     if (files?.document?.length > 0) {
-      
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/owned?error=File+too+large+(max+50MB)");
-        }
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/owned?error=File+too+large+(max+20MB)");
       }
 
       const fileBuffer = fs.readFileSync(file.path);
@@ -707,14 +632,11 @@ exports.checkOut = async (req, res, next) => {
     }
 
     if (files?.document?.length > 0) {
-      const DBlabel = itemService.getDBlabel(); 
-
-      if (DBlabel === "Supabase") {
-        const MAX_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          return res.redirect("/items?error=File+too+large+(max+50MB)");
-        }
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return res.redirect("/items?error=File+too+large+(max+20MB)");
       }
+      
 
       const fileBuffer = fs.readFileSync(file.path);
       fileName = `${Date.now()}_${file.originalFilename}`;
@@ -822,7 +744,8 @@ exports.report = async (req, res, next) => {
     // get history for the last 7 days 
     const AllHistories = await itemService.getDBItemsHistory();
     const AllItems = await itemService.getDBItems();
-    const users = await userService.getAllUsers();
+    const allUsers = await userService.getAllUsers();
+    const users = allUsers.filter(user => user.status !== "Disabled");
     const error = req.query.error  || null;
     const success = req.query.success  || null;
     const selectedUserId = req.query.userId || null;
