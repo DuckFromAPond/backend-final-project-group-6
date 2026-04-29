@@ -304,6 +304,8 @@ exports.createItem = async (req, res, next) => {
       apiRedirect,
     } = await itemService.processItemForm(req);
 
+    const { categories } = await itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
+    
     const statuses = [
       { name: "Available" },
       { name: "Maintenance" },
@@ -317,8 +319,27 @@ exports.createItem = async (req, res, next) => {
     if (!statuses.map(s => s.name).includes(status)) {
       return res.json({
         type: "error",
-        redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
+        redirect: `/api/items?error=Status+must+be+available+or+maintenance`,
       });
+    }
+
+    if(!categories.map(c => c.name).includes(category)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items?error=Invalid+category`
+      })
+    }
+
+    const subcat = subCategory;
+    const isValidSubcat = categories.some(c =>
+      c.subCategories?.some(sc => sc.name === subcat)
+    )
+
+    if (!isValidSubcat) {
+      return res.json({
+          type: "error",
+          redirect: `/api/items?error=Invalid+subcategory`
+      })
     }
 
     const newItem = {
@@ -403,6 +424,8 @@ exports.editItem = async (req, res, next) => {
       redirect,
     } = await itemService.processItemForm(req);
 
+    const {categories} = await itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''})
+
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
 
     const existing = await itemService.getDBItemBySerial(serial);
@@ -440,6 +463,25 @@ exports.editItem = async (req, res, next) => {
         type: "error",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
+    }
+
+    if(!categories.map(c => c.name).includes(category)) {
+      return res.json({
+        type: "error",
+        redirect: `/api/items/${id}?error=Invalid+category`
+      })
+    }
+
+    const subcat = subCategory;
+    const isValidSubcat = categories.some(c =>
+      c.subCategories?.some(sc => sc.name === subcat)
+    )
+
+    if (!isValidSubcat) {
+      return res.json({
+          type: "error",
+          redirect: `/api/items/${id}?error=Invalid+subcategory`
+      })
     }
 
     const newItem = {

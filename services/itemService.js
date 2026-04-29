@@ -256,11 +256,11 @@ exports.getDBFilteredItems = async ({cat, subcat, q, isRetired}) => {
     ];
   }
 
-  if (subcat) items = items.filter(item => item.subCategory === subcat);
-  if (cat) items = items.filter(item => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
-  if (q) items = items.filter(item => item.name?.toLowerCase().includes(q.toLowerCase()));
+  if (subcat && subcat.lengt > 0) items = items.filter(item => item.subCategory === subcat);
+  if (cat && cat.length > 0) items = items.filter(item => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
+  if (q && q.length > 0) items = items.filter(item => item.name?.toLowerCase().includes(q.toLowerCase()));
 
-  items = isRetired
+  items = isRetired && isRetired.length > 0
       ? items.filter(item => item.status === 'Retired')
       : items.filter(item => item.status !== 'Retired');
 
