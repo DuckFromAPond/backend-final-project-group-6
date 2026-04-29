@@ -339,36 +339,39 @@ exports.createItem = async (req, res, next) => {
       errCode
     } = await itemService.processItemForm(req);
     let filePath = null;
-
     const { categories } = await itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
-    
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
-    
+    const existing = await itemService.getDBItemBySerial(serial);
+
+    if (existing) {
+      return res.status(400).json({
+        type: "error",
+        message: "SERIAL ALREADY EXISTS",
+        redirect: "/api/items?error=Serial+already+exists",
+      });
+    }
+
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
       return res.status(errCode).json({
         type: type,
         message: message,
+        redirect: `/api${redirect}`,
       });
     }
 
     if (!statuses.map((s) => s.name).includes(status)) {
       return res.status(400).json({
         type: "error",
+        message: "STATUS MUST BE AVAILABLE OR MAINTENANCE",
         redirect: `/api/items?error=Status+must+be+available+or+maintenance`,
       });
     }
 
     if(!categories.map(c => c.name).includes(category)) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
-        redirect: `/api/items?error=Status+must+be+available+or+maintenance`,
-      });
-    }
-
-    if(!categories.map(c => c.name).includes(category)) {
-      return res.json({
-        type: "error",
+        message: "INVALID CATEGORY",
         redirect: `/api/items?error=Invalid+category`
       })
     }
@@ -379,8 +382,9 @@ exports.createItem = async (req, res, next) => {
     )
 
     if (!isValidSubcat) {
-      return res.json({
+      return res.status(400).json({
           type: "error",
+          message: "INVALID SUBCATEGORY",
           redirect: `/api/items?error=Invalid+subcategory`
       })
     }
@@ -406,6 +410,7 @@ exports.createItem = async (req, res, next) => {
     return res.json({
       ...newItem,
       type: "success",
+      message: "ITEM ADDED SUCCESSFULLY",
       redirect: "/api/items?success=Item+added+successfully",
     });
   } catch (err) {
@@ -425,7 +430,8 @@ exports.showItemDetail = async (req, res) => {
     if (!item) {
       return res.status(404).json({
         type: "error",
-        redirect: `/items/${id}?error=Item+not+found`,
+        message: "ITEM NOT FOUND",
+        redirect: `/api/items/${id}?error=Item+not+found`,
       });
     }
 
@@ -478,52 +484,55 @@ exports.editItem = async (req, res, next) => {
       message,
       errCode
     } = await itemService.processItemForm(req);
-
-    const {categories} = await itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''})
     let filePath = null;
-
+    const {categories} = await itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''})
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
-
     const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "SERIAL ALREADY EXISTS",
         redirect: "/items?error=Serial+already+exists",
       });
     }
 
     if (type?.toLowerCase() === "error") {
-      return res.json({
+      return res.status(errCode).json({
         type: error,
+        message: message,
         redirect: `/api${redirect}`,
       });
     }
 
     if (!item) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "ITEM NOT FOUND",
         redirect: `/api/items/${id}?error=Item+not+found`,
       });
     }
 
     if (item.status === "In-Use") {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "ITEM IN USE CANNOT BE EDITED",
         redirect: `/api/items/${id}?error=Item+in-use+cannot+be+edited`,
       });
     }
 
     if (!statuses.map((s) => s.name).includes(status)) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "STATUS MUST BE AVAILABLE OR MAINTENANCE",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
 
     if(!categories.map(c => c.name).includes(category)) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "INVALID CATEGORY",
         redirect: `/api/items/${id}?error=Invalid+category`
       })
     }
@@ -534,8 +543,9 @@ exports.editItem = async (req, res, next) => {
     )
 
     if (!isValidSubcat) {
-      return res.json({
+      return res.status(400).json({
           type: "error",
+          message: "INVALID SUBCATEGORY",
           redirect: `/api/items/${id}?error=Invalid+subcategory`
       })
     }
@@ -561,6 +571,7 @@ exports.editItem = async (req, res, next) => {
     return res.json({
       ...newItem,
       type: "success",
+      message: "ITEM UPDATED SUCCESSFULLY",
       redirect: `/items/${id}?success=Item+updated+successfully`,
     });
   } catch (err) {
