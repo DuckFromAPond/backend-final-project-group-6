@@ -353,6 +353,7 @@ exports.createItem = async (req, res, next) => {
     if (!statuses.map((s) => s.name).includes(status)) {
       return res.status(400).json({
         type: "error",
+        message: "Status must be available or maintenance",
         redirect: `/api/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
     }
