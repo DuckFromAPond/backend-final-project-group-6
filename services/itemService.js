@@ -5,17 +5,17 @@ const fs = require("fs");
 const sharp = require("sharp");
 
 // CHECKIN / CHECKOUT 
-exports.getDBlabel = () => { 
+exports.getDBlabel = () => {
   const db = getDbProvider();
   return db.providerLabel;
 }
 
-exports.uploadDBFile = async (fileName, fileBuffer, mimeType) => { 
+exports.uploadDBFile = async (fileName, fileBuffer, mimeType) => {
   const db = getDbProvider();
   return await db.uploadFile(fileName, fileBuffer, mimeType);
 }
 
-exports.uploadDBItem = async (fileName, fileBuffer, mimeType) => { 
+exports.uploadDBItem = async (fileName, fileBuffer, mimeType) => {
   const db = getDbProvider();
   return await db.uploadItem(fileName, fileBuffer, mimeType);
 }
@@ -40,12 +40,12 @@ exports.validateCheckout = async (itemId) => {
   }
 };
 
-exports.getDBFile = async (bucket, id) => { 
+exports.getDBFile = async (bucket, id) => {
   const db = getDbProvider();
   return await db.getFile(bucket, id);
 }
 
-exports.checkoutItem = async ({ itemId, userId, duration, referenceLink }) => { 
+exports.checkoutItem = async ({ itemId, userId, duration, referenceLink }) => {
   const db = getDbProvider();
   await db.updateItem(itemId, {
     currentOwner: userId,
@@ -72,7 +72,7 @@ exports.validateCheckin = async (itemId, userId) => {
   if (item.status !== "In-Use") {
     throw new Error("Item is not in-use.");
   }
-  
+
   if (String(item.currentOwner) !== String(userId)) {
     throw new Error("You don't own this item.");
   }
@@ -84,7 +84,7 @@ exports.validateCheckin = async (itemId, userId) => {
   }
 };
 
-exports.checkinItem = async ({ itemId, userId, referenceLink }) => { 
+exports.checkinItem = async ({ itemId, userId, referenceLink }) => {
   const db = getDbProvider();
   await db.updateItem(itemId, {
     currentOwner: null,
@@ -96,7 +96,7 @@ exports.checkinItem = async ({ itemId, userId, referenceLink }) => {
     action: "checkin",
     duration: null,
     referenceLink: referenceLink ?? null,
-    returnedAt:  Date.now(),
+    returnedAt: Date.now(),
   });
 };
 
@@ -183,7 +183,7 @@ exports.getDBItemHistoriesById = async (id) => {
   const db = getDbProvider();
   const itemHistory = await db.getItemHistoryByItemId(id);
   const item = await db.getItemById(id);
-  const userPromises = itemHistory.map(async h => {return await db.getUserById(h.userId)});
+  const userPromises = itemHistory.map(async h => { return await db.getUserById(h.userId) });
   const users = await Promise.all(userPromises);
 
   let itemHistories = {
@@ -194,20 +194,20 @@ exports.getDBItemHistoriesById = async (id) => {
   let history = itemHistories.itemHistories;
 
   if (history) {
-      history = history.map(h => {
-        // find username using id 
-        const user = users.find(u => u.id === h.userId);
+    history = history.map(h => {
+      // find username using id 
+      const user = users.find(u => u.id === h.userId);
 
-        return {
-            ...h,
-            assignee: user ? user.name : "No name given"
-        };
-      });
+      return {
+        ...h,
+        assignee: user ? user.name : "No name given"
+      };
+    });
 
-      itemHistories = {
-        ...itemHistories,
-        itemHistories: history
-      }
+    itemHistories = {
+      ...itemHistories,
+      itemHistories: history
+    }
   }
 
   return itemHistories;
@@ -228,7 +228,7 @@ exports.getDBItems = async () => {
 // Postcondition: array of categories
 exports.getCategoryFromDB = async () => {
   const db = getDbProvider();
-  const categories = await db.getAllCategories(); 
+  const categories = await db.getAllCategories();
 
   const map = new Map();
   const result = [];
@@ -264,35 +264,39 @@ exports.getCategoryFromDB = async () => {
 // Description: gets filtered items from database
 // Precondition: none
 // Postcondition: array of items
-exports.getDBFilteredItems = async ({cat, subcat, q, isRetired}) => {
+exports.getDBFilteredItems = async ({ cat, subcat, q, isRetired }) => {
   let items = await exports.getDBItems();
   let categories = await exports.getCategoryFromDB();
 
-  if(!categories || categories.length === 0) {
+  if (!categories || categories.length === 0) {
     // use static data
     categories = [
-      { name: "Peripherals", subCategories: [
-        { name: "Monitor" },
-        { name: "Keyboard" },
-        { name: "Mouse" },
-        { name: "Scanner" },
-        { name: "Printer" },
-      ] },
-      { name: "Computers", subCategories: [
-        { name: "Laptop" },
-        { name: "Desktop" },
-        { name: "Server" },
-      ] },
+      {
+        name: "Peripherals", subCategories: [
+          { name: "Monitor" },
+          { name: "Keyboard" },
+          { name: "Mouse" },
+          { name: "Scanner" },
+          { name: "Printer" },
+        ]
+      },
+      {
+        name: "Computers", subCategories: [
+          { name: "Laptop" },
+          { name: "Desktop" },
+          { name: "Server" },
+        ]
+      },
     ];
   }
 
-  if (subcat) items = items.filter(item => item.subCategory === subcat);
-  if (cat) items = items.filter(item => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
-  if (q) items = items.filter(item => item.name?.toLowerCase().includes(q.toLowerCase()));
+  if (subcat && subcat.lengt > 0) items = items.filter(item => item.subCategory === subcat);
+  if (cat && cat.length > 0) items = items.filter(item => item.category.toLowerCase().trim() === cat.toLowerCase().trim());
+  if (q && q.length > 0) items = items.filter(item => item.name?.toLowerCase().includes(q.toLowerCase()));
 
-  items = isRetired
-      ? items.filter(item => item.status === 'Retired')
-      : items.filter(item => item.status !== 'Retired');
+  items = isRetired && isRetired.length > 0
+    ? items.filter(item => item.status === 'Retired')
+    : items.filter(item => item.status !== 'Retired');
 
   return { items, categories }
 }
@@ -341,7 +345,7 @@ exports.deleteDBItem = async (id) => {
     status: "Retired",
   };
 
-  if(item.status === "In-Use") {
+  if (item.status === "In-Use") {
     return {
       type: "error",
       redirect: `/items/${id}?error=Item+in-use+cannot+be+retired`,
@@ -365,7 +369,7 @@ exports.processItemForm = async (req) => {
   const db = getDbProvider();
   const id = req.params.id; // for returning to itemDetail if the form is submitted from /itemDetail
   const form = new multiparty.Form();
-  
+
   let type = null;
   let redirect = null;
   let errCode = null;
@@ -397,22 +401,22 @@ exports.processItemForm = async (req) => {
   const serial = fields.serial?.[0] ?? null;
   const status = fields.status?.[0] ?? null;
   const dateAcquired = fields.dateAcquired?.[0] ?? new Date();
-
+  
   if (
     !name ||
     !description ||
     !brand ||
     !model ||
-    !serial || 
-    !category || 
-    !subCategory || 
+    !serial ||
+    !category ||
+    !subCategory ||
     !status
   ) {
     return {
       type: "error",
       errCode: 400,
       message: "MISSING REQUIRED FIELDS",
-      redirect: `/items/${id}?error=Missing+required+fields`,
+      redirect: id && id.length > 0 ? `/items/${id}?error=Missing+required+fields` : `/items?error=Missing+required+fields`,
     }
   }
 
@@ -427,21 +431,11 @@ exports.processItemForm = async (req) => {
     const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
     if (file.size > MAX_SIZE) {
-      if(id) {
-        return {
-          type: "error",
-          errCode: 413,
-          message: "FILE TOO LARGE",
-          redirect : `/items/${id}?error=File+too+large+(max+50MB)`,
-        }
-      }
-      else {
-        return {
-          type : "error",
-          errCode: 413,
-          message: "FILE TOO LARGE",
-          redirect :`/items?error=File+too+large+(max+50MB)`,
-        }
+      return {
+        type: "error",
+        errCode: 413,
+        message: "FILE TOO LARGE",
+        redirect: id && id.length > 0 ? `/items/${id}?error=File+too+large+(max+50MB)` : `/items?error=File+too+large+(max+50MB)`,
       }
     }
 
@@ -459,21 +453,11 @@ exports.processItemForm = async (req) => {
     const isImage = mimeType.startsWith("image/");
 
     if (!allowedImageExtensions.has(ext) || !isImage) {
-      if(id) {
-        return {
-        type : "error",
+      return {
+        type: "error",
         errCode: 415,
         message: "INVALID FILE TYPE",
-        redirect : `/items/${id}?error=Only+image+files+are+allowed`,
-        }
-      }
-      else {
-        return {
-        type : "error",
-        errCode: 415,
-        message: "INVALID FILE TYPE",
-        redirect : `/items?error=Only+image+files+are+allowed`,
-        }
+        redirect: id && id.length > 0 ? `/items/${id}?error=Only+image+files+are+allowed` : `/items?error=Only+image+files+are+allowed`,
       }
     }
     const rawBuffer = fs.readFileSync(file.path);
@@ -487,28 +471,20 @@ exports.processItemForm = async (req) => {
     fileName = `${Date.now()}_${file.originalFilename}.webp`;
   }
   else {
-    if(id) {
-      // for editing, no image defaults to original image instead of error or instead of replacing original with empty.
-      return {
-      type : "warning",
-      redirect : `/items/${id}?warning=Image+file+missing`,
-       }
-    }
-    else {
-       return {
-        type: "error",
-        redirect : `/items?error=Image+file+required`,
-        message: "IMAGE REQUIRED",
-        errCode: 400
-        }
+    return {
+      type: "error",
+      redirect: `/items?error=Image+file+required`,
+      redirect: id && id.length > 0 ? `/items/${id}?error=Image+file+required` : `/items?error=Image+file+required`,
+      message: "IMAGE REQUIRED",
+      errCode: 400
     }
   }
 
-  return {fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect, message, errCode};
+  return { fileBuffer, fileName, mimeType, name, description, brand, model, category, subCategory, serial, status, dateAcquired, type, redirect, message, errCode };
 }
 
 
-exports.buildSessions= async(logs) => {
+exports.buildSessions = async (logs) => {
   // sort oldest → newest (important for pairing)
   const sorted = [...logs].sort(
     (a, b) => new Date(a.createdAt) - new Date(b.createdAt)

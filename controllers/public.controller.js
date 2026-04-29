@@ -230,6 +230,8 @@ exports.addItem = async (req, res, next) => {
       message,
       errCode
     } = await itemService.processItemForm(req);
+
+    const { categories } = itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
     let filePath = null;
 
     const statuses = [
@@ -239,13 +241,13 @@ exports.addItem = async (req, res, next) => {
 
     // an error in form processing must've occured
     if (type?.toLowerCase() === "error") {
-      return res.redirect(redirect);
+      return res.status(errCode).redirect(redirect);
     }
 
     const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing) {
-      return res.redirect("/items?error=Serial+already+exists");
+      return res.status(400).redirect("/items?error=Serial+already+exists");
     }
 
     if (
@@ -257,11 +259,24 @@ exports.addItem = async (req, res, next) => {
       !serial ||
       !status
     ) {
-      return res.redirect("/items?error=Missing+required+fields");
+      return res.status(400).redirect("/items?error=Missing+required+fields");
     }
 
     if(!statuses.map(s => s.name).includes(status)) {
-      return res.redirect(`/items?error=Status+must+be+available+or+maintenance`);
+      return res.status(400).redirect(`/items?error=Status+must+be+available+or+maintenance`);
+    }
+
+    if(!categories.map(c => c.name).includes(category)) {
+      return res.status(400).redirect(`/items?error=Invalid+category`)
+    }
+
+    const subcat = subCategory;
+    const isValidSubcat = categories.some(c =>
+      c.subCategories?.some(sc => sc.name === subcat)
+    )
+
+    if (!isValidSubcat) {
+      return res.status(400).redirect(`/items?error=Invalid+subcategory`)
     }
 
     filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
@@ -386,10 +401,9 @@ exports.editItem = async (req, res, next) => {
       message,
       errCode
     } = await itemService.processItemForm(req);
+    const {categories} = itemService.getDBFilteredItems({cat: '', subcat: '', q: '', isRetired: ''});
     let filePath = null;
-
     const statuses = [{ name: "Available" }, { name: "Maintenance" }];
-
     const existing = await itemService.getDBItemBySerial(serial);
 
     if (existing && existing.id.toString() !== id.toString()) {
@@ -397,25 +411,49 @@ exports.editItem = async (req, res, next) => {
     }
 
     if (type?.toLowerCase() === "error") {
-      return res.json({
+      return res.status(errCode).json({
         type,
+        message,
         redirect,
       });
     }
 
     if (item.status === "In-Use") {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "ITEM IN USE CANNOT BE EDITED",
         redirect: `/items/${id}?error=Item+in-use+cannot+be+edited`,
       });
     }
 
     
     if(!statuses.map(s => s.name).includes(status)) {
-      return res.json({
+      return res.status(400).json({
         type: "error",
+        message: "STATUS MUST BE AVAILABLE OR MAINTENANCE",
         redirect: `/items/${id}?error=Status+must+be+available+or+maintenance`,
       });
+    }
+
+    if(!categories.map(c => c.name).includes(category)) {
+      return res.status(400).json({
+        type: "error",
+        message: "INVALID CATEGORY",
+        redirect: `/items/${id}?error=Invalid+category`
+      })
+    }
+
+    const subcat = subCategory;
+    const isValidSubcat = categories.some(c =>
+      c.subCategories?.some(sc => sc.name === subcat)
+    )
+
+    if (!isValidSubcat) {
+      return res.json({
+          type: "error",
+          message: "INVALID SUBCATEGORY",
+          redirect: `/items/${id}?error=Invalid+subcategory`
+      })
     }
 
     filePath = await itemService.uploadDBItem(fileName, fileBuffer, mimeType);
@@ -441,6 +479,7 @@ exports.editItem = async (req, res, next) => {
 
     return res.json({
       type: "success",
+      message: "ITEM UPDATED SUCCESSFULLY",
       redirect: `/items/${id}?success=Item+updated+successfully`,
     });
   } catch (err) {
