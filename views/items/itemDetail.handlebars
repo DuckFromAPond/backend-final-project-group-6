@@ -160,14 +160,16 @@
         }
     }
 
-    confirmRetireBtn.addEventListener('click', async (event) => {
-        const response = await fetch(`/items/${itemId}`, {
-            method: 'DELETE'
-        });
+    if (confirmRetireBtn) {
+        confirmRetireBtn.addEventListener('click', async (event) => {
+            const response = await fetch(`/items/${itemId}`, {
+                method: 'DELETE'
+            });
 
-        if (response.ok) {
-            const data = await response.json();
-            window.location.href = data.redirect;
-        }
-    });
+            if (response.ok) {
+                const data = await response.json();
+                window.location.href = data.redirect;
+            }
+        });
+    }
 </script>

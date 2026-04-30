@@ -45,7 +45,6 @@ router.patch(
   apiController.updateUserStatus,
 );
 
-
 // keys
 // get keys 
 router.get(
@@ -71,11 +70,9 @@ router.delete(
   apiController.revokeKey,
 );
 
-
 // CHECKIN / CHECKOUT
 router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);       // checkout
 router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);         // checkin
-
 
 
 // API ROUTES FOR ITEMS

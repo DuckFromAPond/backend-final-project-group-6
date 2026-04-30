@@ -999,7 +999,7 @@ exports.notFound = (req, res) => {
     req.path.startsWith("/register");
 
   res.status(404).render("extra_pages/404", {
-    layout: isAuthRoute ? false : true,
+    layout: isAuthRoute ? false : "main",
     message: "The page you are looking for does not exist.",
     pageTitle: "404",
   });
