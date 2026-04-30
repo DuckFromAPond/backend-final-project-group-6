@@ -445,7 +445,7 @@ exports.processItemForm = async (req, isEdit) => {
   const dateAcquired = rawDate;
   
   if (!name || !description || !brand || !model || !serial || !category || !subCategory || !status) {
-    const err = new Error("Missing required fields (name, brand, model, serial, category, subCategory, status, description, dateAcquired, imagge - refer to readme for detail)");
+    const err = new Error("Missing required fields (name, brand, model, serial, category, subCategory, status, description, dateAcquired, image - refer to readme for detail)");
     err.status = 400;
     err.redirect = id
     ? `/items/${id}?error=Missing+required+fields`
