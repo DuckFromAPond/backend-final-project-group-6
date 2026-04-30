@@ -285,81 +285,8 @@ GET    /files/:bucket/:id          - Reference/Image file
 ```
 
 ## API Endpoints
+
 ### Authentication
-```
-POST /api/login                    - Authenticate user and returns JWT token
-```
-**Body:** { email, password }  
-**Returns:** JWT token  
-**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
-
-### Users (Admin Only)
-```
-GET /api/users - Get all users
-```
-**Body:** { }  
-**Returns:** 
-**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
-
-## 🔐 Security Features
-
-- **Password Hashing** - bcryptjs for secure password storage
-- **JWT Tokens** - Stateless authentication with signed tokens
-- **CORS Protection** - Whitelist-based origin validation
-- **Rate Limiting** - Prevents brute force on login endpoints
-- **Role-Based Access** - Fine-grained authorization per endpoint
-- **Secure Headers** - Disables `X-Powered-By` header
-- **Cookie Security** - HTTP-only cookies for sessions
-
-### CORS Whitelist
-Configure allowed origins in `app.js`:
-- `http://localhost:3000`
-- `https://backend-final-project-group-6.onrender.com/` 
-
-## 🧪 Testing
-
-Run tests with:
-```bash
-npm test
-```
-
-Tests are located in the `test/` directory.
-
-## 📦 Dependencies
-
-### Core
-- **express** - Web framework
-- **mongoose** - MongoDB ODM
-- **@supabase/supabase-js** - Supabase client
-- **express-handlebars** - Template engine
-- **jsonwebtoken** - JWT authentication
-- **bcryptjs** - Password hashing
-
-### Middleware & Utils
-- **cors** - Cross-origin resource sharing
-- **cookie-parser** - Cookie parsing
-- **morgan** - HTTP request logging
-- **express-rate-limit** - Rate limiting
-- **dotenv** - Environment variables
-- **multiparty** - File upload parsing
-- **sharp** - Image optimization by converting to webp
-
-### Development
-- **nodemon** - Auto-reload development server
-
-## 🚀 Scripts
-
-```bash
-npm start          # Run production server
-npm run dev        # Run development server with hot-reload
-npm test           # Run tests
-```
-
-## API Examples
-
-### User Management
-
-### Auth
 
 #### Login
 
@@ -628,7 +555,7 @@ curl -X PUT http://localhost:3000/api/items/[ITEM_ID] \
 
 ---
 
-#### Delete Item
+#### Delete Item (Admin)
 
 Retires an item from the inventory (sets status to `Retired`).
 
@@ -636,6 +563,7 @@ Retires an item from the inventory (sets status to `Retired`).
 - **Inputs:** `ITEM_ID` (URL Parameter)
 - **Outputs:** Success confirmation and the retired item object.
 - **Auth:** API Key or Admin JWT
+- **Role Requirement:** Admin-only
 
 ```bash
 curl -X DELETE http://localhost:3000/api/items/[ITEM_ID] \
@@ -656,7 +584,7 @@ Both endpoints require a logged-in user JWT token. API keys are **not accepted**
 Borrows an item for a specified duration.
 
 - **Endpoint:** `POST /api/transactions/checkout`
-- **Inputs:** `itemId`, `duration` (days), `document` (PDF or Word file) — `multipart/form-data`
+- **Inputs:** `itemId`, `duration` (hours - optional if don't have exact duration), `document` (PDF or Word file) — `multipart/form-data`
 - **Outputs:** Success confirmation and transaction record.
 - **Auth:** JWT only
 
@@ -688,6 +616,16 @@ curl -X POST http://localhost:3000/api/transactions/checkin \
 
 > **Document field requirements:** `.pdf`, `.doc`, `.docx` only — max 20MB
 
+### Development
+- **nodemon** - Auto-reload development server
+
+## 🚀 Scripts
+
+```bash
+npm start          # Run production server
+npm run dev        # Run development server with hot-reload
+npm test           # Run tests
+```
 ## Security Features
 
 - **Password Hashing** - bcryptjs for secure password storage
@@ -702,10 +640,8 @@ curl -X POST http://localhost:3000/api/transactions/checkin \
 
 Configure allowed origins in `app.js`:
 
-- `http://localhost:3000`
-- `http://127.0.0.1:3000`
-- `http://localhost:5173`
-- `https://websitename.com` (update for production)
+- `http://localhost:3000`   (only for development)
+- `https://backend-final-project-group-6.onrender.com` (for production)
 
 ## Dependencies
 
@@ -719,13 +655,14 @@ Configure allowed origins in `app.js`:
 - **bcryptjs** - Password hashing
 
 ### Middleware & Utils
-
 - **cors** - Cross-origin resource sharing
 - **cookie-parser** - Cookie parsing
 - **morgan** - HTTP request logging
 - **express-rate-limit** - Rate limiting
 - **dotenv** - Environment variables
 - **multiparty** - File upload parsing
+- **sharp** - Image optimization by converting to webp
+
 
 ### Development
 
