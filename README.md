@@ -258,9 +258,7 @@ POST   /transactions/adminCheckin  - Admin force checkout
 GET    /users                      - List all users (Admin)
 POST   /users/:id/role             - Change user role (Admin)
 POST   /users/:id/status           - Toggle user status (Admin)
-POST   /api/users                  - Create user (Admin)
-PATCH  /api/users/:id/role         - Change user role via API (Admin)
-PATCH  /api/users/:id/status       - Toggle user status via API (Admin)
+POST   /users/create               - Create user (Admin)
 ```
 
 ### Admin - API Keys
@@ -269,8 +267,6 @@ PATCH  /api/users/:id/status       - Toggle user status via API (Admin)
 GET    /keys                       - List API keys (Admin)
 POST   /keys/generate              - Generate new key (Admin)
 POST   /keys/revoke/:id            - Revoke key (Admin)
-POST   /api/keys                   - Create key via API (Admin)
-DELETE /api/keys/:id               - Revoke key via API (Admin)
 ```
 
 ### Other
@@ -284,7 +280,11 @@ GET    /logs                       - Activity logs
 GET    /files/:bucket/:id          - Reference/Image file
 ```
 
-## API Endpoints
+## API Examples
+the following uses the development build as an example, please use the production links for live testing: 
+
+- https://backend-final-project-group-6.onrender.com
+- https://backend-final-project-group-6.up.railway.app (alternative railway deployment)
 
 ### Authentication
 
