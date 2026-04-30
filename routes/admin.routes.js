@@ -6,26 +6,36 @@ const adminController = require("../controllers/admin.controller");
 const keyController = require("../controllers/key.controller");
 
 // user
-router.get("/users", protect, requireRole("Admin"), adminController.listUsers); // <------------ kinda weird... i think it's easier to just require "Admin role" instead of moving to Admin
+router.get("/users", 
+  protect, 
+  requireRole("Admin"), 
+  adminController.listUsers
+);
+
+// change user role
 router.post(
   "/users/:id/role",
   protect,
   requireRole("Admin"),
   adminController.changeRole,
-); // <-- or post here if want since it don't matter
+); 
+
+// disable/enable user
 router.post(
   "/users/:id/status",
   protect,
   requireRole("Admin"),
   adminController.toggleStatus,
-); // disable/enable user
+); 
 
+// for admin to create users
 router.post(
   "/users/create",
   protect,
   requireRole("Admin"),
   adminController.adminCreateUser,
-); // for admin to create users
+); 
+
 
 // == keys-management ==
 router.get(
@@ -36,12 +46,15 @@ router.get(
 );
 
 // Actions
+// generate keys
 router.post(
   "/keys/generate",
   protect,
   requireRole("Admin"),
   keyController.handleGenerateKey,
 );
+
+// revoke key
 router.post(
   "/keys/revoke/:id",
   protect,
@@ -49,12 +62,15 @@ router.post(
   keyController.handleRevokeKey,
 );
 
+// admin checkout
 router.post(
   "/transactions/adminCheckout",
   protect,
   requireRole("Admin"),
   adminController.adminCheckout,
 );
+
+// admin checkin
 router.post(
   "/transactions/adminCheckin",
   protect,

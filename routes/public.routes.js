@@ -19,7 +19,7 @@ router.get("/items/:id/history", protect, publicController.showItemHistory);
 
 router.post("/items", protect, publicController.addItem);
 router.put("/items/:id", protect, publicController.editItem);
-router.delete("/items/:id", protect, requireRole("Admin"), publicController.deleteItem);
+router.delete("/items/:id", protect, requireRole("Admin"), publicController.deleteItem);            // soft-deletes item
 
 // Owned 
 router.get("/owned", protect, publicController.showOwned);

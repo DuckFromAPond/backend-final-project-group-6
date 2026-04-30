@@ -9,7 +9,7 @@ const itemService = require("../services/itemService");
 const userService = require("../services/userService");
 const { error } = require("console");
 
-// GET: /HOME ---------------------------------------------- need to fix later
+// GET: /HOME 
 exports.home = async (req, res, next) => {
   try {
     const currentUserId = req.user.id;
@@ -999,7 +999,7 @@ exports.notFound = (req, res) => {
     req.path.startsWith("/register");
 
   res.status(404).render("extra_pages/404", {
-    layout: isAuthRoute ? "no_nav_bar" : "main",
+    layout: isAuthRoute ? false : true,
     message: "The page you are looking for does not exist.",
     pageTitle: "404",
   });

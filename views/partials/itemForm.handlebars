@@ -63,10 +63,17 @@
                     <option value="{{this.name}}">{{this.name}}</option>
                 {{/each}}
             </select>
-            <label for="image">Item image: </label>
-            <input type="file" name="image" id="image" required accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"
-                class="cursor-pointer w-full px-4 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 file:cursor-pointer"
-            >
+            <div>
+                <label for="image">Item image: </label>
+                <div class="relative">
+                    <input type="file" name="image" id="image" required accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"
+                        class="cursor-pointer w-full px-4 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 file:cursor-pointer"
+                    >
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Allowed: JPG, JPEG, PNG • Max size: 5MB
+                </p>
+            </div>
             <button type="submit" class="rounded-lg justify-self-center self-center col-span-1 sm:col-span-2 w-1/2 text-md bg-green-500 hover:bg-green-700 text-white cursor-pointer p-2 text-center transition-all ease-in-out duration-300">Submit</button>
         </form>
     </div>
@@ -146,10 +153,17 @@
                     </option>
                 {{/each}}
             </select>
-            <label for="image">Item image: </label>
-            <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"
-                class="cursor-pointer w-full px-4 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 file:cursor-pointer"
-            >
+            <div>
+                <label for="image">Item image: </label>
+                <div class="relative">
+                    <input type="file" name="image" id="image" accept=".jpg, .jpeg, .png, image/jpg, image/png, image/jpeg"
+                        class="cursor-pointer w-full px-4 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 file:cursor-pointer"
+                    >
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Allowed: JPG, JPEG, PNG • Max size: 5MB
+                </p>
+            </div>
             <button type="submit" class="rounded-lg justify-self-center self-center col-span-1 sm:col-span-2 w-1/2 text-md bg-green-500 hover:bg-green-700 text-white cursor-pointer p-2 text-center transition-all ease-in-out duration-300">Submit</button>
         </form>
     </div>
