@@ -318,7 +318,7 @@ Tests are located in the `test/` directory.
 - **express-rate-limit** - Rate limiting
 - **dotenv** - Environment variables
 - **multiparty** - File upload parsing
-- **bcryptjs** - Image optimization by converting to webp
+- **sharp** - Image optimization by converting to webp
 
 ### Development
 - **nodemon** - Auto-reload development server
