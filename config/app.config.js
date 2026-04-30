@@ -1,6 +1,5 @@
 // config/app.config.js
 // get env info from this page 
-// ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'secret',
 
 require('dotenv').config();
 const isProd = process.env.NODE_ENV === "production";

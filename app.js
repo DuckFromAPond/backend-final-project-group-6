@@ -43,24 +43,29 @@ const hbsHelpers = {
     }
     return options.inverse(this);
   },
+  // check if equal
   eq: (a, b) => a === b,
+  // format date 
   formatDate: (value) => {
-  const date = new Date(value);
-
-  if (!value || isNaN(date.getTime())) {
-    return "No date";
-  }
-
-  return date.toISOString().split("T")[0];}, // return YYYY-MM-DD
+    const date = new Date(value);
+    if (!value || isNaN(date.getTime())) {
+      return "No date";
+    }
+    return date.toISOString().split("T")[0];}, // return YYYY-MM-DD
+  // stringify JSON
   json: (context) => JSON.stringify(context),
 };
 
 // CORS configuration
 const normalize = (url) => url?.replace(/\/$/, "");
+
 const whitelist = new Set([
-  normalize(`http://localhost:${config.PORT}`),
   normalize(config.BASE_URL),
 ]);
+
+if (config.NODE_ENV === "development") {
+  whitelist.add(normalize(`http://localhost:${config.PORT}`));
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -71,7 +76,6 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    console.log("Blocked");
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
@@ -112,7 +116,7 @@ if (config.NODE_ENV === "production") {
   app.use(morgan("dev"));
 }
 
-// temp (will change when nav is finalized)
+// for navbar UI 
 app.use((req, res, next) => {
   const pathName = req.path;
 
@@ -120,9 +124,10 @@ app.use((req, res, next) => {
   res.locals.navItems = pathName === "/items" || pathName.startsWith("/items/");
   res.locals.navCheckin = pathName.startsWith("/owned");
   res.locals.navReport = pathName.startsWith("/report");
-  res.locals.navLogs = pathName.startsWith("/logs"); //
-  res.locals.navUsers = pathName.startsWith("/users"); //
-  res.locals.navKeys = pathName.startsWith("/keys"); //
+  res.locals.navLogs = pathName.startsWith("/logs"); 
+  // admin only
+  res.locals.navUsers = pathName.startsWith("/users"); 
+  res.locals.navKeys = pathName.startsWith("/keys"); 
 
   res.locals.config = config;
   next();
@@ -131,7 +136,8 @@ app.use((req, res, next) => {
 
 // ---------- API -----------------
 const apiApp = express();
-// apiApp.use(cors(corsOptions));
+apiApp.use(cors(corsOptions));
+apiApp.disable("x-powered-by");
 apiApp.use(express.json());
 apiApp.use(express.urlencoded({ extended: false }));
 apiApp.use(cookieParser());
@@ -147,10 +153,28 @@ app.use("/", publicRoutes);
 app.use((error, req, res, next) => {
   console.error(error);
 
-  return res.status(500).render("extra_pages/500", {
-    layout: "no_nav_bar",
-    pageTitle: "500",
-    message: error.message || "Internal Server Error",
+  const isApi = req.originalUrl.startsWith("/api");
+  const isBrowser = req.headers.accept?.includes("text/html");
+
+  if (isApi) {
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message,
+    });
+  }
+
+  if (isBrowser) {
+    return res.status(500).render("extra_pages/500", {
+      layout: "no_nav_bar",
+      pageTitle: "500",
+      message: error.message || "Internal Server Error",
+    });
+  }
+
+  // fallback (Postman / curl without Accept header)
+  return res.status(500).json({
+    error: "Internal Server Error",
+    message: error.message,
   });
 });
 
@@ -169,7 +193,7 @@ async function startServer() {
         console.log(`Database provider: ${dbProvider.providerLabel}`);
       } else {
         console.log(`Using ${config.NODE_ENV} environment`);
-        console.log(`  Both Admin & Public : http://${config.BASE_URL}`);
+        console.log(`  Both Admin & Public : ${config.BASE_URL}`);
         console.log(`Database provider: ${dbProvider.providerLabel}`);
       }
     });

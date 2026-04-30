@@ -5,10 +5,11 @@ const multiparty = require("multiparty");
 const fs = require("fs");
 const path = require("path");
 
+// POST /users/create
 exports.adminCreateUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    // Use your existing service (Reuse is good!)
+    // Use your existing service 
     await userService.registerNewUser(name, email, password, role);
     return res.redirect("/users?success=User+created+successfully");
   } catch (error) {
@@ -17,6 +18,7 @@ exports.adminCreateUser = async (req, res) => {
   }
 };
 
+// GET /users
 exports.listUsers = async (req, res) => {
   const users = await userService.getAllUsers();
   const error = req.query.error || null;
@@ -29,6 +31,7 @@ exports.listUsers = async (req, res) => {
   }); // changed from Manage Users -> Users for consistency
 };
 
+// POST /users/:id/status
 exports.toggleStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -45,6 +48,7 @@ exports.toggleStatus = async (req, res) => {
   }
 };
 
+// POST /users/:id/role
 exports.changeRole = async (req, res) => {
   try {
     const { id } = req.params;
@@ -61,6 +65,7 @@ exports.changeRole = async (req, res) => {
 // POST CHECKOUT
 exports.adminCheckout = async (req, res, next) => {
   try {
+    // form 
     const { fields, files } = await new Promise((resolve, reject) => {
       const form = new multiparty.Form();
 
@@ -70,6 +75,7 @@ exports.adminCheckout = async (req, res, next) => {
       });
     });
 
+    // get data
     const itemId = fields.itemId?.[0];
     const duration = fields.duration?.[0];
     const userEmail = fields.userEmail?.[0];
@@ -119,6 +125,7 @@ exports.adminCheckout = async (req, res, next) => {
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
 
+    // checkout 
     await itemService.checkoutItem({
       itemId,
       userId,
@@ -132,9 +139,10 @@ exports.adminCheckout = async (req, res, next) => {
   }
 };
 
-// POST CHECKOUT
+// POST CHECKIN
 exports.adminCheckin = async (req, res, next) => {
   try {
+    // form 
     const { fields, files } = await new Promise((resolve, reject) => {
       const form = new multiparty.Form();
 
@@ -144,11 +152,12 @@ exports.adminCheckin = async (req, res, next) => {
       });
     });
 
+    // get data 
     const itemId = fields.itemId?.[0];
     const userEmail = fields.userEmail?.[0];
     const adminId = req.user.id;
 
-    // validate checkout
+    // validate checkin
     const userId = await adminService.adminValidateForCheck(
       userEmail,
       adminId,
@@ -186,12 +195,13 @@ exports.adminCheckin = async (req, res, next) => {
       const allowedExtensions = new Set([".pdf", ".doc", ".docx"]);
 
       if (!allowedExtensions.has(ext) || !allowedMimeTypes.has(mimeType)) {
-        return res.redirect("/items?error=Only+PDF+or+Word+files+allowed");
+        return res.redirect("/report?error=Only+PDF+or+Word+files+allowed");
       }
 
       filePath = await itemService.uploadDBFile(fileName, fileBuffer, mimeType);
     }
 
+    // checkin
     await itemService.checkinItem({
       itemId,
       userId,

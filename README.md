@@ -48,7 +48,7 @@ This is a full-stack backend application built with **Express.js** that provides
    npm start
    ```
 
-The application will be available at `http://localhost:3000` (or your configured port/domain).
+The application will be available at `http://localhost:3000` (or your configured port/domain/base_url).
 
 ## ⚙️ Configuration
 
@@ -85,6 +85,7 @@ The application supports two database backends:
 - Set `DB_PROVIDER=supabase`
 - Provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
 - Full PostgreSQL support with Supabase Auth integration
+- **Note:** Supabase is deprecated and is no longer updated to match current production build (the design is left here in case anyone wants to build upon it)
 
 ## 📁 Project Structure
 
@@ -126,7 +127,6 @@ backend-final-project-group-6/
 │   ├── layouts/                    # Layout templates
 │   └── partials/                   # Reusable partial components
 ├── public/                         # Static assets (CSS, JS, images)
-├── test/                           # Test files
 ├── package.json                    # Dependencies & scripts
 └── .env.example                    # Environment variable template
 ```
@@ -149,7 +149,7 @@ backend-final-project-group-6/
 #### Role-Based Access Control (RBAC)
 - **User Roles**
   - `Admin` - Full system access, user/key management
-  - `Standard` - Regular user, item access
+  - `Technician` - Regular user, item access
 - **Protected Routes** - All sensitive endpoints require authentication
 - **Role Enforcement** - Admin-only routes check role status
 
@@ -192,7 +192,7 @@ Built with **Express Handlebars** templating:
 - Responsive HTML pages for all major features
 - Dynamic navigation based on user roles
 - Form handling for create/update operations
-- Error pages (404, 500)
+- Error pages (403, 404, 500)
 
 ### 5. **API Interface**
 
@@ -228,7 +228,7 @@ DELETE /items/:id                  - Delete item (Admin)
 POST   /transactions/checkin       - Check in item
 POST   /transactions/checkout      - Check out item
 POST   /transactions/adminCheckout - Admin force checkout
-POST   /transactions/adminCheckin - Admin force checkout
+POST   /transactions/adminCheckin  - Admin force checkout
 ```
 
 ### Admin - Users
@@ -263,7 +263,7 @@ GET    /files/:bucket/:id          - Reference/Image file
 ## API Endpoints
 ### Authentication
 ```
-POST /api/login                    - Authenticate a user and receive a JSON Web Token (JWT).
+POST /api/login                    - Authenticate user and returns JWT token
 ```
 **Body:** { email, password }  
 **Returns:** JWT token  
@@ -290,9 +290,7 @@ GET /api/users - Get all users
 ### CORS Whitelist
 Configure allowed origins in `app.js`:
 - `http://localhost:3000`
-- `http://127.0.0.1:3000`
-- `http://localhost:5173`
-- `https://websitename.com` (update for production)
+- `https://backend-final-project-group-6.onrender.com/` 
 
 ## 🧪 Testing
 
@@ -320,6 +318,7 @@ Tests are located in the `test/` directory.
 - **express-rate-limit** - Rate limiting
 - **dotenv** - Environment variables
 - **multiparty** - File upload parsing
+- **bcryptjs** - Image optimization by converting to webp
 
 ### Development
 - **nodemon** - Auto-reload development server
@@ -434,7 +433,7 @@ Both database providers implement the same interface (see `databaseProvider.js`)
 - File: `data/SupabaseProvider.js`
 - Uses PostgreSQL backend
 - Includes auth integration
-- Note: Supabase is deprecated and is no longer updated (the design is left here in case anyone wants to build upon it)
+- **Note:** Supabase is deprecated and is no longer updated (the design is left here in case anyone wants to build upon it)
 
 ## 📄 License
 
