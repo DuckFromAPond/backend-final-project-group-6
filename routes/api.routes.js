@@ -33,7 +33,6 @@ router.patch(
   apiController.updateUserStatus,
 );
 
-
 // keys
 router.get("/keys", apiProtect, requireRoleAPI("Admin"), apiController.getKeys);
 router.post(
@@ -49,12 +48,9 @@ router.delete(
   apiController.revokeKey,
 );
 
-
 // CHECKIN / CHECKOUT
-router.post('/transactions/checkout', apiProtect, apiController.apiCheckout);
-router.post('/transactions/checkin', apiProtect, apiController.apiCheckin);
-
-
+router.post("/transactions/checkout", apiProtect, apiController.apiCheckout);
+router.post("/transactions/checkin", apiProtect, apiController.apiCheckin);
 
 // API ROUTES FOR ITEMS
 router.get("/items", authOrApiKey, apiController.showItems);

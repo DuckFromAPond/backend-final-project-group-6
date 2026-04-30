@@ -440,6 +440,181 @@ curl -X DELETE http://localhost:3000/api/keys/[KEY_ID] \
 
 ---
 
+### Item Management
+
+#### Get All Items
+
+Retrieves a list of all items along with available categories and statuses.
+
+- **Endpoint:** `GET /api/items`
+- **Inputs:** None
+- **Outputs:** List of items, categories, and statuses.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X GET http://localhost:3000/api/items \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X GET http://localhost:3000/api/items \
+     -H "Authorization: Bearer [your_token]"
+```
+
+---
+
+#### Get Item by ID
+
+Retrieves details of a specific item including its statuses and retirement state.
+
+- **Endpoint:** `GET /api/items/[ITEM_ID]`
+- **Inputs:** `ITEM_ID` (URL Parameter)
+- **Outputs:** Item object with full details.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X GET http://localhost:3000/api/items/[ITEM_ID] \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X GET http://localhost:3000/api/items/[ITEM_ID] \
+     -H "Authorization: Bearer [your_token]"
+```
+
+---
+
+#### Get Item History
+
+Retrieves the borrowing/assignment history of a specific item.
+
+- **Endpoint:** `GET /api/items/[ITEM_ID]/history`
+- **Inputs:** `ITEM_ID` (URL Parameter)
+- **Outputs:** Item details and its history records.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X GET http://localhost:3000/api/items/[ITEM_ID]/history \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X GET http://localhost:3000/api/items/[ITEM_ID]/history \
+     -H "Authorization: Bearer [your_token]"
+```
+
+---
+
+#### Create Item
+
+Adds a new item to the inventory. Serial number must be unique.
+
+- **Endpoint:** `POST /api/items`
+- **Inputs:** `name`, `description`, `brand`, `model`, `category`, `subCategory`, `serial`, `status`, `dateAcquired`, `image` (all `multipart/form-data`)
+- **Outputs:** Success confirmation and the created item object.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X POST http://localhost:3000/api/items \
+     -H "X-API-Key: [your_api_key]" \
+     -F "name=Mac Mini M2" \
+     -F "description=Apple Mac Mini with M2 chip" \
+     -F "brand=Apple" \
+     -F "model=Mac Mini M2" \
+     -F "category=Computers" \
+     -F "subCategory=Desktop" \
+     -F "serial=[unique_serial]" \
+     -F "status=Available" \
+     -F "dateAcquired=2023-11-05" \
+     -F "image=@images/image_1.png"
+```
+
+> `category` accepts: `Computers`, `Peripherals`  
+> `subCategory` accepts: `Laptop`, `Desktop`, `Server`, `Monitor`, `Keyboard`, `Mouse`, `Scanner`, `Printer`  
+> `status` accepts: `Available`, `Maintenance`
+
+---
+
+#### Edit Item
+
+Updates an existing item. All fields are required. Items with status `In-Use` cannot be edited.
+
+- **Endpoint:** `PUT /api/items/[ITEM_ID]`
+- **Inputs:** `ITEM_ID` (URL Parameter) and all item fields (same as Create) (`multipart/form-data`)
+- **Outputs:** Success confirmation and the updated item object.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X PUT http://localhost:3000/api/items/[ITEM_ID] \
+     -H "X-API-Key: [your_api_key]" \
+     -F "name=Mac Mini M2" \
+     -F "description=Apple Mac Mini with M2 chip" \
+     -F "brand=Apple" \
+     -F "model=Mac Mini M2" \
+     -F "category=Computers" \
+     -F "subCategory=Desktop" \
+     -F "serial=[unique_serial]" \
+     -F "status=Available" \
+     -F "dateAcquired=2023-11-05" \
+     -F "image=@images/image_1.png"
+```
+
+---
+
+#### Delete Item
+
+Retires an item from the inventory (sets status to `Retired`).
+
+- **Endpoint:** `DELETE /api/items/[ITEM_ID]`
+- **Inputs:** `ITEM_ID` (URL Parameter)
+- **Outputs:** Success confirmation and the retired item object.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X DELETE http://localhost:3000/api/items/[ITEM_ID] \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X DELETE http://localhost:3000/api/items/[ITEM_ID] \
+     -H "Authorization: Bearer [your_token]"
+```
+
+### Transaction
+
+Both endpoints require a logged-in user JWT token. API keys are **not accepted**.
+
+---
+
+#### Checkout Item
+
+Borrows an item for a specified duration.
+
+- **Endpoint:** `POST /api/transactions/checkout`
+- **Inputs:** `itemId`, `duration` (days), `document` (PDF or Word file) — `multipart/form-data`
+- **Outputs:** Success confirmation and transaction record.
+- **Auth:** JWT only
+
+```bash
+curl -X POST http://localhost:3000/api/transactions/checkout \
+     -H "Authorization: Bearer [your_jwt_token]" \
+     -F "itemId=[ITEM_ID]" \
+     -F "duration=7" \
+     -F "document=@/path/to/reference.pdf"
+```
+
+---
+
+#### Checkin Item
+
+Returns a previously checked-out item.
+
+- **Endpoint:** `POST /api/transactions/checkin`
+- **Inputs:** `itemId`, `document` (PDF or Word file) — `multipart/form-data`
+- **Outputs:** Success confirmation and transaction record.
+- **Auth:** JWT only
+
+```bash
+curl -X POST http://localhost:3000/api/transactions/checkin \
+     -H "Authorization: Bearer [your_jwt_token]" \
+     -F "itemId=[ITEM_ID]" \
+     -F "document=@/path/to/reference.pdf"
+```
+
+> **Document field requirements:** `.pdf`, `.doc`, `.docx` only — max 20MB
+
 ## Security Features
 
 - **Password Hashing** - bcryptjs for secure password storage
