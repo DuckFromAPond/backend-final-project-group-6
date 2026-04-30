@@ -619,7 +619,7 @@ curl -X POST http://localhost:3000/api/transactions/checkin \
 ### Development
 - **nodemon** - Auto-reload development server
 
-## 🚀 Scripts
+## Scripts
 
 ```bash
 npm start          # Run production server
