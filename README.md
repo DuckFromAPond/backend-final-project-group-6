@@ -2,9 +2,10 @@
 
 A comprehensive inventory and asset management system with role-based access control, dual authentication methods (web + API), and multi-database support (MongoDB & Supabase).
 
-## 📋 Overview
+## Overview
 
 This is a full-stack backend application built with **Express.js** that provides:
+
 - **User Authentication & Authorization** - JWT-based login, registration, and role management
 - **Inventory Management** - Full CRUD operations for items with history tracking
 - **Check-in/Check-out System** - Track item transactions with timestamps
@@ -12,9 +13,10 @@ This is a full-stack backend application built with **Express.js** that provides
 - **Dual Interfaces** - Web UI (Handlebars templating) + RESTful API
 - **Multi-Database Support** - Switch between MongoDB and Supabase seamlessly
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
+
 - **Node.js** v18+ and npm
 - **MongoDB** (local or cloud URI) OR **Supabase** account with credentials
 - **Git** for version control
@@ -22,12 +24,14 @@ This is a full-stack backend application built with **Express.js** that provides
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/TANGHuyming/backend-final-project-group-6.git
    cd backend-final-project-group-6
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
@@ -35,11 +39,13 @@ This is a full-stack backend application built with **Express.js** that provides
 3. **Set up environment variables**
    - Copy `.env.example` to `.env`
    - Fill in your configuration (see [Configuration](#configuration) below)
+
    ```bash
    cp .env.example .env
    ```
 
 4. **Start the application**
+
    ```bash
    # Development (with hot-reload via nodemon)
    npm run dev
@@ -50,7 +56,7 @@ This is a full-stack backend application built with **Express.js** that provides
 
 The application will be available at `http://localhost:3000` (or your configured port/domain/base_url).
 
-## ⚙️ Configuration
+## Configuration
 
 Create a `.env` file in the project root with the following variables:
 
@@ -77,17 +83,19 @@ SESSION_SECRET=your-session-secret     # Secret for session management
 The application supports two database backends:
 
 #### MongoDB
+
 - Set `DB_PROVIDER=mongodb`
 - Provide a valid `MONGO_URI` (e.g., `mongodb://localhost:27017/inventory`)
 - Supports local MongoDB or MongoDB Atlas
 
 #### Supabase (PostgreSQL)
+
 - Set `DB_PROVIDER=supabase`
 - Provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
 - Full PostgreSQL support with Supabase Auth integration
 - **Note:** Supabase is deprecated and is no longer updated to match current production build (the design is left here in case anyone wants to build upon it)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 backend-final-project-group-6/
@@ -131,22 +139,25 @@ backend-final-project-group-6/
 └── .env.example                    # Environment variable template
 ```
 
-## 🔑 Key Features
+## Key Features
 
 ### 1. **Authentication & Authorization**
 
 #### Web Authentication
+
 - **Login** (`POST /login`) - JWT-based authentication
 - **Register** (`POST /register`) - Create new user accounts
 - **Logout** (`GET /logout`) - Clear session and JWT
 - **Rate Limiting** - Login attempts limited to prevent brute force
 
 #### API Authentication
+
 - **API Login** (`POST /api/login`) - Generate JWT for API use
 - **API Keys** - Generate and manage persistent API keys for long-lived access
 - **Header-based Auth** - `Authorization: Bearer <token>` for API requests
 
 #### Role-Based Access Control (RBAC)
+
 - **User Roles**
   - `Admin` - Full system access, user/key management
   - `Technician` - Regular user, item access
@@ -156,6 +167,7 @@ backend-final-project-group-6/
 ### 2. **Inventory Management**
 
 #### Items CRUD
+
 - **View Items** (`GET /items`) - List all items with optional filtering
 - **Item Details** (`GET /items/:id`) - View full item information
 - **Create Item** (`POST /items`) - Add new items to inventory
@@ -164,6 +176,7 @@ backend-final-project-group-6/
 - **Item History** (`GET /items/:id/history`) - View transaction history
 
 #### Transaction System
+
 - **Check-In** (`POST /transactions/checkin`) - User checks in an item
 - **Check-Out** (`POST /transactions/checkout`) - User checks out an item
 - **Admin Check-Out** (`POST /transactions/adminCheckout`) - Force check-out as Admin
@@ -172,16 +185,19 @@ backend-final-project-group-6/
 ### 3. **Admin Dashboard**
 
 #### User Management
+
 - **List Users** (`GET /users`) - View all system users
 - **Change Role** (`POST /users/:id/role`) - Promote/demote users
 - **Toggle Status** (`POST /users/:id/status`) - Enable/disable user accounts
 
 #### API Key Management
+
 - **List Keys** (`GET /keys`) - View active API keys
 - **Generate Key** (`POST /keys/generate`) - Create new API keys
 - **Revoke Key** (`POST /keys/revoke/:id`) - Deactivate API keys
 
 #### Reporting
+
 - **Dashboard** (`GET /`) - Home overview with user's activity
 - **Report Page** (`GET /report`) - Generate inventory reports
 - **Activity Logs** (`GET /logs`) - View system activity
@@ -189,6 +205,7 @@ backend-final-project-group-6/
 ### 4. **Web Interface**
 
 Built with **Express Handlebars** templating:
+
 - Responsive HTML pages for all major features
 - Dynamic navigation based on user roles
 - Form handling for create/update operations
@@ -197,14 +214,16 @@ Built with **Express Handlebars** templating:
 ### 5. **API Interface**
 
 RESTful API with JSON request/response:
+
 - All functionality accessible via `/api/*` routes
 - API key and JWT authentication
 - Proper HTTP status codes and error messages
 - Rate limiting on login endpoints
 
-## 📊 PUBLIC-facing Endpoints
+## PUBLIC-facing Endpoints
 
 ### Authentication
+
 ```
 POST   /login                      - Web login
 GET    /login                      - Show login form
@@ -214,6 +233,7 @@ GET    /logout                     - Clear session
 ```
 
 ### Items
+
 ```
 GET    /items                      - List all items
 GET    /items/:id                  - Get item details
@@ -224,6 +244,7 @@ DELETE /items/:id                  - Delete item (Admin)
 ```
 
 ### Transactions
+
 ```
 POST   /transactions/checkin       - Check in item
 POST   /transactions/checkout      - Check out item
@@ -232,6 +253,7 @@ POST   /transactions/adminCheckin  - Admin force checkout
 ```
 
 ### Admin - Users
+
 ```
 GET    /users                      - List all users (Admin)
 POST   /users/:id/role             - Change user role (Admin)
@@ -242,6 +264,7 @@ PATCH  /api/users/:id/status       - Toggle user status via API (Admin)
 ```
 
 ### Admin - API Keys
+
 ```
 GET    /keys                       - List API keys (Admin)
 POST   /keys/generate              - Generate new key (Admin)
@@ -251,6 +274,7 @@ DELETE /api/keys/:id               - Revoke key via API (Admin)
 ```
 
 ### Other
+
 ```
 GET    /                           - Dashboard home
 GET    /home                       - Home page
@@ -335,21 +359,52 @@ npm test           # Run tests
 
 ### User Management
 
+### Auth
+
 #### Login
+
+Authenticates a user and provides a session token.
+
+- **Endpoint:** `POST /api/login`
+- **Inputs:** `email` and `password` (JSON).
+- **Outputs:** A success message, a **JWT token** for session management, and a **user object** containing the `id`, `email`, and `role`.
+
 ```bash
 curl -X POST http://localhost:3000/api/login \
      -H "Content-Type: application/json" \
-     -d '{"email": "user@example.com", "password": "superStrongPassword"}'
+     -d '{"email": "admin@gmail.com", "password": "admin"}'
 ```
 
+---
+
+### User Management
+
 #### List Users (Admin)
+
+Retrieves a complete list of all users in the system.
+
+- **Endpoint:** `GET /api/users`
+- **Inputs:** None (requires Bearer Token in Header).
+- **Outputs:** A success flag, user count, and an array of **user objects** containing detailed profile and status information (id, email, name, role, status, createdAt, disabledAt).
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X GET http://localhost:3000/api/users \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer [your_token]"
 ```
 
+---
+
 #### Create User (Admin)
+
+Registers a new user account within the system.
+
+- **Endpoint:** `POST /api/users`
+- **Inputs:** `email`, `name`, `password`, and `role` (Admin/Technician).
+- **Outputs:** The newly created user object and a success status.
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X POST http://localhost:3000/api/users \
      -H "Content-Type: application/json" \
@@ -362,7 +417,17 @@ curl -X POST http://localhost:3000/api/users \
      }'
 ```
 
+---
+
 #### Update User Role (Admin)
+
+Modifies the access level assigned to a specific user.
+
+- **Endpoint:** `PATCH /api/users/[USER_ID]/role`
+- **Inputs:** `role` (Admin/Technician) (JSON) and `USER_ID` (URL Parameter).
+- **Outputs:** Success confirmation and the updated user object.
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X PATCH http://localhost:3000/api/users/[USER_ID]/role \
      -H "Content-Type: application/json" \
@@ -372,7 +437,17 @@ curl -X PATCH http://localhost:3000/api/users/[USER_ID]/role \
      }'
 ```
 
+---
+
 #### Update User Status (Admin)
+
+Changes a user's account status (e.g., to "Disabled" or "Active").
+
+- **Endpoint:** `PATCH /api/users/[USER_ID]/status`
+- **Inputs:** `status` (Disabled/Active) and `USER_ID` (URL Parameter).
+- **Outputs:** Success confirmation and updated status details.
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X PATCH http://localhost:3000/api/users/[USER_ID]/status \
      -H "Content-Type: application/json" \
@@ -382,31 +457,289 @@ curl -X PATCH http://localhost:3000/api/users/[USER_ID]/status \
      }'
 ```
 
+---
+
 ### Key Management
 
 #### List API Keys (Admin)
+
+Retrieves all generated API keys in the system.
+
+- **Endpoint:** `GET /api/keys`
+- **Inputs:** None (requires Admin Bearer Token in Header).
+- **Outputs:** A success flag and an array containing all API key objects.
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X GET http://localhost:3000/api/keys \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer [your_token]"
 ```
 
+---
+
 #### Create API Key (Admin)
+
+Generates a new API key for a specific user. **Note:** This is the only time the raw key is visible.
+
+- **Endpoint:** `POST /api/keys`
+- **Inputs:** `name` (label for the key) and `userId` (the owner of the key).
+- **Outputs:** A success flag and the `raw` API key string.
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X POST http://localhost:3000/api/keys \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer [your_token]" \
-     -d '{"name": "John Doe", "userId": "123"}'
+     -d '{"name": "My Key", "userId": "123"}'
 ```
 
+---
+
 #### Revoke API Key (Admin)
+
+Permanently deletes/invalidates an existing API key.
+
+- **Endpoint:** `DELETE /api/keys/[KEY_ID]`
+- **Inputs:** `KEY_ID` (URL Parameter).
+- **Outputs:** A success flag and a confirmation message.
+- **Role Requirement:** Admin-only
+
 ```bash
 curl -X DELETE http://localhost:3000/api/keys/[KEY_ID] \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer [your_token]"
 ```
 
-## 🐛 Known Issues & TODOs
+---
+
+### Item Management
+
+#### Get All Items
+
+Retrieves a list of all items along with available categories and statuses.
+
+- **Endpoint:** `GET /api/items`
+- **Inputs:** None
+- **Outputs:** List of items, categories, and statuses.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X GET http://localhost:3000/api/items \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X GET http://localhost:3000/api/items \
+     -H "Authorization: Bearer [your_token]"
+```
+
+---
+
+#### Get Item by ID
+
+Retrieves details of a specific item including its statuses and retirement state.
+
+- **Endpoint:** `GET /api/items/[ITEM_ID]`
+- **Inputs:** `ITEM_ID` (URL Parameter)
+- **Outputs:** Item object with full details.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X GET http://localhost:3000/api/items/[ITEM_ID] \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X GET http://localhost:3000/api/items/[ITEM_ID] \
+     -H "Authorization: Bearer [your_token]"
+```
+
+---
+
+#### Get Item History
+
+Retrieves the borrowing/assignment history of a specific item.
+
+- **Endpoint:** `GET /api/items/[ITEM_ID]/history`
+- **Inputs:** `ITEM_ID` (URL Parameter)
+- **Outputs:** Item details and its history records.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X GET http://localhost:3000/api/items/[ITEM_ID]/history \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X GET http://localhost:3000/api/items/[ITEM_ID]/history \
+     -H "Authorization: Bearer [your_token]"
+```
+
+---
+
+#### Create Item
+
+Adds a new item to the inventory. Serial number must be unique.
+
+- **Endpoint:** `POST /api/items`
+- **Inputs:** `name`, `description`, `brand`, `model`, `category`, `subCategory`, `serial`, `status`, `dateAcquired`, `image` (all `multipart/form-data`)
+- **Outputs:** Success confirmation and the created item object.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X POST http://localhost:3000/api/items \
+     -H "X-API-Key: [your_api_key]" \
+     -F "name=Mac Mini M2" \
+     -F "description=Apple Mac Mini with M2 chip" \
+     -F "brand=Apple" \
+     -F "model=Mac Mini M2" \
+     -F "category=Computers" \
+     -F "subCategory=Desktop" \
+     -F "serial=[unique_serial]" \
+     -F "status=Available" \
+     -F "dateAcquired=2023-11-05" \
+     -F "image=@images/image_1.png"
+```
+
+> `category` accepts: `Computers`, `Peripherals`  
+> `subCategory` accepts: `Laptop`, `Desktop`, `Server`, `Monitor`, `Keyboard`, `Mouse`, `Scanner`, `Printer`  
+> `status` accepts: `Available`, `Maintenance`
+
+---
+
+#### Edit Item
+
+Updates an existing item. All fields are required. Items with status `In-Use` cannot be edited.
+
+- **Endpoint:** `PUT /api/items/[ITEM_ID]`
+- **Inputs:** `ITEM_ID` (URL Parameter) and all item fields (same as Create) (`multipart/form-data`)
+- **Outputs:** Success confirmation and the updated item object.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X PUT http://localhost:3000/api/items/[ITEM_ID] \
+     -H "X-API-Key: [your_api_key]" \
+     -F "name=Mac Mini M2" \
+     -F "description=Apple Mac Mini with M2 chip" \
+     -F "brand=Apple" \
+     -F "model=Mac Mini M2" \
+     -F "category=Computers" \
+     -F "subCategory=Desktop" \
+     -F "serial=[unique_serial]" \
+     -F "status=Available" \
+     -F "dateAcquired=2023-11-05" \
+     -F "image=@images/image_1.png"
+```
+
+---
+
+#### Delete Item
+
+Retires an item from the inventory (sets status to `Retired`).
+
+- **Endpoint:** `DELETE /api/items/[ITEM_ID]`
+- **Inputs:** `ITEM_ID` (URL Parameter)
+- **Outputs:** Success confirmation and the retired item object.
+- **Auth:** API Key or Admin JWT
+
+```bash
+curl -X DELETE http://localhost:3000/api/items/[ITEM_ID] \
+     -H "X-API-Key: [your_api_key]"
+# or
+curl -X DELETE http://localhost:3000/api/items/[ITEM_ID] \
+     -H "Authorization: Bearer [your_token]"
+```
+
+### Transaction
+
+Both endpoints require a logged-in user JWT token. API keys are **not accepted**.
+
+---
+
+#### Checkout Item
+
+Borrows an item for a specified duration.
+
+- **Endpoint:** `POST /api/transactions/checkout`
+- **Inputs:** `itemId`, `duration` (days), `document` (PDF or Word file) — `multipart/form-data`
+- **Outputs:** Success confirmation and transaction record.
+- **Auth:** JWT only
+
+```bash
+curl -X POST http://localhost:3000/api/transactions/checkout \
+     -H "Authorization: Bearer [your_jwt_token]" \
+     -F "itemId=[ITEM_ID]" \
+     -F "duration=7" \
+     -F "document=@/path/to/reference.pdf"
+```
+
+---
+
+#### Checkin Item
+
+Returns a previously checked-out item.
+
+- **Endpoint:** `POST /api/transactions/checkin`
+- **Inputs:** `itemId`, `document` (PDF or Word file) — `multipart/form-data`
+- **Outputs:** Success confirmation and transaction record.
+- **Auth:** JWT only
+
+```bash
+curl -X POST http://localhost:3000/api/transactions/checkin \
+     -H "Authorization: Bearer [your_jwt_token]" \
+     -F "itemId=[ITEM_ID]" \
+     -F "document=@/path/to/reference.pdf"
+```
+
+> **Document field requirements:** `.pdf`, `.doc`, `.docx` only — max 20MB
+
+## Security Features
+
+- **Password Hashing** - bcryptjs for secure password storage
+- **JWT Tokens** - Stateless authentication with signed tokens
+- **CORS Protection** - Whitelist-based origin validation
+- **Rate Limiting** - Prevents brute force on login endpoints
+- **Role-Based Access** - Fine-grained authorization per endpoint
+- **Secure Headers** - Disables `X-Powered-By` header
+- **Cookie Security** - HTTP-only cookies for sessions
+
+### CORS Whitelist
+
+Configure allowed origins in `app.js`:
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `http://localhost:5173`
+- `https://websitename.com` (update for production)
+
+## Dependencies
+
+### Core
+
+- **express** - Web framework
+- **mongoose** - MongoDB ODM
+- **@supabase/supabase-js** - Supabase client
+- **express-handlebars** - Template engine
+- **jsonwebtoken** - JWT authentication
+- **bcryptjs** - Password hashing
+
+### Middleware & Utils
+
+- **cors** - Cross-origin resource sharing
+- **cookie-parser** - Cookie parsing
+- **morgan** - HTTP request logging
+- **express-rate-limit** - Rate limiting
+- **dotenv** - Environment variables
+- **multiparty** - File upload parsing
+
+### Development
+
+- **nodemon** - Auto-reload development server
+
+## Scripts
+
+```bash
+npm start          # Run production server
+npm run dev        # Run development server with hot-reload
+npm test           # Run tests
+```
+
+## Known Issues & TODOs
 
 - [ ] Report page integration incomplete (needs frontend work)
 - [ ] Admin routes file commented out (functionality in public.routes.js)
@@ -414,39 +747,42 @@ curl -X DELETE http://localhost:3000/api/keys/[KEY_ID] \
 - [ ] CloudFlare hosting configuration needed
 - [ ] API checkout/checkin endpoints commented out (routes/api.routes.js)
 
-## 📝 Environment Notes
+## Environment Notes
 
 - **Node.js v22** - Requires DNS workaround for MongoDB connections
 - **Development** - Uses `nodemon` for auto-reload on file changes
 - **Database Switching** - Change `DB_PROVIDER` environment variable to switch providers
 
-## 🔧 Database Providers
+## Database Providers
 
 Both database providers implement the same interface (see `databaseProvider.js`):
 
 ### MongoDB Provider
+
 - File: `data/MongoDBProvider.js`
 - Uses Mongoose for schema management
 - Supports local and Atlas deployments
 
 ### Supabase Provider
+
 - File: `data/SupabaseProvider.js`
 - Uses PostgreSQL backend
 - Includes auth integration
 - **Note:** Supabase is deprecated and is no longer updated (the design is left here in case anyone wants to build upon it)
 
-## 📄 License
+## License
 
 ISC License
 
-## 👥 Repository
+## Repository
 
 - **GitHub**: https://github.com/TANGHuyming/backend-final-project-group-6
 - **Issues**: https://github.com/TANGHuyming/backend-final-project-group-6/issues
 
-## 📞 Support
+## Support
 
 For issues or questions:
+
 1. Check the [Known Issues](#-known-issues--todos) section
 2. Review the code comments in `app.js` and routes
 3. Open an issue on GitHub
