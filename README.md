@@ -280,8 +280,14 @@ GET    /logs                       - Activity logs
 GET    /files/:bucket/:id          - Reference/Image file
 ```
 
-## API Examples
-the following uses the development build as an example, please use the production links for live testing: 
+## API Endpoints
+### Authentication
+```
+POST /api/login                    - Authenticate user and returns JWT token
+```
+**Body:** { email, password }  
+**Returns:** JWT token  
+**Protection:** rate limiter (429 if exceeded 20 continuous repeated requests)
 
 - https://backend-final-project-group-6.onrender.com
 - https://backend-final-project-group-6.up.railway.app (alternative railway deployment)
@@ -290,7 +296,10 @@ the following uses the development build as an example, please use the productio
 
 #### Login
 
-Authenticates a user and provides a session token.
+### CORS Whitelist
+Configure allowed origins in `app.js`:
+- `http://localhost:3000`
+- `https://backend-final-project-group-6.onrender.com/` 
 
 - **Endpoint:** `POST /api/login`
 - **Inputs:** `email` and `password` (JSON).
