@@ -996,10 +996,10 @@ exports.logs = async (req, res, next) => {
 exports.notFound = (req, res) => {
   const isAuthRoute =
     req.path.startsWith("/login") ||
-    req.path.startsWith("/register");
+    req.path.startsWith("/register") || (!req.user);
 
   res.status(404).render("extra_pages/404", {
-    layout: isAuthRoute ? false : "main",
+    layout: isAuthRoute ? "no_nav_bar" : "main",
     message: "The page you are looking for does not exist.",
     pageTitle: "404",
   });
