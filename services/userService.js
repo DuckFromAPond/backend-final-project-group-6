@@ -118,7 +118,7 @@ exports.updateUserStatus = async (userId, newStatus, ownedItems) => {
     throw err;
   }
 
-  return user;
+  return await db.updateUser(userId, { status: newStatus });
 };
 
 exports.getDBUserById = async (selectedUserId) => {

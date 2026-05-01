@@ -250,7 +250,7 @@ class MongoProvider extends DatabaseProvider {
 
     // business rule: revoke API keys
     if (user.status === "Disabled") {
-      await ApiKey.updateMany({ adminId: userId }, { revoked: true });
+      await ApiKey.updateMany({ userId: userId }, { revoked: true });
     }
 
     return this.mapUser(user.toObject());
