@@ -85,6 +85,8 @@ const corsOptions = {
 
 // configurations for public app ───────────────────────────────────
 const app = express();
+app.set("trust proxy", 1);
+
 app.engine(
   "handlebars",
   engine({
@@ -136,6 +138,8 @@ app.use((req, res, next) => {
 
 // ---------- API -----------------
 const apiApp = express();
+app.set("trust proxy", 1);
+
 apiApp.use(cors(corsOptions));
 apiApp.disable("x-powered-by");
 apiApp.use(express.json());
